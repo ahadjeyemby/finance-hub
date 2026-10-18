@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/audit/ledger.schema.json",
+  "title": "Audit ledger",
+  "description": "The file the app imports as src/data/seed/ledger.json. Built by scripts/build-ledger.ts. Sign convention: cents is from the account holder's point of view (negative = money left, positive = money came in).",
+  "type": "object",
+  "required": ["accounts", "txns"],
+  "properties": {
+    "builtFrom": { "type": "string", "description": "Where the rows came from, for the audit trail." },
+    "accounts": { "type": "array", "items": { "$ref": "#/$defs/account" } },
+    "txns": { "type": "array", "items": { "$ref": "#/$defs/txn" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "isoDate": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "category": {
+      "enum": ["groceries", "household", "clothing", "fuel", "restaurants", "medical", "auto", "insurance", "phone", "subscriptions", "travel", "education", "giving", "personal_care", "online_shopping", "mixed_retail", "electronics", "entertainment", "government", "people", "other", "uncategorized"]
+    },
+    "account": {
+      "type": "object",
+      "required": ["id", "name", "institution", "type", "last4", "coverage"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "institution": { "type": "string" },
+        "type": { "enum": ["checking", "credit", "cash"] },
+        "last4": { "type": "string", "pattern": "^(\\d{4})?$", "description": "Empty when the account has no number." },
+        "coverage": {
+          "type": "object",
+          "required": ["from", "to"],
+          "properties": { "from": { "$ref": "#/$defs/isoDate" }, "to": { "$ref": "#/$defs/isoDate" } },
+          "additionalProperties": false,
+          "description": "First and last day (inclusive) for which complete statements are held."
+        },
+        "incomeComplete": { "type": "boolean", "description": "false when deposits may be missing because other accounts exist." }
+      },
+      "additionalProperties": false
+    },
+    "txn": {
+      "type": "object",
+      "required": ["id", "accountId", "date", "description", "merchant", "cents", "kind", "source"],
+      "properties": {
+        "id": { "type": "string", "description": "Stable: account:date:cents:description-slug (with #n for repeats). Re-importing never duplicates." },
+        "accountId": { "type": "string" },
+        "date": { "$ref": "#/$defs/isoDate" },
+        "description": { "type": "string", "description": "Raw bank description." },
+        "merchant": { "type": "string", "description": "Cleaned name." },
+        "cents": { "type": "integer" },
+        "kind": {
+          "enum": ["spend", "fee", "refund", "income", "rewards", "transfer"],
+          "description": "transfer = card payments and moves between your own accounts: never spending, never income."
+        },
+        "subtype": { "type": "string", "description": "transfer: card_payment | internal. income: salary | other | unconfirmed." },
+        "category": { "$ref": "#/$defs/category" },
+        "subcategory": { "type": "string" },
+        "business": { "type": "boolean" },
+        "oneOff": { "type": "boolean" },
+        "pairId": { "type": "string", "description": "id of the matching leg of a transfer on another account." },
+        "source": { "type": "string", "description": "Statement or file the row came from." },
+        "ref": { "type": "string", "description": "Order number etc., so a receipt can be attached later." },
+        "note": { "type": "string" },
+        "hints": {
+          "type": "array",
+          "items": { "enum": ["needs_items", "unknown_merchant", "person_payment", "confirm_income", "confirm_transfer_account", "business_or_personal", "large_one_off"] },
+          "description": "Machine hints that drive the question inbox."
+        },
+        "manual": { "type": "boolean" },
+        "receiptId": { "type": "string" },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["item", "cents"],
+            "properties": { "item": { "type": "string" }, "cents": { "type": "integer" }, "category": { "$ref": "#/$defs/category" } },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

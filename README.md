@@ -1,56 +1,165 @@
-# Welcome to your Expo app 👋
+# Audit
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A personal finance audit app for phone and web (Expo, React Native). It reads your statements, receipts and cash entries, then shows what you earned, where the money went, what comes next month, and asks questions whenever something is unclear.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it
 
 ```bash
-npm run reset-project
+bun install
+bunx expo start         # press w for web, or scan the QR code with Expo Go
+bun run build:web       # static web build in dist/
+bun run test            # unit tests for the money logic
+bun run typecheck && bun run lint
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+This project uses [Bun](https://bun.sh) (1.4.3, see `.bun-version`) as its package manager, with one lockfile, `bun.lock`. Metro, the Expo dev server and the tests still run on Node. npm and pnpm work too if you delete `bun.lock` first and keep a single lockfile (pnpm needs `node-linker=hoisted`).
 
-### Other setup steps
+Node: `.nvmrc` says 26. Expo SDK 58 accepts 22.13+, 24.3+ and 26; typecheck, lint, tests and the web build pass on all three.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+### Versions held back on purpose
 
-## Learn more
+- React stays at 19.3.0, React Native at 0.88.0, AsyncStorage at 2.2.0 and react-native-svg at 15.16.0: Expo SDK 58 pins these exact versions and native builds are tested only against them. Use `npx expo install --check` to see the list.
+- TypeScript stays on 6.0.x: TypeScript 7 typechecks this project, but typescript-eslint cannot load, so lint breaks.
+- ESLint stays on 9.x: eslint-config-expo's React plugin crashes on ESLint 10.
+- `bun run lint` calls ESLint directly. `bunx expo lint` 58.0.14 reports false import errors here.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Privacy and sample data
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+This repository holds no real financial data, and the app bundles none. It reads your ledger only from your own Supabase project. Without one it shows "Data is not available" and never fake numbers. A fictional sample ledger (`src/data/seed/ledger.sample.json`, rebuilt by `bun run sample`) exists only for the tests and for `bun run ledger:upload --sample`.
 
-## Join the community
+Your own statements, ledger, receipts, account list and merchant rules live in git-ignored files (`seed/`, `src/data/seed/merchant-rules.json`, `scripts/extract/`, `.env*`). A test fails if they stop being ignored. See [docs/DATA.md](docs/DATA.md) for the formats and the steps to load your own data.
 
-Join our community of developers creating universal apps.
+Two things to remember when you use real data:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Nothing private is bundled into the app, so a web build does not contain your ledger. Your data is protected by row level security and your sign-in, not by hiding the URL.
+- Edits you make (answers, cash entries, saved reports) are stored on the device and synced to your own Supabase project when connected.
+
+## How money is counted
+
+- Spending: purchases, bills and fees, minus refunds.
+- Never spending and never income: credit card payments and moves between your own accounts. Each card payment is matched to its bank withdrawal (same amount, within 6 days); unmatched ones are listed under Accounts and data.
+- Earned: deposits into checking or savings. Unconfirmed deposits count for now and are flagged until you answer in the Inbox.
+- Rewards: tracked apart from earned money.
+- Business: developer tools (GitHub, Heroku, Namecheap, Claude, OpenRouter, Upwork) are filed as business automatically. Use the Personal and Business switch to separate them. The forecast leaves business spending out.
+
+Every screen, report and assistant answer runs through one query engine (`src/core/queries.ts`), so a number never differs between screens.
+
+## Layout
+
+```
+src/core        pure TypeScript: ledger types, queries, forecast, questions, reports, agent, graph
+src/charts      react-native-svg charts (bars, lines, stack, donut, Year to Item graph)
+src/app/(tabs)  screens: Overview, Explore, Add, Inbox, Reports, plus Ledger, Forecast, Accounts, Prices, Ask, Cash, Import
+src/data        repository (ledger + local edits), assistant client
+examples        fictional statements that build the sample ledger
+docs            data formats and the ledger JSON Schema
+scripts         build the ledger from statement extracts, generate the sample
+supabase        optional backend: SQL schema with row level security, two edge functions
+tests           node:test suites
+```
+
+## Loading your own statements
+
+`bun run ledger` classifies the extracts in `seed/raw/`, pairs card payments with their bank withdrawals and writes `seed/ledger.json` (the transactions), `seed/ledger.raw.json` (the untouched source line behind each one) and `seed/transfer-audit.json`. Statement PDFs differ by bank, so extraction is not part of this repository: write any extractor you like that outputs the raw formats in [docs/DATA.md](docs/DATA.md) (keep it in the git-ignored `scripts/extract/`). Merchant rules: national brands are in `src/core/merchants.ts`, your own go in `src/data/seed/merchant-rules.json`.
+
+## Connect Supabase (sync and sign-in)
+
+Without these steps the app has no data source and shows "Data is not available".
+
+1. Create a project at supabase.com/dashboard.
+2. Create the tables: `supabase link --project-ref <your-project-ref>` then `supabase db push` (add `--dry-run` first to see what it will apply). This runs `0001_init.sql` (tables with row level security, private `receipts` bucket) and `0002_evidence.sql` (statements, source lines, receipt details, private `statements` bucket). Without the CLI, paste both files into the dashboard SQL Editor in order.
+3. Authentication > Users > Add user: your email and a password, with "Auto Confirm User" ticked. Then Authentication > Sign In / Providers > Email: turn off "Allow new users to sign up", so nobody else can create an account.
+4. Copy `.env.example` to `.env` and fill in the project URL and anon key (Project Settings > API).
+5. Load your data (next section), then restart with `bunx expo start --clear` and sign in. Until data is loaded the app says "Data is not available".
+
+How sync works: the ledger (accounts and statement rows) is read from the database and cached on the device. Your edits (answers, cash entries, saved reports, receipt items) are written locally first, then pushed about a second later. The app syncs when you sign in and when it returns to the foreground. If two devices edit while offline, the edits are merged and the second device wins on a direct conflict. An Undo made offline on one device can be undone by a stale copy from the other.
+
+Sign out clears the cached ledger and edits from the device.
+
+## Put your data in Supabase
+
+```bash
+bun run ledger                    # build seed/ledger.json from seed/raw/*.json
+bun run ledger:upload             # sign in as you and upload; asks for email and password
+bun run ledger:upload --wipe      # after rebuilding: delete your statement rows first, then upload
+bun run ledger:upload --dry-run   # check the file and the sign-in, send nothing
+bun run ledger:upload --files <dir>   # folder with the original PDFs and photos (default: the folder above this project)
+```
+
+The uploader signs in as your user with the anon key, so row level security applies and no service key is needed. It sends the ledger, then whatever evidence exists next to it: `seed/statements.json` (period, balances, printed totals, terms, rewards per statement), `seed/ledger.raw.json` (the source line behind each transaction) and `seed/receipts.json` (every item, SKU, tax, tip, payment and store detail). The original PDFs and photos named in those records go to private storage buckets. It ends by reading the database back and comparing counts and totals with the file. Re-running is safe; use `--wipe` after changing the ledger.
+
+Receipts are matched to a charge by order number, or by an identical amount within 4 days plus a shared store word, and only when exactly one charge qualifies. Anything else is reported as "NOT linked" and stays attached to nothing until you link it.
+
+In the app, tap a transaction to see its evidence: for a statement row, the statement it came from, the untouched source line and the original PDF; for a receipt, the items and the original image; for an entry you typed, when it was entered and when it was uploaded.
+
+
+## Import inside the app
+
+Add > Import statements or Import receipts. Choose one file or many (PDFs, photos, or a camera shot). In the web version, **Choose a folder** reads every PDF and image inside it, subfolders included. For every file the app:
+
+1. Fingerprints it (SHA-256). A file already stored is refused before it is read, so nothing is paid for twice.
+2. Has the model read everything printed on it (edge functions `ingest-statement` and `ingest-receipt`).
+3. **Checks the result before saving anything.** Missing details become questions you answer (or mark "not printed on it"). Numbers that disagree are named and must be fixed or confirmed: receipt items plus tax against the total, a statement's rows against its printed opening and closing balances (it points at a likely missing, duplicated or flipped row), rows dated outside the period, a period already stored.
+4. Saves only when nothing is left open. Statements go through the same classifier and stable ids as the desktop script, card payments are paired with the bank side, and the original PDF and every source line are kept. Receipts are linked to their charge when exactly one matches; if several match you choose, and if none matches you keep it as evidence or make it a cash purchase.
+
+### Bulk imports
+
+- **Queue.** Files are read three at a time with a progress bar. Stop and resume at any point. A rate limit or timeout is retried (up to three tries, with a wait); a file the model cannot read is reported and can be typed in by hand.
+- **Before any model call.** Junk in a folder (`.DS_Store`, text files, unsupported types) is skipped and named. Identical files, in the folder or already stored, are skipped by fingerprint. If you are adding receipts and a path says `Statements` (or the reverse), those files are left out and the screen says so. This is a guess from folder and file names, so a path that mentions both is not guessed.
+- **One line per file.** From four files up, each file is one row: store or account, date, amount, and what is still missing. Filters: Needs answers, Ready, Problems, Saved. Open a row to answer questions or edit it.
+- **Save all ready** saves only rows with nothing open, one at a time, statements before receipts, so receipts can link to charges the statements just added.
+- **Two documents for one purchase** (a photo and an e-receipt) both attach to the same charge. The first splits its items; the second is kept as an extra document and does not overwrite them. Two identical purchases at one store go to the charge dated the same day as the receipt; if that does not settle it, you choose.
+- Nothing in the queue survives closing the page. Anything saved is in the database; anything only read is read again (and paid for again) next time.
+
+### Points and cash-back tables
+
+Some card statements (Chase Amazon Visa, for one) print a points table next to the charges: purchases paid with points, and credits that give points back. Those lines never touch the balance owed, so the app keeps them out of the transactions and out of the balance check. They are stored with the statement (`statements.raw.rewardsActivity`, and the points summary under `statements.terms.points`), the same shape the desktop script uses. If the reader lists them as rows anyway, the review screen says which rows add up to the gap so you can remove them. Counting points-paid purchases as spending is a separate choice the app does not make for you yet. After updating, redeploy the reader: `supabase functions deploy ingest-statement`.
+
+### Duplicate checks
+
+Before anything is saved, each file is compared with what you already hold. The file fingerprint only catches identical bytes; these catch the same purchase arriving in a different shape.
+
+- **Paper receipt and e-receipt.** Same total to the cent, a shared store word and the same day make the second one *another document for the same purchase*. It is stored as evidence, linked to the same charge, marked `raw.duplicateOf`, and it never creates a purchase or splits the items again. One day apart, or any doubt, is a question. A different time, card, store number or order total rules a match out, so two $5 coffees at different times stay separate. Receipts earlier in the same batch count too, and the earlier file is the original.
+- **Receipt or cash entry against the ledger.** Adding a receipt as a cash purchase, or typing one in Cash, is stopped when a charge or earlier cash entry has the same amount within four days and the same store or day. You link it to that charge or confirm it is separate. One charge with the right amount but a different store name is offered as a question too.
+- **Statement rows against the ledger.** Rows already stored for the same account (same date and amount, similar description, whichever statement or script put them there) are not added again, and the screen says how many. Same date and amount with a different description is a question, so a real second purchase is never lost silently. Two genuine identical purchases are kept as two unless two are already stored. Re-reading the same period updates its rows in place.
+- **Limits.** Matching needs a date and a total, so a receipt missing either cannot be matched until you fill them in. Two same-price purchases at one store on one day, with no time printed on either, look like one purchase; the screen says so and "This is a different purchase" undoes it. Duplicates already stored before these checks existed are not merged. Statement rows are matched on the exact printed date.
+
+Choosing "keep as printed" on a difference saves the document as it is and records that it did not reconcile. Editing any value clears earlier confirmations, because they applied to the old numbers.
+
+The reader runs on your backend, so the file is sent to the model provider you configured. Statements contain account numbers. A statement longer than one model answer can hold (roughly a few hundred rows) is refused with a message; split it by month or use `bun run ledger`. Reading quality on your own banks' layouts is not guaranteed: the balance check exists because the reader can be wrong.
+
+## The assistant and receipt photos
+
+Both run as Supabase edge functions, so they work once the steps above are done and the functions are deployed:
+
+```bash
+brew install supabase           # other platforms: https://supabase.com/docs/guides/local-development/cli/getting-started
+supabase login
+supabase link --project-ref <your-project-ref>
+supabase secrets set OPENROUTER_API_KEY=<your key> ALLOWED_EMAIL=<your email>
+supabase functions deploy ask
+supabase functions deploy ingest-receipt
+supabase functions deploy ingest-statement
+```
+
+The model is fixed, never chosen per request. It defaults to `anthropic/claude-haiku-5.5` (supports tools and image input). To change it:
+
+```bash
+supabase secrets set OPENROUTER_MODEL=anthropic/claude-sonnet-5.5    # optional
+supabase secrets set OPENROUTER_VISION_MODEL=<model id>               # optional, receipts only
+supabase secrets set OPENROUTER_DATA_COLLECTION=allow                 # optional, default is deny
+supabase secrets set OPENROUTER_PDF_ENGINE=mistral-ocr                # optional: native | mistral-ocr | cloudflare-ai (see below)
+```
+
+Requests send `provider.data_collection: "deny"`, so OpenRouter only routes to providers that do not store or train on prompts. If a model has no such provider you get an error naming this setting. Create the key at https://openrouter.ai/settings/keys and add credit first.
+
+Until then the app uses a built-in keyword planner, and receipts can be typed by hand in Import. The model never sees your ledger and never runs code. It can call five fixed read-only tools (query, transactions, summary, forecast, make_report). The tools run on your device, and report specs are validated against a whitelist before anything is drawn. Document reading fills the review for you to check; nothing is saved without your confirmation.
+
+## Known limits
+
+- Prices needs itemised receipts. Bank lines have no items, so the comparison stays empty until receipts are added.
+- Reading PDFs: OpenRouter's PDF handling depends on the engine. Unset, it uses its default for the model. `mistral-ocr` reads scanned or garbled-text PDFs and is billed per page by OpenRouter (check current pricing); `cloudflare-ai` is free and converts the PDF to markdown; `native` works only for models that accept PDFs directly. Which works best on your banks' PDFs is untested here.
+- In-app import has been tested against a mocked backend, not against a live model or Supabase project. Bulk import was tested with about 25 files in a browser. Every picked file is held in memory until saved, so on a phone import a few dozen at a time; use the web version for hundreds. Folder picking is web only, because phones have no folder chooser.
+- CSV statements are not read in the app yet.
+- The Supabase schema, uploader, sync and edge functions are tested against a local stand-in for the API, not yet against a live project. Run `supabase db push` and `bun run ledger:upload` once and check the printed comparison.
+- The offline planner understands common phrasing only. Use the assistant for anything else.

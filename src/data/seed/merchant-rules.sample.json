@@ -1,0 +1,18 @@
+[
+ {
+  "re": "joes diner",
+  "merchant": "Joe's Diner",
+  "category": "restaurants"
+ },
+ {
+  "re": "blue heron wellness",
+  "merchant": "Blue Heron Wellness",
+  "category": "personal_care"
+ },
+ {
+  "re": "mystery gadget",
+  "merchant": "Mystery Gadget Shop",
+  "category": "uncategorized",
+  "hints": ["unknown_merchant", "business_or_personal"]
+ }
+]

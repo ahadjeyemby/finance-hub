@@ -1,0 +1,378 @@
+[
+ {
+  "date": "2026-06-03",
+  "description": "Chevron",
+  "merchant": "Chevron",
+  "appleCategory": "Gas",
+  "type": "Purchase",
+  "amount": 35.94
+ },
+ {
+  "date": "2026-06-03",
+  "description": "Mystery Gadget Shop",
+  "merchant": "Mystery Gadget Shop",
+  "appleCategory": "Shopping",
+  "type": "Purchase",
+  "amount": 51.46
+ },
+ {
+  "date": "2026-06-11",
+  "description": "Exxon",
+  "merchant": "Exxon",
+  "appleCategory": "Gas",
+  "type": "Purchase",
+  "amount": 50.52
+ },
+ {
+  "date": "2026-06-12",
+  "description": "Publix",
+  "merchant": "Publix",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 118.08
+ },
+ {
+  "date": "2026-06-15",
+  "description": "Publix",
+  "merchant": "Publix",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 89.62
+ },
+ {
+  "date": "2026-06-17",
+  "description": "APPLE.COM/BILL ONE APPLE PARK WAY CUPERTINO 95014 CA USA",
+  "merchant": "Apple Services",
+  "appleCategory": "Other",
+  "type": "Purchase",
+  "amount": 10.99
+ },
+ {
+  "date": "2026-06-19",
+  "description": "Publix",
+  "merchant": "Publix",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 105.65
+ },
+ {
+  "date": "2026-06-20",
+  "description": "Geico",
+  "merchant": "Geico",
+  "appleCategory": "Insurance",
+  "type": "Purchase",
+  "amount": 118.4
+ },
+ {
+  "date": "2026-06-25",
+  "description": "ACH DEPOSIT INTERNET TRANSFER FROM ACCOUNT ENDING IN 1111",
+  "merchant": "Ach Deposit Internet Transfer From Account Ending In 1111",
+  "appleCategory": "Payment",
+  "type": "Payment",
+  "amount": -294.94
+ },
+ {
+  "date": "2026-06-26",
+  "description": "Starbucks",
+  "merchant": "Starbucks",
+  "appleCategory": "Restaurants",
+  "type": "Purchase",
+  "amount": 10.09
+ },
+ {
+  "date": "2026-06-26",
+  "description": "Starbucks",
+  "merchant": "Starbucks",
+  "appleCategory": "Restaurants",
+  "type": "Purchase",
+  "amount": 29.04
+ },
+ {
+  "date": "2026-06-27",
+  "description": "DAILY CASH ADJUSTMENT",
+  "merchant": "Daily Cash Redemption",
+  "appleCategory": "Rewards",
+  "type": "Payment",
+  "amount": -3.57
+ },
+ {
+  "date": "2026-07-04",
+  "description": "Whole Foods Market",
+  "merchant": "Whole Foods Market",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 104.45
+ },
+ {
+  "date": "2026-07-05",
+  "description": "Mystery Gadget Shop",
+  "merchant": "Mystery Gadget Shop",
+  "appleCategory": "Shopping",
+  "type": "Purchase",
+  "amount": 38.32
+ },
+ {
+  "date": "2026-07-11",
+  "description": "Trader Joes",
+  "merchant": "Trader Joes",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 91.09
+ },
+ {
+  "date": "2026-07-17",
+  "description": "Trader Joes",
+  "merchant": "Trader Joes",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 100.5
+ },
+ {
+  "date": "2026-07-17",
+  "description": "APPLE.COM/BILL ONE APPLE PARK WAY CUPERTINO 95014 CA USA",
+  "merchant": "Apple Services",
+  "appleCategory": "Other",
+  "type": "Purchase",
+  "amount": 10.99
+ },
+ {
+  "date": "2026-07-19",
+  "description": "Exxon",
+  "merchant": "Exxon",
+  "appleCategory": "Gas",
+  "type": "Purchase",
+  "amount": 52.47
+ },
+ {
+  "date": "2026-07-19",
+  "description": "Panera Bread",
+  "merchant": "Panera Bread",
+  "appleCategory": "Restaurants",
+  "type": "Purchase",
+  "amount": 16.44
+ },
+ {
+  "date": "2026-07-20",
+  "description": "Chipotle",
+  "merchant": "Chipotle",
+  "appleCategory": "Restaurants",
+  "type": "Purchase",
+  "amount": 20.03
+ },
+ {
+  "date": "2026-07-20",
+  "description": "Geico",
+  "merchant": "Geico",
+  "appleCategory": "Insurance",
+  "type": "Purchase",
+  "amount": 118.4
+ },
+ {
+  "date": "2026-07-23",
+  "description": "ACH DEPOSIT INTERNET TRANSFER FROM ACCOUNT ENDING IN 1111",
+  "merchant": "Ach Deposit Internet Transfer From Account Ending In 1111",
+  "appleCategory": "Payment",
+  "type": "Payment",
+  "amount": -457.6
+ },
+ {
+  "date": "2026-07-23",
+  "description": "Chevron",
+  "merchant": "Chevron",
+  "appleCategory": "Gas",
+  "type": "Purchase",
+  "amount": 51.64
+ },
+ {
+  "date": "2026-07-27",
+  "description": "DAILY CASH ADJUSTMENT",
+  "merchant": "Daily Cash Redemption",
+  "appleCategory": "Rewards",
+  "type": "Payment",
+  "amount": -7.27
+ },
+ {
+  "date": "2026-08-09",
+  "description": "Exxon",
+  "merchant": "Exxon",
+  "appleCategory": "Gas",
+  "type": "Purchase",
+  "amount": 34.64
+ },
+ {
+  "date": "2026-08-12",
+  "description": "Publix",
+  "merchant": "Publix",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 96.31
+ },
+ {
+  "date": "2026-08-12",
+  "description": "Whole Foods Market",
+  "merchant": "Whole Foods Market",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 63.82
+ },
+ {
+  "date": "2026-08-17",
+  "description": "APPLE.COM/BILL ONE APPLE PARK WAY CUPERTINO 95014 CA USA",
+  "merchant": "Apple Services",
+  "appleCategory": "Other",
+  "type": "Purchase",
+  "amount": 10.99
+ },
+ {
+  "date": "2026-08-19",
+  "description": "Exxon",
+  "merchant": "Exxon",
+  "appleCategory": "Gas",
+  "type": "Purchase",
+  "amount": 46.56
+ },
+ {
+  "date": "2026-08-20",
+  "description": "Geico",
+  "merchant": "Geico",
+  "appleCategory": "Insurance",
+  "type": "Purchase",
+  "amount": 118.4
+ },
+ {
+  "date": "2026-08-20",
+  "description": "Mystery Gadget Shop",
+  "merchant": "Mystery Gadget Shop",
+  "appleCategory": "Shopping",
+  "type": "Purchase",
+  "amount": 54.77
+ },
+ {
+  "date": "2026-08-22",
+  "description": "Chipotle",
+  "merchant": "Chipotle",
+  "appleCategory": "Restaurants",
+  "type": "Purchase",
+  "amount": 16.77
+ },
+ {
+  "date": "2026-08-24",
+  "description": "ACH DEPOSIT INTERNET TRANSFER FROM ACCOUNT ENDING IN 1111",
+  "merchant": "Ach Deposit Internet Transfer From Account Ending In 1111",
+  "appleCategory": "Payment",
+  "type": "Payment",
+  "amount": -382.29
+ },
+ {
+  "date": "2026-08-25",
+  "description": "Publix",
+  "merchant": "Publix",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 91.12
+ },
+ {
+  "date": "2026-08-26",
+  "description": "Starbucks",
+  "merchant": "Starbucks",
+  "appleCategory": "Restaurants",
+  "type": "Purchase",
+  "amount": 31.4
+ },
+ {
+  "date": "2026-08-27",
+  "description": "DAILY CASH ADJUSTMENT",
+  "merchant": "Daily Cash Redemption",
+  "appleCategory": "Rewards",
+  "type": "Payment",
+  "amount": -7.48
+ },
+ {
+  "date": "2026-09-05",
+  "description": "Whole Foods Market",
+  "merchant": "Whole Foods Market",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 59.66
+ },
+ {
+  "date": "2026-09-12",
+  "description": "Panera Bread",
+  "merchant": "Panera Bread",
+  "appleCategory": "Restaurants",
+  "type": "Purchase",
+  "amount": 26.89
+ },
+ {
+  "date": "2026-09-13",
+  "description": "Whole Foods Market",
+  "merchant": "Whole Foods Market",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 114.08
+ },
+ {
+  "date": "2026-09-13",
+  "description": "Mystery Gadget Shop",
+  "merchant": "Mystery Gadget Shop",
+  "appleCategory": "Shopping",
+  "type": "Purchase",
+  "amount": 42.75
+ },
+ {
+  "date": "2026-09-14",
+  "description": "Exxon",
+  "merchant": "Exxon",
+  "appleCategory": "Gas",
+  "type": "Purchase",
+  "amount": 39.16
+ },
+ {
+  "date": "2026-09-17",
+  "description": "APPLE.COM/BILL ONE APPLE PARK WAY CUPERTINO 95014 CA USA",
+  "merchant": "Apple Services",
+  "appleCategory": "Other",
+  "type": "Purchase",
+  "amount": 10.99
+ },
+ {
+  "date": "2026-09-18",
+  "description": "Panera Bread",
+  "merchant": "Panera Bread",
+  "appleCategory": "Restaurants",
+  "type": "Purchase",
+  "amount": 10.61
+ },
+ {
+  "date": "2026-09-19",
+  "description": "Trader Joes",
+  "merchant": "Trader Joes",
+  "appleCategory": "Grocery",
+  "type": "Purchase",
+  "amount": 116.37
+ },
+ {
+  "date": "2026-09-20",
+  "description": "Chevron",
+  "merchant": "Chevron",
+  "appleCategory": "Gas",
+  "type": "Purchase",
+  "amount": 39.14
+ },
+ {
+  "date": "2026-09-20",
+  "description": "Geico",
+  "merchant": "Geico",
+  "appleCategory": "Insurance",
+  "type": "Purchase",
+  "amount": 118.4
+ },
+ {
+  "date": "2026-09-23",
+  "description": "ACH DEPOSIT INTERNET TRANSFER FROM ACCOUNT ENDING IN 1111",
+  "merchant": "Ach Deposit Internet Transfer From Account Ending In 1111",
+  "appleCategory": "Payment",
+  "type": "Payment",
+  "amount": -277.37
+ }
+]

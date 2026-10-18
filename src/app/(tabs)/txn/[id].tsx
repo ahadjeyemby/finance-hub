@@ -1,0 +1,63 @@
+import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+import { TextInput, View } from 'react-native';
+
+import { EvidenceCard } from '@/components/evidence';
+import { ScreenHeader } from '@/components/header';
+import { CATEGORIES, categoryLabel } from '@/core/categories';
+import { dayLabel } from '@/core/dates';
+import { dollars } from '@/core/queries';
+import type { CategoryId } from '@/core/types';
+import { useRepo } from '@/data/repo';
+import { C, F, R, S } from '@/theme/tokens';
+import { Button, Card, Chip, Row, Screen, Segmented, T } from '@/theme/ui';
+
+export default function TxnDetail() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { txns, accounts, patchTxn } = useRepo();
+  const t = txns.find((x) => x.id === id);
+  const [note, setNote] = useState(t?.note ?? '');
+  if (!t) return <Screen><ScreenHeader back title="Not found" sub="This transaction is no longer in the ledger." /></Screen>;
+  const acct = accounts.find((a) => a.id === t.accountId);
+  const isSpend = t.kind === 'spend' || t.kind === 'fee' || t.kind === 'refund';
+  const lineSum = (t.lines ?? []).reduce((s, l) => s + l.cents, 0);
+  return (
+    <Screen>
+      <ScreenHeader back title={t.merchant} sub={`${dayLabel(t.date)}, ${acct?.name ?? t.accountId}`} />
+      <Card>
+        <T style={{ fontFamily: F.display, fontSize: 32, lineHeight: 38 }}>{dollars(t.cents, { sign: true })}</T>
+        <Row label="Counted as" value={t.kind === 'transfer' ? 'Transfer (not spending)' : t.kind} />
+        {isSpend ? <Row label="Category" value={categoryLabel(t.category)} /> : null}
+        <Row label="Source" value={t.source} />
+        <T size={12} tone="ink3">{t.description}</T>
+      </Card>
+      <EvidenceCard txn={t} />
+      {isSpend ? (
+        <>
+          <Card title="Business or personal">
+            <Segmented value={t.business ? 'b' : 'p'} onChange={(v) => patchTxn(t.id, { business: v === 'b' })} options={[{ value: 'p', label: 'Personal' }, { value: 'b', label: 'Business' }]} />
+          </Card>
+          <Card title="Category">
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+              {CATEGORIES.filter((c) => c.id !== 'uncategorized').map((c) => <Chip key={c.id} label={c.label} on={t.category === c.id} onPress={() => patchTxn(t.id, { category: c.id as CategoryId })} />)}
+            </View>
+          </Card>
+          <Card title="Repeats?">
+            <Segmented value={t.oneOff ? 'one' : 'rep'} onChange={(v) => patchTxn(t.id, { oneOff: v === 'one' })} options={[{ value: 'rep', label: 'Normal' }, { value: 'one', label: 'One-time' }]} />
+            <T size={12} tone="ink3">One-time expenses show in history but stay out of the forecast.</T>
+          </Card>
+        </>
+      ) : null}
+      {t.lines?.length ? (
+        <Card title="Items">
+          {t.lines.map((l, i) => <Row key={i} label={l.item} value={dollars(l.cents)} />)}
+          {lineSum !== -t.cents ? <T size={12} tone="ink3">Items add up to {dollars(lineSum)}.</T> : null}
+        </Card>
+      ) : isSpend ? <Card title="Items"><T size={13} tone="ink2">No item detail. Add the receipt to see what was in this purchase.</T><Button kind="outline" label="Add the receipt" onPress={() => router.push({ pathname: '/import', params: { kind: 'receipt' } })} /></Card> : null}
+      <Card title="Note">
+        <TextInput value={note} onChangeText={setNote} onBlur={() => patchTxn(t.id, { note })} placeholder="Anything worth remembering" placeholderTextColor={C.ink3} multiline accessibilityLabel="Note"
+          style={{ minHeight: 64, borderRadius: R.sm, backgroundColor: C.ground, padding: S.md, fontFamily: F.body, fontSize: 14, color: C.ink, textAlignVertical: 'top' }} />
+      </Card>
+    </Screen>
+  );
+}
