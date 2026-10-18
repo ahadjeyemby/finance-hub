@@ -1,0 +1,62 @@
+import { View } from 'react-native';
+
+import { ScreenHeader } from '@/components/header';
+import { sourceWhen } from '@/components/source';
+import { dayLabel } from '@/core/dates';
+import { dollars } from '@/core/queries';
+import { useRepo } from '@/data/repo';
+import { C, S } from '@/theme/tokens';
+import { Banner, Button, Card, Row, Screen, T } from '@/theme/ui';
+
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+
+export default function Accounts() {
+  const { accounts, txns, dataFrom, dataTo, auth, sync, source } = useRepo();
+  const span = Math.max(1, daysBetween(dataFrom, dataTo));
+  const orphan = txns.filter((t) => t.kind === 'transfer' && t.subtype === 'card_payment' && !t.pairId);
+  const cardSide = orphan.filter((t) => accounts.find((a) => a.id === t.accountId)?.type === 'credit');
+  const bankSide = orphan.filter((t) => accounts.find((a) => a.id === t.accountId)?.type === 'checking');
+  const cardTotal = cardSide.reduce((s, t) => s + t.cents, 0);
+  const incomeOpen = accounts.some((a) => a.type === 'checking' && a.incomeComplete === false);
+  return (
+    <Screen max={820}>
+      <ScreenHeader back title="Accounts and data" sub="What the numbers are built from, and what is missing." />
+      <Card title="Sync">
+        {auth.configured ? (
+          <>
+            <Row label="Signed in as" value={auth.email ?? ''} />
+            <Row label="Data source" value={`Supabase project ${source.project ?? ''}`} />
+            <Row label="Statement data" value={source.kind === 'database' ? `${source.accounts} accounts, ${source.rows} rows, loaded live ${sourceWhen(source.at)}` : source.kind === 'saved' ? `Saved copy from ${sourceWhen(source.at)}, not confirmed` : 'Not loaded'} tone={source.kind === 'saved' ? 'bad' : undefined} />
+            <Row label="Status" value={sync.state === 'synced' ? 'Up to date' : sync.state === 'syncing' ? 'Syncing' : sync.state === 'error' ? 'Not synced' : 'Waiting'} tone={sync.state === 'error' ? 'bad' : undefined} />
+            {sync.lastAt ? <Row label="Last synced" value={new Date(sync.lastAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} /> : null}
+            {sync.error ? <T size={12} tone="bad">{sync.error}. Your changes are saved on this device and will upload when this works.</T> : null}
+            <View style={{ flexDirection: 'row', gap: S.sm }}>
+              <Button small kind="outline" label="Sync now" onPress={sync.now} />
+              <Button small kind="ghost" label="Sign out" onPress={auth.signOut} />
+            </View>
+          </>
+        ) : <T size={13} tone="ink2">Not connected to a backend. Your edits are kept on this device only. See the README to connect Supabase.</T>}
+      </Card>
+      {cardSide.length ? <Banner title={`${dollars(cardTotal)} was paid to your cards from an account that is not connected.`}>{cardSide.length} card payments have no matching withdrawal in the statements here. Add that account’s statements to see where this money came from. It does not count as spending or income either way.</Banner> : null}
+      {bankSide.length ? <Banner tone="info" title={`${bankSide.length} withdrawals for card payments have no matching card credit.`}>The card statement for that period is probably missing.</Banner> : null}
+      {incomeOpen ? <Banner title="Earned may be low.">Income only counts deposits into connected checking accounts, and not every account that receives money is connected.</Banner> : null}
+      {accounts.map((a) => {
+        const left = Math.max(0, daysBetween(dataFrom, a.coverage.from)) / span;
+        const to = a.type === 'cash' ? dataTo : a.coverage.to < dataTo ? a.coverage.to : dataTo;
+        const width = Math.max(0.02, Math.min(1, daysBetween(a.coverage.from > dataFrom ? a.coverage.from : dataFrom, to) / span));
+        const n = txns.filter((t) => t.accountId === a.id).length;
+        return (
+          <Card key={a.id} title={a.name} right={<T size={12} tone="ink3">{a.type}{a.last4 ? ` ${a.last4}` : ''}</T>}>
+            <View style={{ height: 10, backgroundColor: C.line, borderRadius: 5, overflow: 'hidden' }}>
+              <View style={{ marginLeft: `${left * 100}%`, width: `${width * 100}%`, height: '100%', backgroundColor: C.bar, borderRadius: 5 }} />
+            </View>
+            <Row label="Statements cover" value={a.type === 'cash' ? 'Entered by you' : `${dayLabel(a.coverage.from)} to ${dayLabel(a.coverage.to)}`} />
+            <Row label="Transactions" value={String(n)} />
+            {a.coverage.to < dataTo && a.type !== 'cash' ? <T size={12} tone="ink3">{daysBetween(a.coverage.to, dataTo)} days behind the newest statement. Totals for those days are incomplete.</T> : null}
+          </Card>
+        );
+      })}
+      <View style={{ height: S.md }} />
+    </Screen>
+  );
+}

@@ -1,0 +1,527 @@
+[
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-01",
+  "description": "KROGER #375 SPRINGFIELD IL",
+  "amount": 77.56
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-02",
+  "description": "MCDONALDS F4024 SPRINGFIELD IL",
+  "amount": 13.09
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-03",
+  "description": "GITHUB, INC. SAN FRANCISCO CA",
+  "amount": 4
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-05",
+  "description": "NETFLIX.COM 866-579-7172 CA",
+  "amount": 15.49
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-05",
+  "description": "BLUE HERON WELLNESS SPRINGFIELD IL",
+  "amount": 86.08
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-06",
+  "description": "HEROKU* JUN-970280710 WWW.HEROKU.CO CA",
+  "amount": 7
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-07",
+  "description": "ALDI 36219 SPRINGFIELD IL",
+  "amount": 85.19
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-08",
+  "description": "STARBUCKS STORE 10347 SPRINGFIELD IL",
+  "amount": 9.99
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-10",
+  "description": "SHELL OIL 84662609QPS SPRINGFIELD IL",
+  "amount": 49.18
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pay",
+  "date": "2026-06-11",
+  "description": "PAYMENT FROM CHK 1111 CONF# xytr9a6y2",
+  "amount": 229.64
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-11",
+  "description": "SPOTIFY USA 877-7781161 NY",
+  "amount": 11.99
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-12",
+  "description": "KROGER #568 SPRINGFIELD IL",
+  "amount": 63.23
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-12",
+  "description": "WAL-MART #3103 SPRINGFIELD IL",
+  "amount": 92.17
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-12",
+  "description": "WAL-MART #4109 SPRINGFIELD IL",
+  "amount": 28.33
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-13",
+  "description": "ALDI 84581 SPRINGFIELD IL",
+  "amount": 84.52
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-15",
+  "description": "PAYPAL *PIXELCRAFT 1300178160 CA",
+  "amount": 18.52
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-20",
+  "description": "CVS/PHARMACY #4655 SPRINGFIELD IL",
+  "amount": 43.05
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-22",
+  "description": "SHELL OIL 99703681QPS SPRINGFIELD IL",
+  "amount": 40.93
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-25",
+  "description": "KROGER #427 SPRINGFIELD IL",
+  "amount": 84.21
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pay",
+  "date": "2026-06-28",
+  "description": "PAYMENT FROM CHK 1111 CONF# emtdy26hr",
+  "amount": 127.71
+ },
+ {
+  "statement": "sample-2026-06",
+  "section": "pur",
+  "date": "2026-06-28",
+  "description": "CHIPOTLE 1907 SPRINGFIELD IL",
+  "amount": 13.85
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-02",
+  "description": "KROGER #222 SPRINGFIELD IL",
+  "amount": 68.91
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-03",
+  "description": "SHELL OIL 59489321QPS SPRINGFIELD IL",
+  "amount": 47.25
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-03",
+  "description": "GITHUB, INC. SAN FRANCISCO CA",
+  "amount": 4
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-05",
+  "description": "WAL-MART #1221 SPRINGFIELD IL",
+  "amount": 61.07
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-05",
+  "description": "NETFLIX.COM 866-579-7172 CA",
+  "amount": 15.49
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-06",
+  "description": "MCDONALDS F7389 SPRINGFIELD IL",
+  "amount": 16.08
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-06",
+  "description": "HEROKU* JUL-665828531 WWW.HEROKU.CO CA",
+  "amount": 7
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-09",
+  "description": "CHIPOTLE 2919 SPRINGFIELD IL",
+  "amount": 16.24
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-09",
+  "description": "SPRINGFIELD MOTORS REPAIR IL",
+  "amount": 1250
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-10",
+  "description": "SHELL OIL 59112657QPS SPRINGFIELD IL",
+  "amount": 55.73
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pay",
+  "date": "2026-07-11",
+  "description": "PAYMENT FROM CHK 1111 CONF# sbcg5whaj",
+  "amount": 172.23
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-11",
+  "description": "SPOTIFY USA 877-7781161 NY",
+  "amount": 11.99
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-12",
+  "description": "CVS/PHARMACY #7373 SPRINGFIELD IL",
+  "amount": 19.67
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-13",
+  "description": "ALDI 25555 SPRINGFIELD IL",
+  "amount": 43.11
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-13",
+  "description": "PAYPAL *PIXELCRAFT 8706118780 CA",
+  "amount": 8.91
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-14",
+  "description": "KROGER #915 SPRINGFIELD IL",
+  "amount": 139.54
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-14",
+  "description": "ALDI 45030 SPRINGFIELD IL",
+  "amount": 60.79
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-19",
+  "description": "CHIPOTLE 1532 SPRINGFIELD IL",
+  "amount": 13
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pay",
+  "date": "2026-07-19",
+  "description": "WAL-MART #2417 STORE RETURN SPRINGFIELD IL",
+  "amount": 24.99
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-20",
+  "description": "BLUE HERON WELLNESS SPRINGFIELD IL",
+  "amount": 73.81
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pay",
+  "date": "2026-07-26",
+  "description": "PAYMENT FROM CHK 1111 CONF# ypkbh9hx2",
+  "amount": 197.29
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-26",
+  "description": "WAL-MART #2587 SPRINGFIELD IL",
+  "amount": 73.01
+ },
+ {
+  "statement": "sample-2026-07",
+  "section": "pur",
+  "date": "2026-07-28",
+  "description": "KROGER #281 SPRINGFIELD IL",
+  "amount": 104.94
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-03",
+  "description": "SHELL OIL 86403102QPS SPRINGFIELD IL",
+  "amount": 52.74
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-03",
+  "description": "GITHUB, INC. SAN FRANCISCO CA",
+  "amount": 4
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-05",
+  "description": "NETFLIX.COM 866-579-7172 CA",
+  "amount": 15.49
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-06",
+  "description": "WAL-MART #3550 SPRINGFIELD IL",
+  "amount": 102.23
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-06",
+  "description": "HEROKU* AUG-785964001 WWW.HEROKU.CO CA",
+  "amount": 7
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-08",
+  "description": "ALDI 99689 SPRINGFIELD IL",
+  "amount": 93.09
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-11",
+  "description": "SHELL OIL 96900052QPS SPRINGFIELD IL",
+  "amount": 34.05
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-11",
+  "description": "SPOTIFY USA 877-7781161 NY",
+  "amount": 11.99
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pay",
+  "date": "2026-08-12",
+  "description": "PAYMENT FROM CHK 1111 CONF# wuje75z75",
+  "amount": 404.12
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-12",
+  "description": "KROGER #807 SPRINGFIELD IL",
+  "amount": 81.2
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-13",
+  "description": "MCDONALDS F3178 SPRINGFIELD IL",
+  "amount": 9.23
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-14",
+  "description": "LINKEDIN PRE 8442403888 CA",
+  "amount": 39.99
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-15",
+  "description": "BLUE HERON WELLNESS SPRINGFIELD IL",
+  "amount": 49.14
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-17",
+  "description": "CHIPOTLE 3174 SPRINGFIELD IL",
+  "amount": 13.08
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-18",
+  "description": "WAL-MART #1831 SPRINGFIELD IL",
+  "amount": 69.92
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-22",
+  "description": "CVS/PHARMACY #3089 SPRINGFIELD IL",
+  "amount": 43.42
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-24",
+  "description": "STARBUCKS STORE 57559 SPRINGFIELD IL",
+  "amount": 19.74
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-25",
+  "description": "KROGER #234 SPRINGFIELD IL",
+  "amount": 133.62
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-26",
+  "description": "PAYPAL *PIXELCRAFT 6843235895 CA",
+  "amount": 15.35
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pay",
+  "date": "2026-08-27",
+  "description": "PAYMENT FROM CHK 1111 CONF# 6ahajfz6h",
+  "amount": 269.99
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-27",
+  "description": "ALDI 27007 SPRINGFIELD IL",
+  "amount": 66.86
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pur",
+  "date": "2026-08-28",
+  "description": "KROGER #845 SPRINGFIELD IL",
+  "amount": 64.06
+ },
+ {
+  "statement": "sample-2026-08",
+  "section": "pay",
+  "date": "2026-08-30",
+  "description": "CASHREWARD STATEMENT CREDIT",
+  "amount": 12.52
+ },
+ {
+  "statement": "sample-2026-09",
+  "section": "pur",
+  "date": "2026-09-02",
+  "description": "BLUE HERON WELLNESS SPRINGFIELD IL",
+  "amount": 77.8
+ },
+ {
+  "statement": "sample-2026-09",
+  "section": "pur",
+  "date": "2026-09-03",
+  "description": "GITHUB, INC. SAN FRANCISCO CA",
+  "amount": 4
+ },
+ {
+  "statement": "sample-2026-09",
+  "section": "pur",
+  "date": "2026-09-04",
+  "description": "PAYPAL *PIXELCRAFT 7507466543 CA",
+  "amount": 11.85
+ },
+ {
+  "statement": "sample-2026-09",
+  "section": "pur",
+  "date": "2026-09-05",
+  "description": "NETFLIX.COM 866-579-7172 CA",
+  "amount": 15.49
+ },
+ {
+  "statement": "sample-2026-09",
+  "section": "pur",
+  "date": "2026-09-06",
+  "description": "KROGER #860 SPRINGFIELD IL",
+  "amount": 61.7
+ },
+ {
+  "statement": "sample-2026-09",
+  "section": "pur",
+  "date": "2026-09-06",
+  "description": "HEROKU* SEP-281211283 WWW.HEROKU.CO CA",
+  "amount": 7
+ },
+ {
+  "statement": "sample-2026-09",
+  "section": "pur",
+  "date": "2026-09-07",
+  "description": "KROGER #365 SPRINGFIELD IL",
+  "amount": 137.98
+ },
+ {
+  "statement": "sample-2026-09",
+  "section": "pur",
+  "date": "2026-09-10",
+  "description": "WAL-MART #1239 SPRINGFIELD IL",
+  "amount": 174.92
+ }
+]

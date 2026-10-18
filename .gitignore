@@ -41,3 +41,31 @@ example
 # generated native folders
 /ios
 /android
+
+# ---------------------------------------------------------------------------
+# PERSONAL FINANCIAL DATA. Never commit any of this.
+# Statements, extracts, receipts, your ledger, your merchant rules, your accounts.
+# Only the fictional files in examples/ and the *.sample.json files are public.
+# ---------------------------------------------------------------------------
+/seed/
+/src/data/seed/*
+!/src/data/seed/*.sample.json
+/scripts/extract/
+/statements/
+/receipts/
+*.statement.*
+*.ofx
+*.qfx
+*.qif
+*.numbers
+*.tar.gz
+*.zip
+
+# secrets and local config
+.env
+.env.*
+!.env.example
+supabase/.env*
+supabase/.temp/
+supabase/.branches/
+.claude/settings.local.json

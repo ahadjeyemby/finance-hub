@@ -1,0 +1,81 @@
+{
+ "windowStart": "2026-06-01",
+ "accounts": [
+  {
+   "id": "northwind-chk-1111",
+   "name": "Northwind checking",
+   "institution": "Northwind Bank",
+   "type": "checking",
+   "last4": "1111",
+   "coverage": {
+    "from": "2026-06-01",
+    "to": "2026-09-15"
+   },
+   "incomeComplete": false,
+   "source": {
+    "format": "bank",
+    "file": "bank1111.json",
+    "label": "Northwind checking"
+   }
+  },
+  {
+   "id": "harbor-card-2222",
+   "name": "Harbor Rewards card",
+   "institution": "Harbor Credit",
+   "type": "credit",
+   "last4": "2222",
+   "coverage": {
+    "from": "2026-06-01",
+    "to": "2026-09-10"
+   },
+   "source": {
+    "format": "card",
+    "file": "card2222.json",
+    "label": "Harbor card"
+   }
+  },
+  {
+   "id": "orchard-visa-3333",
+   "name": "Orchard Visa",
+   "institution": "Orchard Bank",
+   "type": "credit",
+   "last4": "3333",
+   "coverage": {
+    "from": "2026-06-01",
+    "to": "2026-09-09"
+   },
+   "source": {
+    "format": "card_orders",
+    "file": "visa3333.json",
+    "label": "Orchard statement"
+   }
+  },
+  {
+   "id": "pebble-card",
+   "name": "Pebble Card",
+   "institution": "Pebble",
+   "type": "credit",
+   "last4": "4444",
+   "coverage": {
+    "from": "2026-06-01",
+    "to": "2026-09-26"
+   },
+   "source": {
+    "format": "apple",
+    "file": "pebble.json",
+    "label": "Pebble card export"
+   }
+  },
+  {
+   "id": "cash",
+   "name": "Cash",
+   "institution": "",
+   "type": "cash",
+   "last4": "",
+   "coverage": {
+    "from": "2026-06-01",
+    "to": "2099-12-31"
+   }
+  }
+ ]
+}

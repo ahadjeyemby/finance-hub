@@ -1,0 +1,242 @@
+[
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-01",
+  "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+  "amount": 2150
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-02",
+  "description": "ZELLE PAYMENT TO JORDAN LEE CONF# m8q97bjce",
+  "amount": -1450
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-08",
+  "description": "T-MOBILE DES:WIRELESS",
+  "amount": -85.98
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-10",
+  "description": "Mobile Banking payment to CRD 2222",
+  "amount": -229.64
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-12",
+  "description": "STATE FARM MUTUAL AUTO INS",
+  "amount": -94.14
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-14",
+  "description": "Mobile Banking payment to CRD 3333",
+  "amount": -465.67
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-15",
+  "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+  "amount": 2150
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-22",
+  "description": "Mobile Banking payment to CRD 4444",
+  "amount": -294.94
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-25",
+  "description": "Mobile Banking payment to CRD 2222",
+  "amount": -127.71
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-28",
+  "description": "DEPOSIT (description redacted)",
+  "amount": 640
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-01",
+  "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+  "amount": 2150
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-02",
+  "description": "ZELLE PAYMENT TO JORDAN LEE CONF# ydcdcqcrt",
+  "amount": -1450
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-08",
+  "description": "T-MOBILE DES:WIRELESS",
+  "amount": -85.89
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-10",
+  "description": "Mobile Banking payment to CRD 2222",
+  "amount": -172.23
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-12",
+  "description": "STATE FARM MUTUAL AUTO INS",
+  "amount": -91.5
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-14",
+  "description": "Mobile Banking payment to CRD 3333",
+  "amount": -454.79
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-15",
+  "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+  "amount": 2150
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-18",
+  "description": "Online Banking transfer to CHK 9999",
+  "amount": -500
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-21",
+  "description": "MOBILE DEPOSIT",
+  "amount": 125
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-22",
+  "description": "Mobile Banking payment to CRD 4444",
+  "amount": -457.6
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-25",
+  "description": "Mobile Banking payment to CRD 2222",
+  "amount": -197.29
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-28",
+  "description": "DEPOSIT (description redacted)",
+  "amount": 640
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-01",
+  "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+  "amount": 2150
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-02",
+  "description": "ZELLE PAYMENT TO JORDAN LEE CONF# baaqcxbqx",
+  "amount": -1450
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-08",
+  "description": "T-MOBILE DES:WIRELESS",
+  "amount": -86.98
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-10",
+  "description": "Mobile Banking payment to CRD 2222",
+  "amount": -404.12
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-12",
+  "description": "STATE FARM MUTUAL AUTO INS",
+  "amount": -92.48
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-14",
+  "description": "Mobile Banking payment to CRD 3333",
+  "amount": -347.09
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-15",
+  "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+  "amount": 2150
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-22",
+  "description": "Mobile Banking payment to CRD 4444",
+  "amount": -382.29
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-25",
+  "description": "Mobile Banking payment to CRD 2222",
+  "amount": -269.99
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-28",
+  "description": "DEPOSIT (description redacted)",
+  "amount": 640
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-01",
+  "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+  "amount": 2150
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-02",
+  "description": "ZELLE PAYMENT TO JORDAN LEE CONF# 7yxrz3rt5",
+  "amount": -1450
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-08",
+  "description": "T-MOBILE DES:WIRELESS",
+  "amount": -86.08
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-10",
+  "description": "Mobile Banking payment to CRD 2222",
+  "amount": -257.57
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-12",
+  "description": "STATE FARM MUTUAL AUTO INS",
+  "amount": -91.21
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-14",
+  "description": "Mobile Banking payment to CRD 3333",
+  "amount": -495.07
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-15",
+  "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+  "amount": 2150
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-15",
+  "description": "Mobile Banking payment to CRD 2222",
+  "amount": -75
+ }
+]

@@ -1,0 +1,36 @@
+import { parseOverlay, rowToAccount, rowToTxn } from '@/core/sync';
+import type { AccountRow, TxnRow } from '@/core/sync';
+import type { Account, Overlay, Txn } from '@/core/types';
+import { supabase } from './supabase';
+
+const db = () => { if (!supabase) throw new Error('backend not configured'); return supabase; };
+const PAGE = 1000;
+
+async function all<T>(table: string, order: string): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db().from(table).select('*').order(order).range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    out.push(...((data ?? []) as T[]));
+    if (!data || data.length < PAGE) return out;
+  }
+}
+
+/** Statement-derived rows from the database, or null when the person has none yet. */
+export async function fetchLedger(): Promise<{ accounts: Account[]; txns: Txn[] } | null> {
+  const accounts = await all<AccountRow>('accounts', 'id');
+  if (!accounts.length) return null;
+  const txns = await all<TxnRow>('txns', 'id');
+  return { accounts: accounts.map(rowToAccount), txns: txns.map(rowToTxn) };
+}
+
+export async function fetchOverlay(): Promise<Overlay | null> {
+  const { data, error } = await db().from('overlays').select('body').maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? parseOverlay(data.body) : null;
+}
+
+export async function pushOverlay(overlay: Overlay): Promise<void> {
+  const { error } = await db().from('overlays').upsert({ body: overlay, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+  if (error) throw new Error(error.message);
+}

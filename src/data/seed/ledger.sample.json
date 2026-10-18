@@ -1,0 +1,2489 @@
+{
+ "builtFrom": "examples",
+ "accounts": [
+  {
+   "id": "northwind-chk-1111",
+   "name": "Northwind checking",
+   "institution": "Northwind Bank",
+   "type": "checking",
+   "last4": "1111",
+   "coverage": {
+    "from": "2026-06-01",
+    "to": "2026-09-15"
+   },
+   "incomeComplete": false
+  },
+  {
+   "id": "harbor-card-2222",
+   "name": "Harbor Rewards card",
+   "institution": "Harbor Credit",
+   "type": "credit",
+   "last4": "2222",
+   "coverage": {
+    "from": "2026-06-01",
+    "to": "2026-09-10"
+   }
+  },
+  {
+   "id": "orchard-visa-3333",
+   "name": "Orchard Visa",
+   "institution": "Orchard Bank",
+   "type": "credit",
+   "last4": "3333",
+   "coverage": {
+    "from": "2026-06-01",
+    "to": "2026-09-09"
+   }
+  },
+  {
+   "id": "pebble-card",
+   "name": "Pebble Card",
+   "institution": "Pebble",
+   "type": "credit",
+   "last4": "4444",
+   "coverage": {
+    "from": "2026-06-01",
+    "to": "2026-09-26"
+   }
+  },
+  {
+   "id": "cash",
+   "name": "Cash",
+   "institution": "",
+   "type": "cash",
+   "last4": "",
+   "coverage": {
+    "from": "2026-06-01",
+    "to": "2099-12-31"
+   }
+  }
+ ],
+ "txns": [
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-01",
+   "description": "KROGER #375 SPRINGFIELD IL",
+   "merchant": "Kroger",
+   "cents": -7756,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-06-01:-7756:kroger-375-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-06-01",
+   "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+   "merchant": "Payroll",
+   "cents": 215000,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-06",
+   "subtype": "salary",
+   "id": "northwind-chk-1111:2026-06-01:215000:acme-corp-payroll-des-payroll-id-000123"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-02",
+   "description": "MCDONALDS F4024 SPRINGFIELD IL",
+   "merchant": "Restaurant",
+   "cents": -1309,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "restaurants",
+   "id": "harbor-card-2222:2026-06-02:-1309:mcdonalds-f4024-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-06-02",
+   "description": "ZELLE PAYMENT TO JORDAN LEE CONF# m8q97bjce",
+   "merchant": "Zelle: Jordan Lee",
+   "cents": -145000,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-06",
+   "category": "people",
+   "hints": [
+    "person_payment"
+   ],
+   "id": "northwind-chk-1111:2026-06-02:-145000:zelle-payment-to-jordan-lee-conf-m8q97bj"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-03",
+   "description": "GITHUB, INC. SAN FRANCISCO CA",
+   "merchant": "GitHub",
+   "cents": -400,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "subscriptions",
+   "business": true,
+   "id": "harbor-card-2222:2026-06-03:-400:github-inc-san-francisco-ca"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-03",
+   "description": "AMAZON MKTPL*KX97Y AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -3049,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-06",
+   "ref": "D01-0000001-2249536",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-06-03:-3049:amazon-mktpl-kx97y-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-03",
+   "description": "AMAZON MKTPL*VBG6G AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -3362,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-06",
+   "ref": "D01-0000002-2355618",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-06-03:-3362:amazon-mktpl-vbg6g-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-03",
+   "description": "Chevron",
+   "merchant": "Gas station",
+   "cents": -3594,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "fuel",
+   "id": "pebble-card:2026-06-03:-3594:chevron"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-03",
+   "description": "Mystery Gadget Shop",
+   "merchant": "Mystery Gadget Shop",
+   "cents": -5146,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "pebble-card:2026-06-03:-5146:mystery-gadget-shop"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-05",
+   "description": "NETFLIX.COM 866-579-7172 CA",
+   "merchant": "Netflix",
+   "cents": -1549,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "subscriptions",
+   "id": "harbor-card-2222:2026-06-05:-1549:netflix-com-866-579-7172-ca"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-05",
+   "description": "BLUE HERON WELLNESS SPRINGFIELD IL",
+   "merchant": "Blue Heron Wellness Springfield Il",
+   "cents": -8608,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "harbor-card-2222:2026-06-05:-8608:blue-heron-wellness-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-06",
+   "description": "HEROKU* JUN-970280710 WWW.HEROKU.CO CA",
+   "merchant": "Heroku",
+   "cents": -700,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "subscriptions",
+   "business": true,
+   "id": "harbor-card-2222:2026-06-06:-700:heroku-jun-970280710-www-heroku-co-ca"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-07",
+   "description": "ALDI 36219 SPRINGFIELD IL",
+   "merchant": "Aldi",
+   "cents": -8519,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-06-07:-8519:aldi-36219-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-08",
+   "description": "STARBUCKS STORE 10347 SPRINGFIELD IL",
+   "merchant": "Restaurant",
+   "cents": -999,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "restaurants",
+   "id": "harbor-card-2222:2026-06-08:-999:starbucks-store-10347-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-06-08",
+   "description": "T-MOBILE DES:WIRELESS",
+   "merchant": "T-Mobile",
+   "cents": -8598,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-06",
+   "category": "phone",
+   "id": "northwind-chk-1111:2026-06-08:-8598:t-mobile-des-wireless"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-09",
+   "description": "OPENROUTER, INC NEW YORK NY",
+   "merchant": "OpenRouter",
+   "cents": -2000,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-06",
+   "category": "subscriptions",
+   "business": true,
+   "id": "orchard-visa-3333:2026-06-09:-2000:openrouter-inc-new-york-ny"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-09",
+   "description": "AMAZON MKTPL*2RD3K AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -6041,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-06",
+   "ref": "D01-0000003-5061426",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-06-09:-6041:amazon-mktpl-2rd3k-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-10",
+   "description": "SHELL OIL 84662609QPS SPRINGFIELD IL",
+   "merchant": "Shell",
+   "cents": -4918,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "fuel",
+   "id": "harbor-card-2222:2026-06-10:-4918:shell-oil-84662609qps-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-06-10",
+   "description": "Mobile Banking payment to CRD 2222",
+   "merchant": "Card payment",
+   "cents": -22964,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-06",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-06-10:-22964:mobile-banking-payment-to-crd-2222",
+   "pairId": "harbor-card-2222:2026-06-11:22964:payment-from-chk-1111-conf-xytr9a6y2"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-11",
+   "description": "SPOTIFY USA 877-7781161 NY",
+   "merchant": "Spotify",
+   "cents": -1199,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "subscriptions",
+   "id": "harbor-card-2222:2026-06-11:-1199:spotify-usa-877-7781161-ny"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-11",
+   "description": "PAYMENT FROM CHK 1111 CONF# xytr9a6y2",
+   "merchant": "Card payment",
+   "cents": 22964,
+   "kind": "transfer",
+   "source": "Harbor card sample-2026-06",
+   "subtype": "card_payment",
+   "id": "harbor-card-2222:2026-06-11:22964:payment-from-chk-1111-conf-xytr9a6y2",
+   "pairId": "northwind-chk-1111:2026-06-10:-22964:mobile-banking-payment-to-crd-2222"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-11",
+   "description": "COSTCO WHSE #663 SPRINGFIELD IL",
+   "merchant": "Costco",
+   "cents": -19961,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-06",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-06-11:-19961:costco-whse-663-springfield-il"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-11",
+   "description": "Exxon",
+   "merchant": "Gas station",
+   "cents": -5052,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "fuel",
+   "id": "pebble-card:2026-06-11:-5052:exxon"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-12",
+   "description": "WAL-MART #4109 SPRINGFIELD IL",
+   "merchant": "Walmart",
+   "cents": -2833,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "harbor-card-2222:2026-06-12:-2833:wal-mart-4109-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-12",
+   "description": "KROGER #568 SPRINGFIELD IL",
+   "merchant": "Kroger",
+   "cents": -6323,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-06-12:-6323:kroger-568-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-12",
+   "description": "WAL-MART #3103 SPRINGFIELD IL",
+   "merchant": "Walmart",
+   "cents": -9217,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "harbor-card-2222:2026-06-12:-9217:wal-mart-3103-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-06-12",
+   "description": "STATE FARM MUTUAL AUTO INS",
+   "merchant": "State Farm",
+   "cents": -9414,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-06",
+   "category": "insurance",
+   "id": "northwind-chk-1111:2026-06-12:-9414:state-farm-mutual-auto-ins"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-12",
+   "description": "Publix",
+   "merchant": "Grocery store",
+   "cents": -11808,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-06-12:-11808:publix"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-13",
+   "description": "ALDI 84581 SPRINGFIELD IL",
+   "merchant": "Aldi",
+   "cents": -8452,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-06-13:-8452:aldi-84581-springfield-il"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-13",
+   "description": "COSTCO GAS #1106 SPRINGFIELD IL",
+   "merchant": "Costco Gas",
+   "cents": -5083,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-06",
+   "category": "fuel",
+   "id": "orchard-visa-3333:2026-06-13:-5083:costco-gas-1106-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-06-14",
+   "description": "Mobile Banking payment to CRD 3333",
+   "merchant": "Card payment",
+   "cents": -46567,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-06",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-06-14:-46567:mobile-banking-payment-to-crd-3333",
+   "pairId": "orchard-visa-3333:2026-06-17:46567:payment-thank-you-mobile"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-15",
+   "description": "PAYPAL *PIXELCRAFT 1300178160 CA",
+   "merchant": "Paypal *Pixelcraft 1300178160 Ca",
+   "cents": -1852,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "harbor-card-2222:2026-06-15:-1852:paypal-pixelcraft-1300178160-ca"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-06-15",
+   "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+   "merchant": "Payroll",
+   "cents": 215000,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-06",
+   "subtype": "salary",
+   "id": "northwind-chk-1111:2026-06-15:215000:acme-corp-payroll-des-payroll-id-000123"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-15",
+   "description": "Publix",
+   "merchant": "Grocery store",
+   "cents": -8962,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-06-15:-8962:publix"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-17",
+   "description": "AMAZON MKTPL*J7CY4 AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -5257,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-06",
+   "ref": "D01-0000004-3435039",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-06-17:-5257:amazon-mktpl-j7cy4-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-17",
+   "description": "Payment Thank You-Mobile",
+   "merchant": "Card payment",
+   "cents": 46567,
+   "kind": "transfer",
+   "source": "Orchard statement sample-2026-06",
+   "subtype": "card_payment",
+   "id": "orchard-visa-3333:2026-06-17:46567:payment-thank-you-mobile",
+   "pairId": "northwind-chk-1111:2026-06-14:-46567:mobile-banking-payment-to-crd-3333"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-17",
+   "description": "Apple Services",
+   "merchant": "Apple Services",
+   "cents": -1099,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "subscriptions",
+   "id": "pebble-card:2026-06-17:-1099:apple-services"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-19",
+   "description": "Publix",
+   "merchant": "Grocery store",
+   "cents": -10565,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-06-19:-10565:publix"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-20",
+   "description": "CVS/PHARMACY #4655 SPRINGFIELD IL",
+   "merchant": "Pharmacy",
+   "cents": -4305,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "medical",
+   "id": "harbor-card-2222:2026-06-20:-4305:cvs-pharmacy-4655-springfield-il"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-20",
+   "description": "NAMECHEAP.COM PHOENIX AZ",
+   "merchant": "Namecheap",
+   "cents": -1128,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-06",
+   "category": "subscriptions",
+   "business": true,
+   "id": "orchard-visa-3333:2026-06-20:-1128:namecheap-com-phoenix-az"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-20",
+   "description": "Geico",
+   "merchant": "Insurance",
+   "cents": -11840,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "insurance",
+   "id": "pebble-card:2026-06-20:-11840:geico"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-22",
+   "description": "SHELL OIL 99703681QPS SPRINGFIELD IL",
+   "merchant": "Shell",
+   "cents": -4093,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "fuel",
+   "id": "harbor-card-2222:2026-06-22:-4093:shell-oil-99703681qps-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-06-22",
+   "description": "Mobile Banking payment to CRD 4444",
+   "merchant": "Card payment",
+   "cents": -29494,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-06",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-06-22:-29494:mobile-banking-payment-to-crd-4444",
+   "pairId": "pebble-card:2026-06-25:29494:ach-deposit-internet-transfer-from-accou"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-23",
+   "description": "COSTCO WHSE #354 SPRINGFIELD IL",
+   "merchant": "Costco",
+   "cents": -14681,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-06",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-06-23:-14681:costco-whse-354-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-25",
+   "description": "KROGER #427 SPRINGFIELD IL",
+   "merchant": "Kroger",
+   "cents": -8421,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-06-25:-8421:kroger-427-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-06-25",
+   "description": "Mobile Banking payment to CRD 2222",
+   "merchant": "Card payment",
+   "cents": -12771,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-06",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-06-25:-12771:mobile-banking-payment-to-crd-2222",
+   "pairId": "harbor-card-2222:2026-06-28:12771:payment-from-chk-1111-conf-emtdy26hr"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-25",
+   "description": "THE HOME DEPOT #2748 SPRINGFIELD IL",
+   "merchant": "Home Depot",
+   "cents": -2760,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-06",
+   "category": "household",
+   "id": "orchard-visa-3333:2026-06-25:-2760:the-home-depot-2748-springfield-il"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-25",
+   "description": "Ach Deposit Internet Transfer From Account Ending In 1111",
+   "merchant": "Card payment",
+   "cents": 29494,
+   "kind": "transfer",
+   "source": "Pebble card export",
+   "subtype": "card_payment",
+   "id": "pebble-card:2026-06-25:29494:ach-deposit-internet-transfer-from-accou",
+   "pairId": "northwind-chk-1111:2026-06-22:-29494:mobile-banking-payment-to-crd-4444"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-26",
+   "description": "Starbucks",
+   "merchant": "Restaurant",
+   "cents": -1009,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "restaurants",
+   "id": "pebble-card:2026-06-26:-1009:starbucks"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-26",
+   "description": "Starbucks",
+   "merchant": "Restaurant",
+   "cents": -2904,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "restaurants",
+   "id": "pebble-card:2026-06-26:-2904:starbucks"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-06-27",
+   "description": "Daily Cash Redemption",
+   "merchant": "Apple Daily Cash",
+   "cents": 357,
+   "kind": "rewards",
+   "source": "Pebble card export",
+   "subtype": "cash_back",
+   "id": "pebble-card:2026-06-27:357:daily-cash-redemption"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-28",
+   "description": "CHIPOTLE 1907 SPRINGFIELD IL",
+   "merchant": "Restaurant",
+   "cents": -1385,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-06",
+   "category": "restaurants",
+   "id": "harbor-card-2222:2026-06-28:-1385:chipotle-1907-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-06-28",
+   "description": "PAYMENT FROM CHK 1111 CONF# emtdy26hr",
+   "merchant": "Card payment",
+   "cents": 12771,
+   "kind": "transfer",
+   "source": "Harbor card sample-2026-06",
+   "subtype": "card_payment",
+   "id": "harbor-card-2222:2026-06-28:12771:payment-from-chk-1111-conf-emtdy26hr",
+   "pairId": "northwind-chk-1111:2026-06-25:-12771:mobile-banking-payment-to-crd-2222"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-06-28",
+   "description": "DEPOSIT (description redacted)",
+   "merchant": "Deposit",
+   "cents": 64000,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-06",
+   "subtype": "unconfirmed",
+   "hints": [
+    "confirm_income"
+   ],
+   "id": "northwind-chk-1111:2026-06-28:64000:deposit-description-redacted"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-06-28",
+   "description": "AMAZON PRIME*BAGQM2 AMZN.COM/BILL WA",
+   "merchant": "Amazon Prime",
+   "cents": -1499,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-06",
+   "category": "subscriptions",
+   "id": "orchard-visa-3333:2026-06-28:-1499:amazon-prime-bagqm2-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-01",
+   "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+   "merchant": "Payroll",
+   "cents": 215000,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-07",
+   "subtype": "salary",
+   "id": "northwind-chk-1111:2026-07-01:215000:acme-corp-payroll-des-payroll-id-000123"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-02",
+   "description": "KROGER #222 SPRINGFIELD IL",
+   "merchant": "Kroger",
+   "cents": -6891,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-07-02:-6891:kroger-222-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-02",
+   "description": "ZELLE PAYMENT TO JORDAN LEE CONF# ydcdcqcrt",
+   "merchant": "Zelle: Jordan Lee",
+   "cents": -145000,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-07",
+   "category": "people",
+   "hints": [
+    "person_payment"
+   ],
+   "id": "northwind-chk-1111:2026-07-02:-145000:zelle-payment-to-jordan-lee-conf-ydcdcqc"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-07-02",
+   "description": "AMAZON MKTPL*B3GKX AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -8935,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-07",
+   "ref": "D01-0000008-1888849",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-07-02:-8935:amazon-mktpl-b3gkx-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-03",
+   "description": "GITHUB, INC. SAN FRANCISCO CA",
+   "merchant": "GitHub",
+   "cents": -400,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "subscriptions",
+   "business": true,
+   "id": "harbor-card-2222:2026-07-03:-400:github-inc-san-francisco-ca"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-03",
+   "description": "SHELL OIL 59489321QPS SPRINGFIELD IL",
+   "merchant": "Shell",
+   "cents": -4725,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "fuel",
+   "id": "harbor-card-2222:2026-07-03:-4725:shell-oil-59489321qps-springfield-il"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-04",
+   "description": "Whole Foods Market",
+   "merchant": "Grocery store",
+   "cents": -10445,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-07-04:-10445:whole-foods-market"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-05",
+   "description": "NETFLIX.COM 866-579-7172 CA",
+   "merchant": "Netflix",
+   "cents": -1549,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "subscriptions",
+   "id": "harbor-card-2222:2026-07-05:-1549:netflix-com-866-579-7172-ca"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-05",
+   "description": "WAL-MART #1221 SPRINGFIELD IL",
+   "merchant": "Walmart",
+   "cents": -6107,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "harbor-card-2222:2026-07-05:-6107:wal-mart-1221-springfield-il"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-05",
+   "description": "Mystery Gadget Shop",
+   "merchant": "Mystery Gadget Shop",
+   "cents": -3832,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "pebble-card:2026-07-05:-3832:mystery-gadget-shop"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-06",
+   "description": "MCDONALDS F7389 SPRINGFIELD IL",
+   "merchant": "Restaurant",
+   "cents": -1608,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "restaurants",
+   "id": "harbor-card-2222:2026-07-06:-1608:mcdonalds-f7389-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-06",
+   "description": "HEROKU* JUL-665828531 WWW.HEROKU.CO CA",
+   "merchant": "Heroku",
+   "cents": -700,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "subscriptions",
+   "business": true,
+   "id": "harbor-card-2222:2026-07-06:-700:heroku-jul-665828531-www-heroku-co-ca"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-08",
+   "description": "T-MOBILE DES:WIRELESS",
+   "merchant": "T-Mobile",
+   "cents": -8589,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-07",
+   "category": "phone",
+   "id": "northwind-chk-1111:2026-07-08:-8589:t-mobile-des-wireless"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-09",
+   "description": "SPRINGFIELD MOTORS REPAIR IL",
+   "merchant": "Springfield Motors Repair Il",
+   "cents": -125000,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant",
+    "large_one_off"
+   ],
+   "id": "harbor-card-2222:2026-07-09:-125000:springfield-motors-repair-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-09",
+   "description": "CHIPOTLE 2919 SPRINGFIELD IL",
+   "merchant": "Restaurant",
+   "cents": -1624,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "restaurants",
+   "id": "harbor-card-2222:2026-07-09:-1624:chipotle-2919-springfield-il"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-07-09",
+   "description": "OPENROUTER, INC NEW YORK NY",
+   "merchant": "OpenRouter",
+   "cents": -2000,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-07",
+   "category": "subscriptions",
+   "business": true,
+   "id": "orchard-visa-3333:2026-07-09:-2000:openrouter-inc-new-york-ny"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-10",
+   "description": "SHELL OIL 59112657QPS SPRINGFIELD IL",
+   "merchant": "Shell",
+   "cents": -5573,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "fuel",
+   "id": "harbor-card-2222:2026-07-10:-5573:shell-oil-59112657qps-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-10",
+   "description": "Mobile Banking payment to CRD 2222",
+   "merchant": "Card payment",
+   "cents": -17223,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-07",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-07-10:-17223:mobile-banking-payment-to-crd-2222",
+   "pairId": "harbor-card-2222:2026-07-11:17223:payment-from-chk-1111-conf-sbcg5whaj"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-11",
+   "description": "SPOTIFY USA 877-7781161 NY",
+   "merchant": "Spotify",
+   "cents": -1199,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "subscriptions",
+   "id": "harbor-card-2222:2026-07-11:-1199:spotify-usa-877-7781161-ny"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-11",
+   "description": "PAYMENT FROM CHK 1111 CONF# sbcg5whaj",
+   "merchant": "Card payment",
+   "cents": 17223,
+   "kind": "transfer",
+   "source": "Harbor card sample-2026-07",
+   "subtype": "card_payment",
+   "id": "harbor-card-2222:2026-07-11:17223:payment-from-chk-1111-conf-sbcg5whaj",
+   "pairId": "northwind-chk-1111:2026-07-10:-17223:mobile-banking-payment-to-crd-2222"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-07-11",
+   "description": "AMAZON PRIME*C22H3U AMZN.COM/BILL WA",
+   "merchant": "Amazon Prime",
+   "cents": -1499,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-07",
+   "category": "subscriptions",
+   "id": "orchard-visa-3333:2026-07-11:-1499:amazon-prime-c22h3u-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-07-11",
+   "description": "AMAZON MKTPL*PDZN3 AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -6855,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-07",
+   "ref": "D01-0000006-5272490",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-07-11:-6855:amazon-mktpl-pdzn3-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-11",
+   "description": "Trader Joes",
+   "merchant": "Grocery store",
+   "cents": -9109,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-07-11:-9109:trader-joes"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-12",
+   "description": "CVS/PHARMACY #7373 SPRINGFIELD IL",
+   "merchant": "Pharmacy",
+   "cents": -1967,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "medical",
+   "id": "harbor-card-2222:2026-07-12:-1967:cvs-pharmacy-7373-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-12",
+   "description": "STATE FARM MUTUAL AUTO INS",
+   "merchant": "State Farm",
+   "cents": -9150,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-07",
+   "category": "insurance",
+   "id": "northwind-chk-1111:2026-07-12:-9150:state-farm-mutual-auto-ins"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-13",
+   "description": "ALDI 25555 SPRINGFIELD IL",
+   "merchant": "Aldi",
+   "cents": -4311,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-07-13:-4311:aldi-25555-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-13",
+   "description": "PAYPAL *PIXELCRAFT 8706118780 CA",
+   "merchant": "Paypal *Pixelcraft 8706118780 Ca",
+   "cents": -891,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "harbor-card-2222:2026-07-13:-891:paypal-pixelcraft-8706118780-ca"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-14",
+   "description": "KROGER #915 SPRINGFIELD IL",
+   "merchant": "Kroger",
+   "cents": -13954,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-07-14:-13954:kroger-915-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-14",
+   "description": "ALDI 45030 SPRINGFIELD IL",
+   "merchant": "Aldi",
+   "cents": -6079,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-07-14:-6079:aldi-45030-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-14",
+   "description": "Mobile Banking payment to CRD 3333",
+   "merchant": "Card payment",
+   "cents": -45479,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-07",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-07-14:-45479:mobile-banking-payment-to-crd-3333",
+   "pairId": "orchard-visa-3333:2026-07-15:45479:payment-thank-you-mobile"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-15",
+   "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+   "merchant": "Payroll",
+   "cents": 215000,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-07",
+   "subtype": "salary",
+   "id": "northwind-chk-1111:2026-07-15:215000:acme-corp-payroll-des-payroll-id-000123"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-07-15",
+   "description": "Payment Thank You-Mobile",
+   "merchant": "Card payment",
+   "cents": 45479,
+   "kind": "transfer",
+   "source": "Orchard statement sample-2026-07",
+   "subtype": "card_payment",
+   "id": "orchard-visa-3333:2026-07-15:45479:payment-thank-you-mobile",
+   "pairId": "northwind-chk-1111:2026-07-14:-45479:mobile-banking-payment-to-crd-3333"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-07-16",
+   "description": "AMAZON MKTPL*P5WQZ AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -1715,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-07",
+   "ref": "D01-0000007-1271683",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-07-16:-1715:amazon-mktpl-p5wqz-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-07-16",
+   "description": "COSTCO WHSE #1471 SPRINGFIELD IL",
+   "merchant": "Costco",
+   "cents": -24970,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-07",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-07-16:-24970:costco-whse-1471-springfield-il"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-17",
+   "description": "Trader Joes",
+   "merchant": "Grocery store",
+   "cents": -10050,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-07-17:-10050:trader-joes"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-17",
+   "description": "Apple Services",
+   "merchant": "Apple Services",
+   "cents": -1099,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "subscriptions",
+   "id": "pebble-card:2026-07-17:-1099:apple-services"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-18",
+   "description": "Online Banking transfer to CHK 9999",
+   "merchant": "Transfer to own account",
+   "cents": -50000,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-07",
+   "subtype": "internal",
+   "hints": [
+    "confirm_transfer_account"
+   ],
+   "id": "northwind-chk-1111:2026-07-18:-50000:online-banking-transfer-to-chk-9999"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-19",
+   "description": "CHIPOTLE 1532 SPRINGFIELD IL",
+   "merchant": "Restaurant",
+   "cents": -1300,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "restaurants",
+   "id": "harbor-card-2222:2026-07-19:-1300:chipotle-1532-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-19",
+   "description": "WAL-MART #2417 STORE RETURN SPRINGFIELD IL",
+   "merchant": "Walmart",
+   "cents": 2499,
+   "kind": "refund",
+   "source": "Harbor card sample-2026-07",
+   "category": "mixed_retail",
+   "id": "harbor-card-2222:2026-07-19:2499:wal-mart-2417-store-return-springfield-i"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-19",
+   "description": "Panera Bread",
+   "merchant": "Restaurant",
+   "cents": -1644,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "restaurants",
+   "id": "pebble-card:2026-07-19:-1644:panera-bread"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-19",
+   "description": "Exxon",
+   "merchant": "Gas station",
+   "cents": -5247,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "fuel",
+   "id": "pebble-card:2026-07-19:-5247:exxon"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-20",
+   "description": "BLUE HERON WELLNESS SPRINGFIELD IL",
+   "merchant": "Blue Heron Wellness Springfield Il",
+   "cents": -7381,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "harbor-card-2222:2026-07-20:-7381:blue-heron-wellness-springfield-il"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-07-20",
+   "description": "AMAZON MKTPL*2CAAE AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -6443,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-07",
+   "ref": "D01-0000005-6703483",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-07-20:-6443:amazon-mktpl-2caae-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-20",
+   "description": "Geico",
+   "merchant": "Insurance",
+   "cents": -11840,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "insurance",
+   "id": "pebble-card:2026-07-20:-11840:geico"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-20",
+   "description": "Chipotle",
+   "merchant": "Restaurant",
+   "cents": -2003,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "restaurants",
+   "id": "pebble-card:2026-07-20:-2003:chipotle"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-21",
+   "description": "MOBILE DEPOSIT",
+   "merchant": "Mobile check deposit",
+   "cents": 12500,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-07",
+   "subtype": "unconfirmed",
+   "hints": [
+    "confirm_income"
+   ],
+   "id": "northwind-chk-1111:2026-07-21:12500:mobile-deposit"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-22",
+   "description": "Mobile Banking payment to CRD 4444",
+   "merchant": "Card payment",
+   "cents": -45760,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-07",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-07-22:-45760:mobile-banking-payment-to-crd-4444",
+   "pairId": "pebble-card:2026-07-23:45760:ach-deposit-internet-transfer-from-accou"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-23",
+   "description": "Chevron",
+   "merchant": "Gas station",
+   "cents": -5164,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "fuel",
+   "id": "pebble-card:2026-07-23:-5164:chevron"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-23",
+   "description": "Ach Deposit Internet Transfer From Account Ending In 1111",
+   "merchant": "Card payment",
+   "cents": 45760,
+   "kind": "transfer",
+   "source": "Pebble card export",
+   "subtype": "card_payment",
+   "id": "pebble-card:2026-07-23:45760:ach-deposit-internet-transfer-from-accou",
+   "pairId": "northwind-chk-1111:2026-07-22:-45760:mobile-banking-payment-to-crd-4444"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-25",
+   "description": "Mobile Banking payment to CRD 2222",
+   "merchant": "Card payment",
+   "cents": -19729,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-07",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-07-25:-19729:mobile-banking-payment-to-crd-2222",
+   "pairId": "harbor-card-2222:2026-07-26:19729:payment-from-chk-1111-conf-ypkbh9hx2"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-07-25",
+   "description": "COSTCO WHSE #334 SPRINGFIELD IL",
+   "merchant": "Costco",
+   "cents": -22171,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-07",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-07-25:-22171:costco-whse-334-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-26",
+   "description": "WAL-MART #2587 SPRINGFIELD IL",
+   "merchant": "Walmart",
+   "cents": -7301,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "harbor-card-2222:2026-07-26:-7301:wal-mart-2587-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-26",
+   "description": "PAYMENT FROM CHK 1111 CONF# ypkbh9hx2",
+   "merchant": "Card payment",
+   "cents": 19729,
+   "kind": "transfer",
+   "source": "Harbor card sample-2026-07",
+   "subtype": "card_payment",
+   "id": "harbor-card-2222:2026-07-26:19729:payment-from-chk-1111-conf-ypkbh9hx2",
+   "pairId": "northwind-chk-1111:2026-07-25:-19729:mobile-banking-payment-to-crd-2222"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-07-26",
+   "description": "COSTCO GAS #1807 SPRINGFIELD IL",
+   "merchant": "Costco Gas",
+   "cents": -3150,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-07",
+   "category": "fuel",
+   "id": "orchard-visa-3333:2026-07-26:-3150:costco-gas-1807-springfield-il"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-07-27",
+   "description": "Daily Cash Redemption",
+   "merchant": "Apple Daily Cash",
+   "cents": 727,
+   "kind": "rewards",
+   "source": "Pebble card export",
+   "subtype": "cash_back",
+   "id": "pebble-card:2026-07-27:727:daily-cash-redemption"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-07-28",
+   "description": "KROGER #281 SPRINGFIELD IL",
+   "merchant": "Kroger",
+   "cents": -10494,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-07",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-07-28:-10494:kroger-281-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-07-28",
+   "description": "DEPOSIT (description redacted)",
+   "merchant": "Deposit",
+   "cents": 64000,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-07",
+   "subtype": "unconfirmed",
+   "hints": [
+    "confirm_income"
+   ],
+   "id": "northwind-chk-1111:2026-07-28:64000:deposit-description-redacted"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-07-28",
+   "description": "THE HOME DEPOT #9025 SPRINGFIELD IL",
+   "merchant": "Home Depot",
+   "cents": -5344,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-07",
+   "category": "household",
+   "id": "orchard-visa-3333:2026-07-28:-5344:the-home-depot-9025-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-08-01",
+   "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+   "merchant": "Payroll",
+   "cents": 215000,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-08",
+   "subtype": "salary",
+   "id": "northwind-chk-1111:2026-08-01:215000:acme-corp-payroll-des-payroll-id-000123"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-08-02",
+   "description": "ZELLE PAYMENT TO JORDAN LEE CONF# baaqcxbqx",
+   "merchant": "Zelle: Jordan Lee",
+   "cents": -145000,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-08",
+   "category": "people",
+   "hints": [
+    "person_payment"
+   ],
+   "id": "northwind-chk-1111:2026-08-02:-145000:zelle-payment-to-jordan-lee-conf-baaqcxb"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-03",
+   "description": "GITHUB, INC. SAN FRANCISCO CA",
+   "merchant": "GitHub",
+   "cents": -400,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "subscriptions",
+   "business": true,
+   "id": "harbor-card-2222:2026-08-03:-400:github-inc-san-francisco-ca"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-03",
+   "description": "SHELL OIL 86403102QPS SPRINGFIELD IL",
+   "merchant": "Shell",
+   "cents": -5274,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "fuel",
+   "id": "harbor-card-2222:2026-08-03:-5274:shell-oil-86403102qps-springfield-il"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-04",
+   "description": "Payment Thank You-Mobile",
+   "merchant": "Card payment",
+   "cents": 21000,
+   "kind": "transfer",
+   "source": "Orchard statement sample-2026-08",
+   "subtype": "card_payment",
+   "id": "orchard-visa-3333:2026-08-04:21000:payment-thank-you-mobile"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-05",
+   "description": "NETFLIX.COM 866-579-7172 CA",
+   "merchant": "Netflix",
+   "cents": -1549,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "subscriptions",
+   "id": "harbor-card-2222:2026-08-05:-1549:netflix-com-866-579-7172-ca"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-06",
+   "description": "WAL-MART #3550 SPRINGFIELD IL",
+   "merchant": "Walmart",
+   "cents": -10223,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "harbor-card-2222:2026-08-06:-10223:wal-mart-3550-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-06",
+   "description": "HEROKU* AUG-785964001 WWW.HEROKU.CO CA",
+   "merchant": "Heroku",
+   "cents": -700,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "subscriptions",
+   "business": true,
+   "id": "harbor-card-2222:2026-08-06:-700:heroku-aug-785964001-www-heroku-co-ca"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-08",
+   "description": "ALDI 99689 SPRINGFIELD IL",
+   "merchant": "Aldi",
+   "cents": -9309,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-08-08:-9309:aldi-99689-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-08-08",
+   "description": "T-MOBILE DES:WIRELESS",
+   "merchant": "T-Mobile",
+   "cents": -8698,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-08",
+   "category": "phone",
+   "id": "northwind-chk-1111:2026-08-08:-8698:t-mobile-des-wireless"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-09",
+   "description": "OPENROUTER, INC NEW YORK NY",
+   "merchant": "OpenRouter",
+   "cents": -2000,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-08",
+   "category": "subscriptions",
+   "business": true,
+   "id": "orchard-visa-3333:2026-08-09:-2000:openrouter-inc-new-york-ny"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-09",
+   "description": "Exxon",
+   "merchant": "Gas station",
+   "cents": -3464,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "fuel",
+   "id": "pebble-card:2026-08-09:-3464:exxon"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-08-10",
+   "description": "Mobile Banking payment to CRD 2222",
+   "merchant": "Card payment",
+   "cents": -40412,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-08",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-08-10:-40412:mobile-banking-payment-to-crd-2222",
+   "pairId": "harbor-card-2222:2026-08-12:40412:payment-from-chk-1111-conf-wuje75z75"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-10",
+   "description": "AMAZON MKTPL*7UMU2 AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -9025,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-08",
+   "ref": "D01-0000011-1383453",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-08-10:-9025:amazon-mktpl-7umu2-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-11",
+   "description": "SPOTIFY USA 877-7781161 NY",
+   "merchant": "Spotify",
+   "cents": -1199,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "subscriptions",
+   "id": "harbor-card-2222:2026-08-11:-1199:spotify-usa-877-7781161-ny"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-11",
+   "description": "SHELL OIL 96900052QPS SPRINGFIELD IL",
+   "merchant": "Shell",
+   "cents": -3405,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "fuel",
+   "id": "harbor-card-2222:2026-08-11:-3405:shell-oil-96900052qps-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-12",
+   "description": "KROGER #807 SPRINGFIELD IL",
+   "merchant": "Kroger",
+   "cents": -8120,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-08-12:-8120:kroger-807-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-12",
+   "description": "PAYMENT FROM CHK 1111 CONF# wuje75z75",
+   "merchant": "Card payment",
+   "cents": 40412,
+   "kind": "transfer",
+   "source": "Harbor card sample-2026-08",
+   "subtype": "card_payment",
+   "id": "harbor-card-2222:2026-08-12:40412:payment-from-chk-1111-conf-wuje75z75",
+   "pairId": "northwind-chk-1111:2026-08-10:-40412:mobile-banking-payment-to-crd-2222"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-08-12",
+   "description": "STATE FARM MUTUAL AUTO INS",
+   "merchant": "State Farm",
+   "cents": -9248,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-08",
+   "category": "insurance",
+   "id": "northwind-chk-1111:2026-08-12:-9248:state-farm-mutual-auto-ins"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-12",
+   "description": "Whole Foods Market",
+   "merchant": "Grocery store",
+   "cents": -6382,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-08-12:-6382:whole-foods-market"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-12",
+   "description": "Publix",
+   "merchant": "Grocery store",
+   "cents": -9631,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-08-12:-9631:publix"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-13",
+   "description": "MCDONALDS F3178 SPRINGFIELD IL",
+   "merchant": "Restaurant",
+   "cents": -923,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "restaurants",
+   "id": "harbor-card-2222:2026-08-13:-923:mcdonalds-f3178-springfield-il"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-13",
+   "description": "COSTCO WHSE #921 SPRINGFIELD IL",
+   "merchant": "Costco",
+   "cents": -12758,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-08",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-08-13:-12758:costco-whse-921-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-14",
+   "description": "LINKEDIN PRE 8442403888 CA",
+   "merchant": "LinkedIn",
+   "cents": -3999,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "subscriptions",
+   "hints": [
+    "business_or_personal"
+   ],
+   "id": "harbor-card-2222:2026-08-14:-3999:linkedin-pre-8442403888-ca"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-08-14",
+   "description": "Mobile Banking payment to CRD 3333",
+   "merchant": "Card payment",
+   "cents": -34709,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-08",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-08-14:-34709:mobile-banking-payment-to-crd-3333",
+   "pairId": "orchard-visa-3333:2026-08-15:34709:payment-thank-you-mobile"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-14",
+   "description": "AMAZON MKTPL*2YFZX AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -1195,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-08",
+   "ref": "D01-0000010-3391127",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-08-14:-1195:amazon-mktpl-2yfzx-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-14",
+   "description": "AMAZON PRIME*66Z44H AMZN.COM/BILL WA",
+   "merchant": "Amazon Prime",
+   "cents": -1499,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-08",
+   "category": "subscriptions",
+   "id": "orchard-visa-3333:2026-08-14:-1499:amazon-prime-66z44h-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-15",
+   "description": "BLUE HERON WELLNESS SPRINGFIELD IL",
+   "merchant": "Blue Heron Wellness Springfield Il",
+   "cents": -4914,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "harbor-card-2222:2026-08-15:-4914:blue-heron-wellness-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-08-15",
+   "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+   "merchant": "Payroll",
+   "cents": 215000,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-08",
+   "subtype": "salary",
+   "id": "northwind-chk-1111:2026-08-15:215000:acme-corp-payroll-des-payroll-id-000123"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-15",
+   "description": "Payment Thank You-Mobile",
+   "merchant": "Card payment",
+   "cents": 34709,
+   "kind": "transfer",
+   "source": "Orchard statement sample-2026-08",
+   "subtype": "card_payment",
+   "id": "orchard-visa-3333:2026-08-15:34709:payment-thank-you-mobile",
+   "pairId": "northwind-chk-1111:2026-08-14:-34709:mobile-banking-payment-to-crd-3333"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-17",
+   "description": "CHIPOTLE 3174 SPRINGFIELD IL",
+   "merchant": "Restaurant",
+   "cents": -1308,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "restaurants",
+   "id": "harbor-card-2222:2026-08-17:-1308:chipotle-3174-springfield-il"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-17",
+   "description": "Apple Services",
+   "merchant": "Apple Services",
+   "cents": -1099,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "subscriptions",
+   "id": "pebble-card:2026-08-17:-1099:apple-services"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-18",
+   "description": "WAL-MART #1831 SPRINGFIELD IL",
+   "merchant": "Walmart",
+   "cents": -6992,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "harbor-card-2222:2026-08-18:-6992:wal-mart-1831-springfield-il"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-19",
+   "description": "COSTCO GAS #982 SPRINGFIELD IL",
+   "merchant": "Costco Gas",
+   "cents": -4327,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-08",
+   "category": "fuel",
+   "id": "orchard-visa-3333:2026-08-19:-4327:costco-gas-982-springfield-il"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-19",
+   "description": "Exxon",
+   "merchant": "Gas station",
+   "cents": -4656,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "fuel",
+   "id": "pebble-card:2026-08-19:-4656:exxon"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-20",
+   "description": "Geico",
+   "merchant": "Insurance",
+   "cents": -11840,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "insurance",
+   "id": "pebble-card:2026-08-20:-11840:geico"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-20",
+   "description": "Mystery Gadget Shop",
+   "merchant": "Mystery Gadget Shop",
+   "cents": -5477,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "pebble-card:2026-08-20:-5477:mystery-gadget-shop"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-21",
+   "description": "THE HOME DEPOT #9208 SPRINGFIELD IL",
+   "merchant": "Home Depot",
+   "cents": -11666,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-08",
+   "category": "household",
+   "id": "orchard-visa-3333:2026-08-21:-11666:the-home-depot-9208-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-22",
+   "description": "CVS/PHARMACY #3089 SPRINGFIELD IL",
+   "merchant": "Pharmacy",
+   "cents": -4342,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "medical",
+   "id": "harbor-card-2222:2026-08-22:-4342:cvs-pharmacy-3089-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-08-22",
+   "description": "Mobile Banking payment to CRD 4444",
+   "merchant": "Card payment",
+   "cents": -38229,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-08",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-08-22:-38229:mobile-banking-payment-to-crd-4444",
+   "pairId": "pebble-card:2026-08-24:38229:ach-deposit-internet-transfer-from-accou"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-22",
+   "description": "Chipotle",
+   "merchant": "Restaurant",
+   "cents": -1677,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "restaurants",
+   "id": "pebble-card:2026-08-22:-1677:chipotle"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-24",
+   "description": "STARBUCKS STORE 57559 SPRINGFIELD IL",
+   "merchant": "Restaurant",
+   "cents": -1974,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "restaurants",
+   "id": "harbor-card-2222:2026-08-24:-1974:starbucks-store-57559-springfield-il"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-24",
+   "description": "Ach Deposit Internet Transfer From Account Ending In 1111",
+   "merchant": "Card payment",
+   "cents": 38229,
+   "kind": "transfer",
+   "source": "Pebble card export",
+   "subtype": "card_payment",
+   "id": "pebble-card:2026-08-24:38229:ach-deposit-internet-transfer-from-accou",
+   "pairId": "northwind-chk-1111:2026-08-22:-38229:mobile-banking-payment-to-crd-4444"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-25",
+   "description": "KROGER #234 SPRINGFIELD IL",
+   "merchant": "Kroger",
+   "cents": -13362,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-08-25:-13362:kroger-234-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-08-25",
+   "description": "Mobile Banking payment to CRD 2222",
+   "merchant": "Card payment",
+   "cents": -26999,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-08",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-08-25:-26999:mobile-banking-payment-to-crd-2222",
+   "pairId": "harbor-card-2222:2026-08-27:26999:payment-from-chk-1111-conf-6ahajfz6h"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-25",
+   "description": "Publix",
+   "merchant": "Grocery store",
+   "cents": -9112,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-08-25:-9112:publix"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-26",
+   "description": "PAYPAL *PIXELCRAFT 6843235895 CA",
+   "merchant": "Paypal *Pixelcraft 6843235895 Ca",
+   "cents": -1535,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "harbor-card-2222:2026-08-26:-1535:paypal-pixelcraft-6843235895-ca"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-26",
+   "description": "Starbucks",
+   "merchant": "Restaurant",
+   "cents": -3140,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "restaurants",
+   "id": "pebble-card:2026-08-26:-3140:starbucks"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-27",
+   "description": "ALDI 27007 SPRINGFIELD IL",
+   "merchant": "Aldi",
+   "cents": -6686,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-08-27:-6686:aldi-27007-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-27",
+   "description": "PAYMENT FROM CHK 1111 CONF# 6ahajfz6h",
+   "merchant": "Card payment",
+   "cents": 26999,
+   "kind": "transfer",
+   "source": "Harbor card sample-2026-08",
+   "subtype": "card_payment",
+   "id": "harbor-card-2222:2026-08-27:26999:payment-from-chk-1111-conf-6ahajfz6h",
+   "pairId": "northwind-chk-1111:2026-08-25:-26999:mobile-banking-payment-to-crd-2222"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-27",
+   "description": "AMAZON MKTPL*ATYZY AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -6732,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-08",
+   "ref": "D01-0000012-1646573",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-08-27:-6732:amazon-mktpl-atyzy-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-08-27",
+   "description": "Daily Cash Redemption",
+   "merchant": "Apple Daily Cash",
+   "cents": 748,
+   "kind": "rewards",
+   "source": "Pebble card export",
+   "subtype": "cash_back",
+   "id": "pebble-card:2026-08-27:748:daily-cash-redemption"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-28",
+   "description": "KROGER #845 SPRINGFIELD IL",
+   "merchant": "Kroger",
+   "cents": -6406,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-08",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-08-28:-6406:kroger-845-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-08-28",
+   "description": "DEPOSIT (description redacted)",
+   "merchant": "Deposit",
+   "cents": 64000,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-08",
+   "subtype": "unconfirmed",
+   "hints": [
+    "confirm_income"
+   ],
+   "id": "northwind-chk-1111:2026-08-28:64000:deposit-description-redacted"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-28",
+   "description": "AMAZON MKTPL*GFFAJ AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -4276,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-08",
+   "ref": "D01-0000009-2987925",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-08-28:-4276:amazon-mktpl-gffaj-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-08-28",
+   "description": "COSTCO WHSE #1446 SPRINGFIELD IL",
+   "merchant": "Costco",
+   "cents": -9926,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-08",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-08-28:-9926:costco-whse-1446-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-08-30",
+   "description": "CASHREWARD STATEMENT CREDIT",
+   "merchant": "Bank of America rewards",
+   "cents": 1252,
+   "kind": "rewards",
+   "source": "Harbor card sample-2026-08",
+   "subtype": "cash_back",
+   "id": "harbor-card-2222:2026-08-30:1252:cashreward-statement-credit"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-09-01",
+   "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+   "merchant": "Payroll",
+   "cents": 215000,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-09",
+   "subtype": "salary",
+   "id": "northwind-chk-1111:2026-09-01:215000:acme-corp-payroll-des-payroll-id-000123"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-09-01",
+   "description": "AMAZON MKTPL*YJ6GQ AMZN.COM/BILL WA",
+   "merchant": "Amazon",
+   "cents": -8573,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-09",
+   "ref": "D01-0000014-4826487",
+   "category": "online_shopping",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-09-01:-8573:amazon-mktpl-yj6gq-amzn-com-bill-wa"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-09-02",
+   "description": "BLUE HERON WELLNESS SPRINGFIELD IL",
+   "merchant": "Blue Heron Wellness Springfield Il",
+   "cents": -7780,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-09",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "harbor-card-2222:2026-09-02:-7780:blue-heron-wellness-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-09-02",
+   "description": "ZELLE PAYMENT TO JORDAN LEE CONF# 7yxrz3rt5",
+   "merchant": "Zelle: Jordan Lee",
+   "cents": -145000,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-09",
+   "category": "people",
+   "hints": [
+    "person_payment"
+   ],
+   "id": "northwind-chk-1111:2026-09-02:-145000:zelle-payment-to-jordan-lee-conf-7yxrz3r"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-09-03",
+   "description": "GITHUB, INC. SAN FRANCISCO CA",
+   "merchant": "GitHub",
+   "cents": -400,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-09",
+   "category": "subscriptions",
+   "business": true,
+   "id": "harbor-card-2222:2026-09-03:-400:github-inc-san-francisco-ca"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-09-03",
+   "description": "COSTCO WHSE #465 SPRINGFIELD IL",
+   "merchant": "Costco",
+   "cents": -12474,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-09",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-09-03:-12474:costco-whse-465-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-09-04",
+   "description": "PAYPAL *PIXELCRAFT 7507466543 CA",
+   "merchant": "Paypal *Pixelcraft 7507466543 Ca",
+   "cents": -1185,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-09",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "harbor-card-2222:2026-09-04:-1185:paypal-pixelcraft-7507466543-ca"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-09-04",
+   "description": "COSTCO WHSE #931 SPRINGFIELD IL",
+   "merchant": "Costco",
+   "cents": -17129,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-09",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "orchard-visa-3333:2026-09-04:-17129:costco-whse-931-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-09-05",
+   "description": "NETFLIX.COM 866-579-7172 CA",
+   "merchant": "Netflix",
+   "cents": -1549,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-09",
+   "category": "subscriptions",
+   "id": "harbor-card-2222:2026-09-05:-1549:netflix-com-866-579-7172-ca"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-09-05",
+   "description": "COSTCO GAS #1091 SPRINGFIELD IL",
+   "merchant": "Costco Gas",
+   "cents": -4924,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-09",
+   "category": "fuel",
+   "id": "orchard-visa-3333:2026-09-05:-4924:costco-gas-1091-springfield-il"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-09-05",
+   "description": "Whole Foods Market",
+   "merchant": "Grocery store",
+   "cents": -5966,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-09-05:-5966:whole-foods-market"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-09-06",
+   "description": "KROGER #860 SPRINGFIELD IL",
+   "merchant": "Kroger",
+   "cents": -6170,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-09",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-09-06:-6170:kroger-860-springfield-il"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-09-06",
+   "description": "HEROKU* SEP-281211283 WWW.HEROKU.CO CA",
+   "merchant": "Heroku",
+   "cents": -700,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-09",
+   "category": "subscriptions",
+   "business": true,
+   "id": "harbor-card-2222:2026-09-06:-700:heroku-sep-281211283-www-heroku-co-ca"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-09-07",
+   "description": "KROGER #365 SPRINGFIELD IL",
+   "merchant": "Kroger",
+   "cents": -13798,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-09",
+   "category": "groceries",
+   "id": "harbor-card-2222:2026-09-07:-13798:kroger-365-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-09-08",
+   "description": "T-MOBILE DES:WIRELESS",
+   "merchant": "T-Mobile",
+   "cents": -8608,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-09",
+   "category": "phone",
+   "id": "northwind-chk-1111:2026-09-08:-8608:t-mobile-des-wireless"
+  },
+  {
+   "accountId": "orchard-visa-3333",
+   "date": "2026-09-09",
+   "description": "OPENROUTER, INC NEW YORK NY",
+   "merchant": "OpenRouter",
+   "cents": -2000,
+   "kind": "spend",
+   "source": "Orchard statement sample-2026-09",
+   "category": "subscriptions",
+   "business": true,
+   "id": "orchard-visa-3333:2026-09-09:-2000:openrouter-inc-new-york-ny"
+  },
+  {
+   "accountId": "harbor-card-2222",
+   "date": "2026-09-10",
+   "description": "WAL-MART #1239 SPRINGFIELD IL",
+   "merchant": "Walmart",
+   "cents": -17492,
+   "kind": "spend",
+   "source": "Harbor card sample-2026-09",
+   "category": "mixed_retail",
+   "hints": [
+    "needs_items"
+   ],
+   "id": "harbor-card-2222:2026-09-10:-17492:wal-mart-1239-springfield-il"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-09-10",
+   "description": "Mobile Banking payment to CRD 2222",
+   "merchant": "Card payment",
+   "cents": -25757,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-09",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-09-10:-25757:mobile-banking-payment-to-crd-2222"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-09-12",
+   "description": "STATE FARM MUTUAL AUTO INS",
+   "merchant": "State Farm",
+   "cents": -9121,
+   "kind": "spend",
+   "source": "Northwind checking sample-2026-09",
+   "category": "insurance",
+   "id": "northwind-chk-1111:2026-09-12:-9121:state-farm-mutual-auto-ins"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-09-12",
+   "description": "Panera Bread",
+   "merchant": "Restaurant",
+   "cents": -2689,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "restaurants",
+   "id": "pebble-card:2026-09-12:-2689:panera-bread"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-09-13",
+   "description": "Whole Foods Market",
+   "merchant": "Grocery store",
+   "cents": -11408,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-09-13:-11408:whole-foods-market"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-09-13",
+   "description": "Mystery Gadget Shop",
+   "merchant": "Mystery Gadget Shop",
+   "cents": -4275,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "uncategorized",
+   "hints": [
+    "unknown_merchant"
+   ],
+   "id": "pebble-card:2026-09-13:-4275:mystery-gadget-shop"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-09-14",
+   "description": "Mobile Banking payment to CRD 3333",
+   "merchant": "Card payment",
+   "cents": -49507,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-09",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-09-14:-49507:mobile-banking-payment-to-crd-3333"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-09-14",
+   "description": "Exxon",
+   "merchant": "Gas station",
+   "cents": -3916,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "fuel",
+   "id": "pebble-card:2026-09-14:-3916:exxon"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-09-15",
+   "description": "Mobile Banking payment to CRD 2222",
+   "merchant": "Card payment",
+   "cents": -7500,
+   "kind": "transfer",
+   "source": "Northwind checking sample-2026-09",
+   "subtype": "card_payment",
+   "id": "northwind-chk-1111:2026-09-15:-7500:mobile-banking-payment-to-crd-2222"
+  },
+  {
+   "accountId": "northwind-chk-1111",
+   "date": "2026-09-15",
+   "description": "ACME CORP PAYROLL DES:PAYROLL ID:000123",
+   "merchant": "Payroll",
+   "cents": 215000,
+   "kind": "income",
+   "source": "Northwind checking sample-2026-09",
+   "subtype": "salary",
+   "id": "northwind-chk-1111:2026-09-15:215000:acme-corp-payroll-des-payroll-id-000123"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-09-17",
+   "description": "Apple Services",
+   "merchant": "Apple Services",
+   "cents": -1099,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "subscriptions",
+   "id": "pebble-card:2026-09-17:-1099:apple-services"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-09-18",
+   "description": "Panera Bread",
+   "merchant": "Restaurant",
+   "cents": -1061,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "restaurants",
+   "id": "pebble-card:2026-09-18:-1061:panera-bread"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-09-19",
+   "description": "Trader Joes",
+   "merchant": "Grocery store",
+   "cents": -11637,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "groceries",
+   "id": "pebble-card:2026-09-19:-11637:trader-joes"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-09-20",
+   "description": "Geico",
+   "merchant": "Insurance",
+   "cents": -11840,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "insurance",
+   "id": "pebble-card:2026-09-20:-11840:geico"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-09-20",
+   "description": "Chevron",
+   "merchant": "Gas station",
+   "cents": -3914,
+   "kind": "spend",
+   "source": "Pebble card export",
+   "category": "fuel",
+   "id": "pebble-card:2026-09-20:-3914:chevron"
+  },
+  {
+   "accountId": "pebble-card",
+   "date": "2026-09-23",
+   "description": "Ach Deposit Internet Transfer From Account Ending In 1111",
+   "merchant": "Card payment",
+   "cents": 27737,
+   "kind": "transfer",
+   "source": "Pebble card export",
+   "subtype": "card_payment",
+   "id": "pebble-card:2026-09-23:27737:ach-deposit-internet-transfer-from-accou"
+  }
+ ]
+}

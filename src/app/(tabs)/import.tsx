@@ -1,0 +1,521 @@
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { View } from 'react-native';
+
+import { FieldInput, Findings, RowsEditor } from '@/components/intake';
+import { ScreenHeader } from '@/components/header';
+import { matchesFilter, progressLine, runPool, separateByKind, splitRepeats, tally } from '@/core/bulk';
+import type { BulkStatus, Filter } from '@/core/bulk';
+import { CATEGORIES } from '@/core/categories';
+import { todayISO } from '@/core/dates';
+import { findSameReceipt, keyOf, likelyCharges } from '@/core/dedupe';
+import type { ReceiptKey, Sameness } from '@/core/dedupe';
+import { receiptToLines } from '@/core/evidence';
+import type { ReceiptRecord } from '@/core/evidence';
+import { analyseReceipt, analyseStatement, linkReceipt, noAnswers, planStatement, receiptFieldText, resolveAccount, setReceiptField, setStatementField, statementFieldText } from '@/core/intake';
+import type { Analysis, Answers, DocKind, Gap, StatementDraft } from '@/core/intake';
+import { dollars } from '@/core/queries';
+import { suggestCategory } from '@/core/questions';
+import type { Account, Txn } from '@/core/types';
+import { canPickFolder, findDuplicate, loadStoredReceipts, pickFiles, pickFolder, readReceiptFile, readStatementFile, saveReceiptRecord, saveStatementPlan } from '@/data/intake';
+import type { PickedFile } from '@/data/intake';
+import { useRepo } from '@/data/repo';
+import { supabase } from '@/data/supabase';
+import { C, R, S } from '@/theme/tokens';
+import { Banner, Button, Card, Chip, Row, Screen, Segmented, T } from '@/theme/ui';
+
+interface Item {
+  key: string; kind: DocKind; file: PickedFile | null; status: BulkStatus; message?: string;
+  receipt?: ReceiptRecord; statement?: StatementDraft;
+  answers: Answers; errors: Record<string, string>;
+  /** receipts: 'auto' follows the match, 'none' keeps it as evidence only, 'cash' makes a cash purchase, otherwise a ledger transaction id */
+  link: string; cat: string | null; edit: boolean;
+  /** in a long list a row is one line until opened */
+  open: boolean;
+  /** set once saved: the stored receipt, and the charge it ended up on, so later files can be checked against it */
+  savedId?: string; savedTxnId?: string | null;
+}
+type Stored = { id: string; accountId: string | null; periodFrom: string | null; periodTo: string | null };
+
+/** How many files are read at the same time. Each is a paid model call, so this stays small. */
+const READ_LANES = 3;
+/** Rows drawn before "Show more": a hundred open forms would make the page crawl. */
+const PAGE = 40;
+/** A list this long switches to one-line rows. */
+const COMPACT_FROM = 4;
+
+const RECEIPT_FIELDS: [string, string][] = [['merchant', 'Store'], ['date', 'Date'], ['time', 'Time'], ['total', 'Total paid'], ['subtotal', 'Subtotal'], ['tax', 'Sales tax'], ['tip', 'Tip'], ['paymentMethod', 'Paid with'], ['cardLast4', 'Card last 4'], ['storeAddress', 'Store address'], ['storeRef', 'Store number'], ['orderRef', 'Order number']];
+const STATEMENT_FIELDS: [string, string][] = [['institution', 'Bank or issuer'], ['last4', 'Account last 4'], ['periodFrom', 'Period start'], ['periodTo', 'Period end'], ['opening', 'Opening balance (card: previous balance owed)'], ['closing', 'Closing balance (card: new balance owed)']];
+
+async function loadStored(): Promise<Stored[]> {
+  if (!supabase) return [];
+  const q = await supabase.from('statements').select('id, account_id, period_from, period_to');
+  return q.error ? [] : (q.data ?? []).map((r) => ({ id: r.id as string, accountId: r.account_id as string | null, periodFrom: r.period_from as string | null, periodTo: r.period_to as string | null }));
+}
+
+let counter = 0;
+const newItem = (kind: DocKind, file: PickedFile | null, extra: Partial<Item> = {}): Item => ({ key: `i${++counter}`, kind, file, status: 'queued', answers: noAnswers(), errors: {}, link: 'auto', cat: null, edit: false, open: false, ...extra });
+const NONE: ReadonlySet<string> = new Set<string>();
+
+interface Ctx {
+  accounts: Account[]; txns: Txn[]; stored: Stored[];
+  /** receipts already stored, for the same-purchase check */
+  receipts: ReceiptKey[];
+  /** charges that got a receipt earlier in this same save run (the screen has not caught up yet) */
+  claimed: ReadonlySet<string>;
+}
+
+/** Everything the card and the Save buttons need to agree on. `before` = receipts earlier in this batch, so of two copies of one purchase the first is the original. */
+function evaluate(item: Item, ctx: Ctx, before: ReceiptKey[]) {
+  const today = todayISO();
+  let analysis: Analysis;
+  let linkTxn: Txn | null = null; let candidates: Txn[] = []; let linkPending = false; let cash = false; let cashCat: string | null = null; let second = false;
+  let same: Sameness | null = null; let extra = false; let waitingFor: string | null = null; let cashClash: Txn[] = [];
+  if (item.kind === 'receipt') {
+    const rec = item.receipt!;
+    same = rec.dup === 'different' ? null : findSameReceipt(rec, [...ctx.receipts, ...before]);
+    analysis = analyseReceipt(rec, item.answers, today, same);
+    // another document for a purchase already held: it never creates a purchase and never re-splits the items
+    extra = !!same && (same.level === 'same' || rec.dup === 'extra');
+    if (extra) {
+      if (same!.of.id.startsWith('q:')) waitingFor = same!.of.label;
+      linkTxn = ctx.txns.find((t) => t.id === same!.of.txnId) ?? null;
+      second = !!linkTxn;
+    } else {
+      // prefer charges that have no receipt yet, so two identical purchases do not collapse into one; fall back to all charges for a second document of the same purchase
+      const free = ctx.txns.filter((t) => !t.receiptId && !ctx.claimed.has(t.id));
+      let m = linkReceipt(rec, free);
+      if (!m.txnId && !m.candidates.length) m = linkReceipt(rec, ctx.txns);
+      candidates = m.candidates.map((id) => ctx.txns.find((t) => t.id === id)).filter((t): t is Txn => !!t);
+      if (item.link === 'cash') { cash = true; cashCat = item.cat ?? suggestCategory(rec.merchant ?? '') ?? null; if (!item.answers.acknowledged.includes('cash-dup')) cashClash = likelyCharges(rec, ctx.txns); }
+      else if (item.link === 'none') linkTxn = null;
+      else if (item.link !== 'auto') linkTxn = ctx.txns.find((t) => t.id === item.link) ?? null;
+      else if (m.txnId) linkTxn = ctx.txns.find((t) => t.id === m.txnId) ?? null;
+      else if (candidates.length >= 1) linkPending = true;      // one charge with this amount but another store name is still a question
+      second = !!linkTxn && (!!linkTxn.receiptId || ctx.claimed.has(linkTxn.id));
+    }
+  } else {
+    analysis = analyseStatement(item.statement!, { accounts: ctx.accounts, statements: ctx.stored, existing: ctx.txns }, item.answers, today);
+  }
+  const canSave = analysis.ok && !linkPending && !waitingFor && cashClash.length === 0 && (!cash || !!cashCat);
+  return { analysis, linkTxn, candidates, linkPending, cash, cashCat, second, same, extra, waitingFor, cashClash, canSave };
+}
+type Ev = ReturnType<typeof evaluate>;
+
+/** Evaluate the whole list in order, each receipt seeing the ones before it. */
+function evaluateAll(items: Item[], ctx: Ctx): Map<string, Ev> {
+  const out = new Map<string, Ev>(); const before: ReceiptKey[] = [];
+  for (const i of items) {
+    if (i.status === 'review') out.set(i.key, evaluate(i, ctx, before));
+    if (i.receipt && (i.status === 'review' || i.status === 'saving' || i.status === 'saved')) before.push(keyOf(i.receipt, i.savedId ?? `q:${i.key}`, i.file?.name ?? 'a receipt typed by hand', i.savedTxnId));
+  }
+  return out;
+}
+
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export default function Import() {
+  const { accounts, txns, hasData, sync, addCash, attachReceipt, patchTxn } = useRepo();
+  const params = useLocalSearchParams<{ kind?: string }>();
+  const [kind, setKind] = useState<DocKind>(params.kind === 'receipt' ? 'receipt' : 'statement');
+  const [items, setItems] = useState<Item[]>([]);
+  const [stored, setStored] = useState<Stored[]>([]);
+  const [receipts, setReceipts] = useState<ReceiptKey[]>([]);
+  const [notice, setNotice] = useState('');
+  const [info, setInfo] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [limit, setLimit] = useState(PAGE);
+  const [reading, setReading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const connected = !!supabase;
+
+  // The async work below must see the newest list and ledger, not the ones from the render that started it.
+  const itemsRef = useRef<Item[]>([]);
+  const ctx: Ctx = { accounts, txns, stored, receipts, claimed: NONE };
+  const ctxRef = useRef<Ctx>(ctx);
+  useEffect(() => { ctxRef.current = { accounts, txns, stored, receipts, claimed: NONE }; });
+  const savedKeysRef = useRef<ReceiptKey[]>([]);
+  const claimedRef = useRef<Set<string>>(new Set());
+  const stopRef = useRef(false);
+
+  useEffect(() => {
+    let on = true;
+    loadStored().then((s) => { if (on) setStored(s); });
+    loadStoredReceipts().then((r) => { if (on) setReceipts(r); });
+    return () => { on = false; };
+  }, []);
+
+  const update = (f: (xs: Item[]) => Item[]) => { itemsRef.current = f(itemsRef.current); setItems(itemsRef.current); };
+  const patch = (key: string, f: (i: Item) => Item) => update((xs) => xs.map((x) => (x.key === key ? f(x) : x)));
+  const live = (key: string) => itemsRef.current.find((x) => x.key === key);
+
+  /** wait (briefly) for the screen to pick up a ledger change made by a save, so the next file is checked against it */
+  const settle = async (prev: Txn[]) => { for (let i = 0; i < 20 && ctxRef.current.txns === prev; i++) await pause(50); };
+
+  const read = async (item: Item) => {
+    if (!live(item.key)) return;                       // discarded while waiting
+    patch(item.key, (x) => ({ ...x, status: 'reading' }));
+    try {
+      if (item.file) {
+        const dup = await findDuplicate(item.kind, item.file.sha256);
+        if (dup.duplicateOf) return patch(item.key, (x) => ({ ...x, status: 'duplicate', message: `Already stored: ${dup.duplicateOf}. Nothing was changed.` }));
+      }
+      if (item.kind === 'receipt') { const r = await readReceiptFile(item.file!); patch(item.key, (x) => ({ ...x, status: 'review', receipt: r })); }
+      else { const d = await readStatementFile(item.file!); patch(item.key, (x) => ({ ...x, status: 'review', statement: d })); }
+    } catch (e) { patch(item.key, (x) => ({ ...x, status: 'failed', message: (e as Error).message })); }
+  };
+
+  /** Read everything waiting, a few at a time. Safe to call again: it only takes rows still marked waiting. */
+  const processQueue = async () => {
+    const waiting = itemsRef.current.filter((i) => i.status === 'queued');
+    if (!waiting.length) return;
+    stopRef.current = false; setReading(true);
+    await runPool(waiting, READ_LANES, read, () => stopRef.current);
+    setReading(false);
+  };
+
+  const add = async (source: 'files' | 'photos' | 'camera' | 'folder') => {
+    setNotice(''); setInfo('');
+    let files: PickedFile[] = []; let skipped: string[] = [];
+    try {
+      if (source === 'folder') { const p = await pickFolder(); files = p.files; skipped = p.skipped; }
+      else files = await pickFiles(source);
+    } catch (e) { return setNotice((e as Error).message); }
+    if (!files.length && !skipped.length) return;
+
+    const sep = separateByKind(files, kind);
+    const known = new Set(itemsRef.current.flatMap((i) => (i.file ? [i.file.sha256] : [])));
+    const { fresh, repeats } = splitRepeats(sep.fit, known);
+    const notes: string[] = [];
+    if (sep.other.length) notes.push(`${sep.other.length} ${sep.other.length === 1 ? 'file looks' : 'files look'} like ${kind === 'receipt' ? 'statements' : 'receipts'} and ${sep.other.length === 1 ? 'was' : 'were'} left out. Switch the choice above to add ${sep.other.length === 1 ? 'it' : 'them'}.`);
+    if (skipped.length) notes.push(`Skipped ${skipped.length} that ${skipped.length === 1 ? 'is' : 'are'} not a PDF or image: ${skipped.slice(0, 3).map((n) => n.split('/').pop()).join(', ')}${skipped.length > 3 ? ' and more' : ''}.`);
+    if (repeats.length) notes.push(`${repeats.length} repeated ${repeats.length === 1 ? 'file' : 'files'} skipped before reading, so nothing is paid for twice.`);
+    setInfo(notes.join(' '));
+    if (!fresh.length && !repeats.length) return;
+    setFilter('all'); setLimit(PAGE);
+    update((xs) => [
+      ...xs,
+      ...repeats.map((r) => newItem(kind, r.file, { status: 'duplicate', message: `Same file as ${r.of}. Skipped.` })),
+      ...fresh.map((f) => newItem(kind, f)),
+    ]);
+    await processQueue();
+  };
+  const typeByHand = () => update((xs) => [...xs, newItem('receipt', null, { status: 'review', receipt: { lines: [] }, open: true })]);
+  const stop = () => { stopRef.current = true; };
+  const retryFailed = async () => { update((xs) => xs.map((x) => (x.status === 'failed' && x.file ? { ...x, status: 'queued', message: undefined } : x))); await processQueue(); };
+
+  /** any change to the data clears earlier "keep as printed" confirmations: they applied to the old numbers */
+  const edited = (x: Item, over: Partial<Item>): Item => ({ ...x, ...over, answers: { ...x.answers, acknowledged: [] }, errors: {} });
+  const answer = (item: Item, field: string, id: string, text: string) => {
+    if (item.kind === 'receipt') {
+      const r = setReceiptField(item.receipt!, field, text);
+      patch(item.key, (x) => (r.error ? { ...x, errors: { ...x.errors, [id]: r.error! } } : edited(x, { receipt: r.record })));
+    } else {
+      const r = setStatementField(item.statement!, field, text);
+      patch(item.key, (x) => (r.error ? { ...x, errors: { ...x.errors, [id]: r.error! } } : edited(x, { statement: r.draft })));
+    }
+  };
+  const skip = (item: Item, g: Gap) => patch(item.key, (x) => ({ ...x, answers: { ...x.answers, notPrinted: [...x.answers.notPrinted, g.id] } }));
+  const acknowledge = (item: Item, id: string) => patch(item.key, (x) => ({ ...x, answers: { ...x.answers, acknowledged: [...x.answers.acknowledged, id] } }));
+
+  const save = async (key: string) => {
+    const item = live(key);
+    if (!item || item.status !== 'review') return;
+    const cx: Ctx = { ...ctxRef.current, receipts: [...ctxRef.current.receipts, ...savedKeysRef.current], claimed: claimedRef.current };
+    const ev = evaluateAll(itemsRef.current, cx).get(key);
+    if (!ev || !ev.canSave) return;
+    let savedId: string | undefined; let savedTxnId: string | null = null;
+    patch(key, (x) => ({ ...x, status: 'saving', message: undefined }));
+    try {
+      let message: string;
+      if (item.kind === 'receipt') {
+        const rec = item.receipt!;
+        const link = ev.linkTxn;
+        const original = ev.extra && ev.same && !ev.same.of.id.startsWith('q:') ? ev.same.of : null;
+        const rid = await saveReceiptRecord(original ? { ...rec, duplicateOf: original.id } : rec, item.file, link?.id ?? original?.txnId ?? null);
+        savedId = rid; savedTxnId = link?.id ?? original?.txnId ?? null;
+        if (ev.extra) {
+          if (link) claimedRef.current.add(link.id);
+          message = `Saved as an extra document for ${ev.same!.of.label}${link ? `, the ${link.date} charge at ${link.merchant}` : ''}. No new purchase was added and its items were not split again.`;
+        } else if (link) {
+          claimedRef.current.add(link.id);
+          if (ev.second) message = `Saved as an extra document for ${link.merchant}, ${link.date}, ${dollars(-link.cents)}. That charge already had a receipt, so its items were not split again.`;
+          else {
+            const lines = receiptToLines(rec, -link.cents);
+            if (lines.length) attachReceipt(link.id, lines, rid); else patchTxn(link.id, { receiptId: rid });
+            message = `Saved and linked to ${link.merchant}, ${link.date}, ${dollars(-link.cents)}.`;
+          }
+        } else if (ev.cash) {
+          const t = addCash({ amount: (rec.totalCents ?? 0) / 100, merchant: rec.merchant ?? 'Receipt', what: 'Receipt', category: ev.cashCat!, date: rec.date!, business: false, oneOff: false, splitAsked: true, receiptId: rid, lines: receiptToLines(rec, rec.totalCents ?? 0).map((l) => ({ item: l.item, amount: l.cents / 100 })) });
+          savedTxnId = t.id;
+          message = 'Saved and added as a cash purchase.';
+        } else message = 'Saved as evidence. It is not linked to a charge yet.';
+      } else {
+        const plan = planStatement(item.statement!, { accounts: cx.accounts, statements: cx.stored, existing: cx.txns }, { name: item.file?.name ?? 'statement', sha256: item.file?.sha256 });
+        await saveStatementPlan(plan, item.file);
+        await sync.now();
+        setStored(await loadStored());
+        await settle(cx.txns);
+        message = plan.txns.length === 0 && plan.skipped.length
+          ? `Nothing new: all ${plan.skipped.length} rows were already in your ledger. The statement itself was recorded.`
+          : `Saved ${plan.txns.length} transactions to ${plan.account.name}${plan.isNewAccount ? ' (new account)' : ''}${plan.pairUpdates.length ? `, linked ${plan.pairUpdates.length} card payment${plan.pairUpdates.length > 1 ? 's' : ''}` : ''}.${plan.skipped.length ? ` ${plan.skipped.length} ${plan.skipped.length === 1 ? 'row was' : 'rows were'} already in your ledger and not added again.` : ''}`;
+      }
+      // the original is stored; drop its bytes from memory so a long run does not hold every photo
+      if (savedId) savedKeysRef.current.push(keyOf(item.receipt!, savedId, item.file?.name ?? 'a receipt typed by hand', savedTxnId));
+      if (savedId) setReceipts((xs) => [...xs, keyOf(item.receipt!, savedId!, item.file?.name ?? 'a receipt typed by hand', savedTxnId)]);
+      patch(key, (x) => ({ ...x, status: 'saved', message, open: false, savedId, savedTxnId, file: x.file ? { ...x.file, bytes: new Uint8Array(0) } : null }));
+    } catch (e) { patch(key, (x) => ({ ...x, status: 'review', message: (e as Error).message })); }
+  };
+
+  /** Statements first: they add the charges that receipts then link to. One at a time, so each file is checked against the one before it. */
+  const saveAll = async () => {
+    stopRef.current = false; setSaving(true);
+    // Passes, because saving one file can unlock another: a second document of a purchase waits for the first to be stored.
+    const tried = new Set<string>();
+    for (let pass = 0; pass < 6 && !stopRef.current; pass++) {
+      const evs = evaluateAll(itemsRef.current, { ...ctxRef.current, receipts: [...ctxRef.current.receipts, ...savedKeysRef.current], claimed: claimedRef.current });
+      const keys = itemsRef.current
+        .filter((i) => i.status === 'review' && !tried.has(i.key) && evs.get(i.key)?.canSave)
+        .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'statement' ? -1 : 1))
+        .map((i) => i.key);
+      if (!keys.length) break;
+      for (const k of keys) { if (stopRef.current) break; tried.add(k); await save(k); }
+      await pause(60);                        // let the screen take in what was just stored
+    }
+    setSaving(false);
+  };
+
+  const evals = evaluateAll(items, ctx);
+  const t = tally(items.map((i) => ({ status: i.status, ready: !!evals.get(i.key)?.canSave })));
+  const compact = items.length >= COMPACT_FROM;
+  const visible = items.filter((i) => matchesFilter(filter, i.status, !!evals.get(i.key)?.canSave));
+  const shown = visible.slice(0, limit);
+
+  return (
+    <Screen max={760}>
+      <ScreenHeader back title="Import" sub="Every receipt and statement is read and checked first. Nothing is saved until every detail is accounted for." />
+      {!connected ? <Banner title="No database is connected.">Set the Supabase URL and anon key in .env first. Nothing can be saved without it.</Banner> : null}
+      <Card title="What are you adding?">
+        <Segmented value={kind} onChange={setKind} options={[{ value: 'statement', label: 'Statements' }, { value: 'receipt', label: 'Receipts' }]} />
+        <T size={13} tone="ink2">{kind === 'statement' ? 'Bank or card statements, one PDF per month, or photos of its pages.' : 'Store receipts or order confirmations, as photos or PDFs.'} {canPickFolder ? 'Choose a whole folder, or select as many files as you like.' : 'Select as many files or photos as you like.'}</T>
+        <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+          {canPickFolder ? <Button label="Choose a folder" disabled={!connected} onPress={() => add('folder')} /> : null}
+          <Button kind={canPickFolder ? 'outline' : 'solid'} label="Choose files" disabled={!connected} onPress={() => add('files')} />
+          <Button kind="outline" label="Choose photos" disabled={!connected} onPress={() => add('photos')} />
+          <Button kind="outline" label="Take a photo" disabled={!connected} onPress={() => add('camera')} />
+          {kind === 'receipt' ? <Button kind="ghost" label="Type a receipt by hand" onPress={typeByHand} /> : null}
+        </View>
+        <T size={12} tone="ink3">Files are sent to the AI model your backend uses to read them (set by OPENROUTER_MODEL), with provider data collection denied unless you changed that. Statements show account numbers: read them only if you accept that. Each file is one model call, so a large folder takes a while and costs per file.</T>
+        {notice ? <T size={13} tone="bad">{notice}</T> : null}
+        {info ? <T size={13} tone="ink2">{info}</T> : null}
+      </Card>
+
+      {!hasData && !items.length ? <Banner tone="info" title="Your database is empty.">Import your first statement above. Receipts can be added once there are transactions to link them to.</Banner> : null}
+
+      {items.length > 1 ? (
+        <Card title="Progress">
+          <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: t.total, now: t.done }} style={{ height: 6, borderRadius: R.pill, backgroundColor: C.ground, overflow: 'hidden' }}>
+            <View style={{ height: 6, width: `${Math.round((t.done / t.total) * 100)}%`, backgroundColor: C.ink }} />
+          </View>
+          <T size={13} tone="ink2">{progressLine(t)}.</T>
+          {t.ready && reading ? <T size={12} tone="ink3">Save all unlocks when reading finishes, so every file is checked against the others first.</T> : null}
+          {t.attention && !reading ? <T size={12} tone="ink3">Rows marked “Needs attention” are missing a detail or have numbers that disagree. Open them under “Needs answers”.</T> : null}
+          <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+            {reading ? <Button small kind="outline" label="Stop reading" onPress={stop} /> : t.waiting ? <Button small kind="outline" label={`Resume reading (${t.waiting} waiting)`} onPress={processQueue} /> : null}
+            {t.ready ? <Button label={saving ? 'Saving' : `Save all ${t.ready} ready`} disabled={saving || reading} onPress={saveAll} /> : null}
+            {saving ? <Button small kind="outline" label="Stop saving" onPress={stop} /> : null}
+            {t.failed && !reading ? <Button small kind="outline" label={`Try ${t.failed} failed again`} onPress={retryFailed} /> : null}
+            {t.saved ? <Button small kind="ghost" label="Clear saved" onPress={() => update((xs) => xs.filter((x) => x.status !== 'saved'))} /> : null}
+          </View>
+        </Card>
+      ) : null}
+
+      {items.length >= COMPACT_FROM ? (
+        <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
+          {([['all', 'All', t.total], ['attention', 'Needs answers', t.attention], ['ready', 'Ready', t.ready], ['problems', 'Problems', t.failed + t.duplicate], ['saved', 'Saved', t.saved]] as [Filter, string, number][]).map(([f, label, n]) => (
+            <Chip key={f} label={label} count={n} on={filter === f} onPress={() => { setFilter(f); setLimit(PAGE); }} />
+          ))}
+        </View>
+      ) : null}
+
+      {shown.map((item) => {
+        const ev = evals.get(item.key);
+        if (compact && !item.open && (item.status === 'queued' || item.status === 'reading' || item.status === 'saving' || item.status === 'saved')) return <Line key={item.key} item={item} />;
+        if (compact && !item.open && item.status === 'review' && ev) return <Summary key={item.key} item={item} ev={ev} accounts={accounts} onOpen={() => patch(item.key, (x) => ({ ...x, open: true }))} onSave={() => save(item.key)} onRemove={() => update((xs) => xs.filter((x) => x.key !== item.key))} />;
+        return (
+          <ItemCard key={item.key} item={item} ev={ev} accounts={accounts}
+            onAnswer={(field, id, text) => answer(item, field, id, text)} onSkip={(g) => skip(item, g)} onAcknowledge={(id) => acknowledge(item, id)}
+            onStatement={(d) => patch(item.key, (x) => edited(x, { statement: d }))}
+            onSet={(over) => patch(item.key, (x) => ({ ...x, ...over }))} onSave={() => save(item.key)}
+            onCollapse={compact && item.status === 'review' ? () => patch(item.key, (x) => ({ ...x, open: false })) : undefined}
+            onRetryByHand={() => patch(item.key, (x) => ({ ...x, status: 'review', message: undefined, open: true, receipt: x.kind === 'receipt' ? { lines: [] } : undefined, statement: x.kind === 'statement' ? { rows: [] } : undefined }))}
+            onRemove={() => update((xs) => xs.filter((x) => x.key !== item.key))} />
+        );
+      })}
+      {visible.length > shown.length ? <Button kind="outline" label={`Show ${Math.min(PAGE, visible.length - shown.length)} more (${visible.length - shown.length} hidden)`} onPress={() => setLimit(limit + PAGE)} /> : null}
+      {items.length && !visible.length ? <T size={13} tone="ink3">Nothing in this list.</T> : null}
+
+      {items.some((i) => i.status === 'saved') ? <View style={{ flexDirection: 'row', gap: S.sm }}><Button kind="outline" label="Back to Overview" onPress={() => router.replace('/')} /></View> : null}
+    </Screen>
+  );
+}
+
+const STATUS_TEXT: Record<BulkStatus, string> = { queued: 'Waiting', reading: 'Reading', review: '', saving: 'Saving', saved: 'Saved', failed: 'Not read', duplicate: 'Skipped' };
+
+/** One line for a file that is waiting, being read, saving, or already saved. */
+function Line({ item }: { item: Item }) {
+  return (
+    <View style={{ gap: 2, paddingVertical: S.xs, paddingHorizontal: S.md, backgroundColor: C.paper, borderRadius: R.md }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: S.sm }}>
+        <View style={{ flex: 1 }}><T size={13} numberOfLines={1}>{item.file?.name ?? 'Receipt typed by hand'}</T></View>
+        <T size={12} tone={item.status === 'saved' ? 'good' : 'ink3'} bold={item.status === 'saved'}>{STATUS_TEXT[item.status]}</T>
+      </View>
+      {item.status === 'saved' && item.message ? <T size={12} tone="ink2">{item.message}</T> : null}
+    </View>
+  );
+}
+
+function summaryLine(item: Item, accounts: Account[]): string {
+  if (item.receipt) { const r = item.receipt; return `${r.merchant || 'Store missing'}, ${r.date ?? 'date missing'}, ${r.totalCents != null ? dollars(r.totalCents) : 'total missing'}, ${r.lines.length} ${r.lines.length === 1 ? 'item' : 'items'}`; }
+  const s = item.statement!;
+  const acct = resolveAccount(s, accounts);
+  return `${acct ? acct.name : s.institution && s.last4 ? `New: ${s.institution} ${s.last4}` : 'Account unknown'}, ${s.periodFrom && s.periodTo ? `${s.periodFrom} to ${s.periodTo}` : 'period missing'}, ${s.rows.length} transactions`;
+}
+
+function needsText(ev: Ev): string {
+  const parts: string[] = [];
+  if (ev.analysis.gaps.length) parts.push(`Missing: ${ev.analysis.gaps.slice(0, 4).map((g) => g.label).join(', ')}${ev.analysis.gaps.length > 4 ? ` and ${ev.analysis.gaps.length - 4} more` : ''}.`);
+  if (ev.analysis.problems.length) parts.push(`${ev.analysis.problems.length} ${ev.analysis.problems.length === 1 ? 'number does' : 'numbers do'} not add up.`);
+  if (ev.waitingFor) parts.push(`Waiting for ${ev.waitingFor} to be saved first: this is another document for the same purchase.`);
+  if (ev.cashClash.length) parts.push('A charge with this amount already exists. Link it, or confirm this is a separate cash purchase.');
+  if (ev.linkPending) parts.push('Choose which charge it belongs to.');
+  if (ev.cash && !ev.cashCat) parts.push('Pick a category.');
+  return parts.join(' ');
+}
+
+/** A file that has been read, as one row. Ready ones can be saved from here; the rest open to be answered. */
+function Summary({ item, ev, accounts, onOpen, onSave, onRemove }: { item: Item; ev: Ev; accounts: Account[]; onOpen: () => void; onSave: () => void; onRemove: () => void }) {
+  return (
+    <Card title={item.file?.name ?? 'Receipt typed by hand'} right={<T size={12} tone={ev.canSave ? 'good' : 'ink3'} bold>{ev.canSave ? 'Ready' : 'Needs attention'}</T>}>
+      <T size={13} tone="ink2">{summaryLine(item, accounts)}</T>
+      {item.receipt && ev.canSave ? <T size={12} tone="ink3">{ev.extra ? `Another document for ${ev.same!.of.label}. Adds no new purchase.` : ev.linkTxn ? (ev.second ? `Extra document for the ${ev.linkTxn.date} charge at ${ev.linkTxn.merchant}.` : `Matches ${ev.linkTxn.merchant}, ${ev.linkTxn.date}, ${dollars(-ev.linkTxn.cents)}.`) : ev.cash ? 'Will be added as a cash purchase.' : 'No matching charge yet. Kept as evidence.'}</T> : null}
+      {!ev.canSave ? <T size={12} tone="bad">{needsText(ev)}</T> : null}
+      {item.message ? <T size={12} tone="bad">{item.message}</T> : null}
+      <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+        {ev.canSave ? <Button small label="Save" onPress={onSave} /> : <Button small label="Answer questions" onPress={onOpen} />}
+        <Button small kind="ghost" label="Review" onPress={onOpen} />
+        <Button small kind="ghost" label="Discard" onPress={onRemove} />
+      </View>
+    </Card>
+  );
+}
+
+function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onStatement, onSet, onSave, onCollapse, onRetryByHand, onRemove }: {
+  item: Item; ev?: Ev; accounts: Account[]; onAnswer: (field: string, id: string, text: string) => void; onSkip: (g: Gap) => void; onAcknowledge: (id: string) => void;
+  onStatement: (d: StatementDraft) => void; onSet: (over: Partial<Item>) => void; onSave: () => void; onCollapse?: () => void; onRetryByHand: () => void; onRemove: () => void;
+}) {
+  const title = item.file?.name ?? 'Receipt typed by hand';
+  const tag = item.kind === 'statement' ? 'Statement' : 'Receipt';
+  if (item.status === 'queued') return <Card title={title} right={<T size={12} tone="ink3">Waiting</T>}><T size={13} tone="ink2">In line to be read.</T><View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Discard" onPress={onRemove} /></View></Card>;
+  if (item.status === 'reading') return <Card title={title} right={<T size={12} tone="ink3">Reading</T>}><T size={13} tone="ink2">Reading the {tag.toLowerCase()} and checking it. This can take a minute for a long statement.</T></Card>;
+  if (item.status === 'duplicate') return <Card title={title}><T size={13} tone="ink2">{item.message}</T><View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Dismiss" onPress={onRemove} /></View></Card>;
+  if (item.status === 'failed') return (
+    <Card title={title}>
+      <Banner title="Could not read this file">{item.message}</Banner>
+      <T size={13} tone="ink2">You can still add it: the file is kept as the original, and you type the details it should have.</T>
+      <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}><Button small label="Enter the details by hand" onPress={onRetryByHand} /><Button small kind="ghost" label="Discard" onPress={onRemove} /></View>
+    </Card>
+  );
+  if (item.status === 'saved') return <Card title={title} right={<T size={12} tone="good" bold>Saved</T>}><T size={13} tone="ink2">{item.message}</T></Card>;
+  if (!ev) return null;
+
+  const saving = item.status === 'saving';
+  const rec = item.receipt; const st = item.statement;
+  const acct = st ? resolveAccount(st, accounts) : null;
+  const net = st ? st.rows.reduce((s, r) => s + (r.cents ?? 0), 0) : 0;
+  return (
+    <Card title={title} right={<T size={12} tone={ev.canSave ? 'good' : 'ink3'} bold>{ev.canSave ? 'Ready' : 'Needs attention'}</T>}>
+      {rec ? (
+        <>
+          <Row label="Store" value={rec.merchant || 'missing'} /><Row label="Date" value={rec.date ?? 'missing'} />
+          <Row label="Total paid" value={rec.totalCents != null ? dollars(rec.totalCents) : 'missing'} /><Row label="Items read" value={String(rec.lines.length)} />
+          {rec.paymentMethod ? <Row label="Paid with" value={`${rec.paymentMethod}${rec.cardLast4 ? ` ending ${rec.cardLast4}` : ''}`} /> : null}
+        </>
+      ) : null}
+      {st ? (
+        <>
+          <Row label="Account" value={acct ? acct.name : st.institution && st.last4 ? `New: ${st.institution} ${st.last4}` : 'unknown'} />
+          <Row label="Period" value={st.periodFrom && st.periodTo ? `${st.periodFrom} to ${st.periodTo}` : 'missing'} />
+          <Row label={st.accountType === 'credit' ? 'Previous / new balance' : 'Opening / closing'} value={st.openingCents != null && st.closingCents != null ? `${dollars(st.openingCents)} / ${dollars(st.closingCents)}` : 'missing'} />
+          <Row label="Transactions read" value={`${st.rows.length}, net ${dollars(net)}`} />
+        </>
+      ) : null}
+
+      <Findings analysis={ev.analysis} errors={item.errors}
+        onAnswer={(g, text) => onAnswer(g.field, g.id, text)} onSkip={onSkip} onAcknowledge={onAcknowledge} />
+
+      {rec && ev.extra && ev.same ? (
+        <View style={{ gap: S.xs }}>
+          <T size={13} tone="ink2">Treated as another document for {ev.same.of.label}{ev.same.of.date ? `, ${ev.same.of.date}` : ''} ({ev.same.why}). It is kept as evidence only: no new purchase, and the items are not split twice.</T>
+          {ev.waitingFor ? <T size={13} tone="bad">Waiting for {ev.waitingFor} to be saved first.</T> : null}
+          <View style={{ flexDirection: 'row' }}><Button small kind="outline" label="This is a different purchase" onPress={() => onAnswer('dup', 'edit.dup', 'different')} /></View>
+        </View>
+      ) : null}
+      {rec && !ev.extra && ev.cashClash.length ? (
+        <View style={{ gap: S.xs }}>
+          <Banner title="This amount is already in your ledger">{ev.cashClash.slice(0, 3).map((c) => `${c.merchant}, ${c.date}, ${dollars(-c.cents)}${c.accountId === 'cash' ? ' (earlier cash entry)' : ''}`).join('. ')}. Adding it as cash would count the purchase twice.</Banner>
+          {ev.cashClash.slice(0, 3).map((c) => <Button key={c.id} small kind="outline" label={`It is this one: link to ${c.merchant}, ${c.date}`} onPress={() => onSet({ link: c.id })} />)}
+          <View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="It is a separate cash purchase" onPress={onAcknowledge.bind(null, 'cash-dup')} /></View>
+        </View>
+      ) : null}
+      {rec && !ev.extra && ev.linkPending && item.link === 'auto' ? (
+        <View style={{ gap: S.xs }}>
+          <Banner title={ev.candidates.length > 1 ? 'More than one charge could be this receipt' : 'A charge has this amount, but another store name'}>{ev.candidates.length > 1 ? 'Choose the right one, or keep the receipt unlinked.' : 'Link it if it is the same purchase, or keep the receipt unlinked.'}</Banner>
+          {ev.candidates.map((c) => <Button key={c.id} small kind="outline" label={`${c.merchant}, ${c.date}, ${dollars(-c.cents)}${c.receiptId ? ' (has a receipt)' : ''}`} onPress={() => onSet({ link: c.id })} />)}
+          <Button small kind="ghost" label="Keep it unlinked" onPress={() => onSet({ link: 'none' })} />
+        </View>
+      ) : null}
+      {rec && !ev.extra && ev.analysis.ok && ev.linkTxn ? <T size={13} tone="ink2">{ev.second ? `Belongs to ${ev.linkTxn.merchant}, ${ev.linkTxn.date}, ${dollars(-ev.linkTxn.cents)}, which already has a receipt. This one is kept as an additional document and its items are not split again.` : `Links to ${ev.linkTxn.merchant}, ${ev.linkTxn.date}, ${dollars(-ev.linkTxn.cents)}. Its items will be split out.`}</T> : null}
+      {rec && !ev.extra && ev.analysis.ok && !ev.linkTxn && !ev.linkPending && !ev.cashClash.length ? (
+        <View style={{ gap: S.xs }}>
+          <T size={13} tone="ink2">{ev.cash ? 'Will be added as a cash purchase. Pick its category.' : 'No charge in your ledger matches this receipt. It is kept as evidence. If you paid cash, make it a cash purchase.'}</T>
+          <View style={{ flexDirection: 'row', gap: S.xs, flexWrap: 'wrap' }}>
+            <Chip label="Keep as evidence" on={!ev.cash} onPress={() => onSet({ link: 'none' })} />
+            <Chip label="Cash purchase" on={ev.cash} onPress={() => onSet({ link: 'cash' })} />
+          </View>
+          {ev.cash ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{CATEGORIES.filter((c) => c.id !== 'uncategorized').map((c) => <Chip key={c.id} label={c.label} on={ev.cashCat === c.id} onPress={() => onSet({ cat: c.id })} />)}</View> : null}
+        </View>
+      ) : null}
+
+      <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Button label={saving ? 'Saving' : 'Save'} disabled={!ev.canSave || saving} onPress={onSave} />
+        <Button small kind="ghost" label={item.edit ? 'Hide details' : 'Check or edit details'} onPress={() => onSet({ edit: !item.edit })} />
+        {onCollapse ? <Button small kind="ghost" label="Collapse" onPress={onCollapse} /> : null}
+        <Button small kind="ghost" label="Discard" disabled={saving} onPress={onRemove} />
+      </View>
+      {!ev.canSave && !saving ? <T size={12} tone="ink3">Save unlocks when every question above is answered and every difference is fixed or confirmed.</T> : null}
+      {item.message ? <T size={13} tone="bad">{item.message}</T> : null}
+
+      {item.edit ? (
+        <View style={{ gap: S.sm, borderTopWidth: 1, borderTopColor: C.line, paddingTop: S.sm }}>
+          {rec ? (
+            <>
+              {RECEIPT_FIELDS.map(([f, label]) => <FieldInput key={`${f}:${receiptFieldText(rec, f)}`} label={label} value={receiptFieldText(rec, f)} error={item.errors[`edit.${f}`]} onCommit={(t) => onAnswer(f, `edit.${f}`, t)} />)}
+              <FieldInput key={`lines:${receiptFieldText(rec, 'lines')}`} label="Items, one per line as “item price”" multiline value={receiptFieldText(rec, 'lines')} error={item.errors['edit.lines']} onCommit={(t) => onAnswer('lines', 'edit.lines', t)} />
+            </>
+          ) : null}
+          {st ? (
+            <>
+              {STATEMENT_FIELDS.map(([f, label]) => <FieldInput key={`${f}:${statementFieldText(st, f)}`} label={label} value={statementFieldText(st, f)} error={item.errors[`edit.${f}`]} onCommit={(t) => onAnswer(f, `edit.${f}`, t)} />)}
+              <View style={{ flexDirection: 'row', gap: 4 }}>
+                <Chip label="Checking or savings" on={st.accountType === 'checking'} onPress={() => onAnswer('accountType', 'edit.accountType', 'checking')} />
+                <Chip label="Credit card" on={st.accountType === 'credit'} onPress={() => onAnswer('accountType', 'edit.accountType', 'credit')} />
+              </View>
+              <RowsEditor draft={st} onChange={onStatement} />
+            </>
+          ) : null}
+        </View>
+      ) : null}
+    </Card>
+  );
+}

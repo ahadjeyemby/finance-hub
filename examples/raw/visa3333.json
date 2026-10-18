@@ -1,0 +1,282 @@
+[
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-03",
+  "description": "AMAZON MKTPL*KX97Y AMZN.COM/BILL WA",
+  "amount": 30.49,
+  "order": "D01-0000001-2249536"
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-03",
+  "description": "AMAZON MKTPL*VBG6G AMZN.COM/BILL WA",
+  "amount": 33.62,
+  "order": "D01-0000002-2355618"
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-09",
+  "description": "AMAZON MKTPL*2RD3K AMZN.COM/BILL WA",
+  "amount": 60.41,
+  "order": "D01-0000003-5061426"
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-09",
+  "description": "OPENROUTER, INC NEW YORK NY",
+  "amount": 20,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-11",
+  "description": "COSTCO WHSE #663 SPRINGFIELD IL",
+  "amount": 199.61,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-13",
+  "description": "COSTCO GAS #1106 SPRINGFIELD IL",
+  "amount": 50.83,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-17",
+  "description": "Payment Thank You-Mobile",
+  "amount": -465.67,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-17",
+  "description": "AMAZON MKTPL*J7CY4 AMZN.COM/BILL WA",
+  "amount": 52.57,
+  "order": "D01-0000004-3435039"
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-20",
+  "description": "NAMECHEAP.COM PHOENIX AZ",
+  "amount": 11.28,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-23",
+  "description": "COSTCO WHSE #354 SPRINGFIELD IL",
+  "amount": 146.81,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-25",
+  "description": "THE HOME DEPOT #2748 SPRINGFIELD IL",
+  "amount": 27.6,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-06",
+  "date": "2026-06-28",
+  "description": "AMAZON PRIME*BAGQM2 AMZN.COM/BILL WA",
+  "amount": 14.99,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-02",
+  "description": "AMAZON MKTPL*B3GKX AMZN.COM/BILL WA",
+  "amount": 89.35,
+  "order": "D01-0000008-1888849"
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-09",
+  "description": "OPENROUTER, INC NEW YORK NY",
+  "amount": 20,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-11",
+  "description": "AMAZON MKTPL*PDZN3 AMZN.COM/BILL WA",
+  "amount": 68.55,
+  "order": "D01-0000006-5272490"
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-11",
+  "description": "AMAZON PRIME*C22H3U AMZN.COM/BILL WA",
+  "amount": 14.99,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-15",
+  "description": "Payment Thank You-Mobile",
+  "amount": -454.79,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-16",
+  "description": "AMAZON MKTPL*P5WQZ AMZN.COM/BILL WA",
+  "amount": 17.15,
+  "order": "D01-0000007-1271683"
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-16",
+  "description": "COSTCO WHSE #1471 SPRINGFIELD IL",
+  "amount": 249.7,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-20",
+  "description": "AMAZON MKTPL*2CAAE AMZN.COM/BILL WA",
+  "amount": 64.43,
+  "order": "D01-0000005-6703483"
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-25",
+  "description": "COSTCO WHSE #334 SPRINGFIELD IL",
+  "amount": 221.71,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-26",
+  "description": "COSTCO GAS #1807 SPRINGFIELD IL",
+  "amount": 31.5,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-07",
+  "date": "2026-07-28",
+  "description": "THE HOME DEPOT #9025 SPRINGFIELD IL",
+  "amount": 53.44,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-04",
+  "description": "Payment Thank You-Mobile",
+  "amount": -210,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-09",
+  "description": "OPENROUTER, INC NEW YORK NY",
+  "amount": 20,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-10",
+  "description": "AMAZON MKTPL*7UMU2 AMZN.COM/BILL WA",
+  "amount": 90.25,
+  "order": "D01-0000011-1383453"
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-13",
+  "description": "COSTCO WHSE #921 SPRINGFIELD IL",
+  "amount": 127.58,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-14",
+  "description": "AMAZON MKTPL*2YFZX AMZN.COM/BILL WA",
+  "amount": 11.95,
+  "order": "D01-0000010-3391127"
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-14",
+  "description": "AMAZON PRIME*66Z44H AMZN.COM/BILL WA",
+  "amount": 14.99,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-15",
+  "description": "Payment Thank You-Mobile",
+  "amount": -347.09,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-19",
+  "description": "COSTCO GAS #982 SPRINGFIELD IL",
+  "amount": 43.27,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-21",
+  "description": "THE HOME DEPOT #9208 SPRINGFIELD IL",
+  "amount": 116.66,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-27",
+  "description": "AMAZON MKTPL*ATYZY AMZN.COM/BILL WA",
+  "amount": 67.32,
+  "order": "D01-0000012-1646573"
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-28",
+  "description": "AMAZON MKTPL*GFFAJ AMZN.COM/BILL WA",
+  "amount": 42.76,
+  "order": "D01-0000009-2987925"
+ },
+ {
+  "statement": "sample-2026-08",
+  "date": "2026-08-28",
+  "description": "COSTCO WHSE #1446 SPRINGFIELD IL",
+  "amount": 99.26,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-01",
+  "description": "AMAZON MKTPL*YJ6GQ AMZN.COM/BILL WA",
+  "amount": 85.73,
+  "order": "D01-0000014-4826487"
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-03",
+  "description": "COSTCO WHSE #465 SPRINGFIELD IL",
+  "amount": 124.74,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-04",
+  "description": "COSTCO WHSE #931 SPRINGFIELD IL",
+  "amount": 171.29,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-05",
+  "description": "COSTCO GAS #1091 SPRINGFIELD IL",
+  "amount": 49.24,
+  "order": null
+ },
+ {
+  "statement": "sample-2026-09",
+  "date": "2026-09-09",
+  "description": "OPENROUTER, INC NEW YORK NY",
+  "amount": 20,
+  "order": null
+ }
+]
