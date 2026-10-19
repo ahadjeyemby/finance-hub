@@ -128,6 +128,19 @@ Choosing "keep as printed" on a difference saves the document as it is and recor
 
 The reader runs on your backend, so the file is sent to the model provider you configured. Statements contain account numbers. A statement longer than one model answer can hold (roughly a few hundred rows) is refused with a message; split it by month or use `bun run ledger`. Reading quality on your own banks' layouts is not guaranteed: the balance check exists because the reader can be wrong.
 
+## Receipt links
+
+A link says which receipt belongs to which statement charge. It is its own record, in the `receipt_links` table (migration `0003_links.sql`, run it once), many to many: a receipt can explain more than one charge and a charge can have more than one receipt (an order confirmation and a store receipt).
+
+- **Saving a receipt** links it at once when the evidence is strong: an order number, or the same store, amount and date. When only the amount, the date and your card agree but the bank prints a different store name, the app proposes the charge and you confirm it.
+- **Importing a statement** afterwards links the receipts you saved earlier that now have their charge. Import order does not matter.
+- **Links screen** (Overview, Import, or a charge): receipts with no charge and why (no statement for that date, a card that is not loaded, several charges fit, no such charge), charges with no receipt, suggestions to confirm, and every link with how it was made. You can choose a charge yourself, unlink, or mark the receipt as paid another way (cash, another account, a gift card or points) or the charge as "no receipt expected". Marked items are not listed as unlinked.
+- A cash purchase added from a receipt is linked to its cash entry.
+- A charge takes its item lines from its linked receipt, so correcting the receipt corrects the charge.
+- Not yet: remembering a rejected suggestion across visits (it is hidden until you reload), and the desktop `bun run ledger:upload` does not write links.
+
+To start over while testing, `supabase/reset_test_data.sql` (run by hand) empties your tables.
+
 ## The assistant and receipt photos
 
 Both run as Supabase edge functions, so they work once the steps above are done and the functions are deployed:

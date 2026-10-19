@@ -83,6 +83,7 @@ export default function Overview() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: S.sm }}>
           <Button small kind="outline" label="All transactions" onPress={() => router.push('/ledger')} />
           <Button small kind="outline" label="Accounts and data" onPress={() => router.push('/accounts')} />
+          <Button small kind="outline" label="Receipt links" onPress={() => router.push('/links')} />
           <Button small kind="outline" label="Prices" onPress={() => router.push('/prices')} />
         </View>
       </Card>
