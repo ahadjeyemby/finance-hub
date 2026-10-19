@@ -1,4 +1,7 @@
-import type { AccountNumber } from '@/core/types';
+import { mergedNumbers, unmergedNumbers, whyNotMerge } from '@/core/accounts';
+import type { Account, AccountNumber } from '@/core/types';
+import { rowToAccount } from '@/core/sync';
+import type { AccountRow } from '@/core/sync';
 import { signed } from './evidence';
 import { supabase } from './supabase';
 
@@ -36,3 +39,31 @@ export async function fetchStatements(accountId: string | null): Promise<Stateme
 
 /** A link to the original PDF or photo that opens for a few minutes. null when no original was stored. */
 export const statementFileUrl = (path: string | null) => signed('statements', path);
+
+const needsMergeMigration = (m: string) => /merge_accounts|unmerge_accounts|merged_into|merged_from|schema cache/i.test(m);
+
+/** Merge `source` into `target`: its transactions and statements move to `target`, its numbers are added to it, and it is hidden. One database transaction; nothing is deleted. */
+export async function mergeAccounts(source: Account, target: Account): Promise<{ transactions: number; statements: number }> {
+  if (!supabase) throw new Error('No database is connected.');
+  const why = whyNotMerge(source, target);
+  if (why) throw new Error(why);
+  const { data, error } = await supabase.rpc('merge_accounts', { p_source: source.id, p_target: target.id, p_numbers: mergedNumbers(target, source) });
+  if (error) throw new Error(needsMergeMigration(error.message) ? 'The database needs migration 0005 first (supabase db push).' : error.message);
+  return data as { transactions: number; statements: number };
+}
+
+/** Undo a merge: everything that moved goes back, and the account is shown again. */
+export async function unmergeAccount(source: Account, target: Account): Promise<{ transactions: number; statements: number }> {
+  if (!supabase) throw new Error('No database is connected.');
+  const { data, error } = await supabase.rpc('unmerge_accounts', { p_source: source.id, p_numbers: unmergedNumbers(target, source) });
+  if (error) throw new Error(needsMergeMigration(error.message) ? 'The database needs migration 0005 first (supabase db push).' : error.message);
+  return data as { transactions: number; statements: number };
+}
+
+/** Accounts that were merged away, with the account each went into. Empty when nothing was merged or migration 0005 is not run. */
+export async function fetchMergedAccounts(): Promise<(Account & { mergedInto: string })[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('accounts').select('*').not('merged_into', 'is', null);
+  if (error) return [];
+  return (data ?? []).map((r) => ({ ...rowToAccount(r as AccountRow), mergedInto: r.merged_into as string }));
+}
