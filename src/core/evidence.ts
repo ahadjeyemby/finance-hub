@@ -1,3 +1,4 @@
+import { hasNumber } from './accounts';
 import type { Account, Txn } from './types';
 
 // Evidence: the documents and records behind a transaction. Pure mapping and matching, no network, no React.
@@ -193,7 +194,7 @@ export function matchReceipt(r: ReceiptRecord, txns: Txn[], days = 4, opts: Matc
   const spend = txns.filter((t) => (t.kind === 'spend' || t.kind === 'fee') && Math.abs(-t.cents - r.totalCents!) <= 1 && dayGap(t.date, r.date!) <= days);
   const rw = new Set(words(r.merchant ?? ''));
   const nameOk = (t: Txn) => rw.size === 0 || words(`${t.merchant} ${t.description}`).some((w) => rw.has(w)) || !!(r.merchant && opts.aliases?.has(aliasKey(r.merchant, t.merchant)));
-  const onCard = (t: Txn) => !!r.cardLast4 && opts.accounts?.find((a) => a.id === t.accountId)?.last4 === r.cardLast4;
+  const onCard = (t: Txn) => { const a = opts.accounts?.find((x) => x.id === t.accountId); return !!r.cardLast4 && !!a && hasNumber(a, r.cardLast4); };
   const named = spend.filter(nameOk);
   const pool = named.length ? named : [];
   if (pool.length === 1) return { txnId: pool[0].id, candidates: [pool[0].id], reason: 'amount, date and store' };

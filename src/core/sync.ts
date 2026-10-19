@@ -7,7 +7,7 @@ export interface TxnRow {
   subtype: string | null; category: string | null; subcategory: string | null; business: boolean | null; one_off: boolean | null;
   pair_id: string | null; source: string; ref: string | null; note: string | null; hints: string[]; manual: boolean; receipt_id: string | null; lines: unknown | null;
 }
-export interface AccountRow { id: string; name: string; institution: string; type: string; last4: string; coverage_from: string; coverage_to: string; income_complete: boolean | null }
+export interface AccountRow { id: string; name: string; institution: string; type: string; last4: string; coverage_from: string; coverage_to: string; income_complete: boolean | null; extra_numbers?: unknown }
 
 const n = <T,>(v: T | undefined | null): T | null => (v === undefined ? null : v);
 const u = <T,>(v: T | null): T | undefined => (v === null ? undefined : v);
@@ -38,10 +38,13 @@ export const rowToTxn = (r: TxnRow): Txn => {
 export const accountToRow = (a: Account): AccountRow => ({
   id: a.id, name: a.name, institution: a.institution, type: a.type, last4: a.last4,
   coverage_from: a.coverage.from, coverage_to: a.coverage.to, income_complete: n(a.incomeComplete),
+  // only sent when there is something to say, so a database without migration 0004 still accepts the row
+  ...(a.extraNumbers?.length ? { extra_numbers: a.extraNumbers } : {}),
 });
 export const rowToAccount = (r: AccountRow): Account => ({
   id: r.id, name: r.name, institution: r.institution, type: r.type as Account['type'], last4: r.last4,
   coverage: { from: r.coverage_from, to: r.coverage_to }, ...(r.income_complete !== null ? { incomeComplete: u(r.income_complete) } : {}),
+  ...(Array.isArray(r.extra_numbers) && r.extra_numbers.length ? { extraNumbers: r.extra_numbers as Account['extraNumbers'] } : {}),
 });
 
 export const chunk = <T,>(xs: T[], size: number): T[][] => { const out: T[][] = []; for (let i = 0; i < xs.length; i += size) out.push(xs.slice(i, i + size)); return out; };

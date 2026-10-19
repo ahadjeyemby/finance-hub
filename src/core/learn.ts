@@ -1,5 +1,6 @@
 // What the app has learned from what the person already confirmed. There is no separate memory to keep in step: every saved receipt records its
 // payment method, card digits and the charge it was linked to, so habits are counted from that history. Pure TypeScript, no React, no network.
+import { hasNumber } from './accounts';
 import { aliasKey } from './evidence';
 import type { ReceiptRecord } from './evidence';
 import type { ReceiptKey } from './dedupe';
@@ -68,7 +69,7 @@ export function linkTrust(receipts: ReceiptKey[], txns: Txn[], accounts: Account
   for (const r of receipts) {
     const t = r.txnId ? byId.get(r.txnId) : undefined;
     const a = t ? accounts.find((x) => x.id === t.accountId) : undefined;
-    if (t && a && r.cardLast4 && a.last4 === r.cardLast4) out.set(a.id, (out.get(a.id) ?? 0) + 1);
+    if (t && a && r.cardLast4 && hasNumber(a, r.cardLast4)) out.set(a.id, (out.get(a.id) ?? 0) + 1);
   }
   return out;
 }
