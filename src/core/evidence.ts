@@ -7,7 +7,12 @@ import type { Account, Txn } from './types';
 export interface ReceiptLine {
   item: string;
   cents: number;                 // line total, after any line discount
+  /** how many were bought (a whole number): "8 @ 0.59" is qty 8. A weighed item is qty 1 with a weight instead. */
   qty?: number;
+  /** how much it weighed, in `weightUnit`: "1.64 lb x 2.69/lb" is weight 1.64 */
+  weight?: number;
+  weightUnit?: string;
+  /** price of one unit (each, or per weight unit) */
   unitCents?: number;
   code?: string;                 // SKU, item number, UPC fragment as printed
   discountCents?: number;
@@ -112,6 +117,14 @@ export const statementToRow = (s: StatementRecord, storagePath: string | null) =
 export const rawToRow = (r: RawRecord) => ({
   txn_id: r.txnId, statement_id: n(r.statementId), line_no: n(r.lineNo), posted_date: n(r.postedDate), source_file: n(r.sourceFile), row: r.row,
 });
+
+/** A line with a negative amount is a discount or price reduction ("New price -2.50"), not something bought: it counts in the money but not in the number of items. */
+export const isDiscountLine = (l: ReceiptLine) => l.cents < 0;
+/** The lines that are things bought, without discount lines. */
+export const itemLines = (lines: ReceiptLine[]): ReceiptLine[] => lines.filter((l) => !isDiscountLine(l));
+
+/** How many items the lines stand for: a quantity counts as that many, a weighed or single item as one, a discount line as none. Compared with the item count printed on the receipt. */
+export const receiptUnits = (lines: ReceiptLine[]): number => itemLines(lines).reduce((t, l) => t + (Number.isInteger(l.qty) && (l.qty as number) > 0 ? (l.qty as number) : 1), 0);
 
 export const receiptToRow = (r: ReceiptRecord, storagePath: string | null, txnId: string | null) => ({
   kind: r.kind ?? 'store_receipt', txn_id: txnId, storage_path: storagePath, merchant: n(r.merchant), date: n(r.date), time: n(r.time),

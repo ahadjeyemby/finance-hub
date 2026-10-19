@@ -94,7 +94,7 @@ function Body({ t, ev, loading }: { t: Txn; ev: Evidence | null; loading: boolea
           <Field label="Store" value={[r.storeAddress, r.storeRef].filter(Boolean).join(', ')} />
           <Field label="Order" value={r.orderRef} />
           <Field label="Read from" value={r.origin === 'typed' ? 'Typed in by hand' : r.origin === 'offline_extract' ? 'A document file' : 'An uploaded photo'} />
-          {r.lines.length ? <View style={{ marginTop: 6 }}>{r.lines.map((l, i) => <Field key={i} label={i === 0 ? 'Items' : ''} value={`${l.item}${l.qty && l.qty !== 1 ? ` x${l.qty}` : ''}${l.code ? ` (${l.code})` : ''}  ${cents(l.cents)}`} />)}</View> : null}
+          {r.lines.length ? <View style={{ marginTop: 6 }}>{r.lines.map((l, i) => <Field key={i} label={i === 0 ? 'Items' : ''} value={`${l.item}${l.qty && l.qty !== 1 ? ` x${l.qty}` : ''}${l.weight ? ` ${l.weight} ${l.weightUnit ?? 'lb'}` : ''}${l.code ? ` (${l.code})` : ''}  ${cents(l.cents)}`} />)}</View> : null}
           {r.url && isImage(r.storagePath) ? <Image source={{ uri: r.url }} style={{ width: '100%', height: 260, borderRadius: R.sm, marginTop: 6 }} contentFit="contain" accessibilityLabel="Receipt image" /> : null}
           {r.url ? <Button small kind="outline" label="Open the original" onPress={() => open(r.url)} style={{ marginTop: 6, alignSelf: 'flex-start' }} /> : null}
         </Section>

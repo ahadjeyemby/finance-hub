@@ -13,7 +13,7 @@ import { todayISO } from '@/core/dates';
 import { findSameReceipt, keyOf, likelyCharges } from '@/core/dedupe';
 import { AUTO_AFTER, applyCardHabit, learnAliases, learnCard, linkTrust, methodKey } from '@/core/learn';
 import type { ReceiptKey, Sameness } from '@/core/dedupe';
-import { likelyRefundCredits, receiptToLines } from '@/core/evidence';
+import { itemLines, likelyRefundCredits, receiptToLines, receiptUnits } from '@/core/evidence';
 import type { ReceiptRecord } from '@/core/evidence';
 import { acceptReading, acceptReceiptReading, analyseReceipt, analyseStatement, diffReadings, diffReceipts, linkReceipt, noAnswers, planStatement, receiptFieldText, resolveAccount, setReceiptField, setStatementField, statementFieldText } from '@/core/intake';
 import type { Analysis, Answers, DocKind, Gap, StatementDraft } from '@/core/intake';
@@ -551,7 +551,7 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
         <>
           <Row label="Store" value={rec.merchant || 'missing'} /><Row label="Date" value={rec.date ?? 'missing'} />
           {rec.readBy ? <Row label="Read by" value={rec.readBy} /> : null}
-          <Row label="Total paid" value={rec.totalCents != null ? dollars(rec.totalCents) : 'missing'} /><Row label="Items read" value={String(rec.lines.length)} />
+          <Row label="Total paid" value={rec.totalCents != null ? dollars(rec.totalCents) : 'missing'} /><Row label="Items read" value={receiptUnits(rec.lines) !== rec.lines.length ? `${itemLines(rec.lines).length} lines, ${receiptUnits(rec.lines)} items${rec.lines.length !== itemLines(rec.lines).length ? `, ${rec.lines.length - itemLines(rec.lines).length} discount` : ''}${rec.itemCount ? ` (receipt prints ${rec.itemCount})` : ''}` : String(rec.lines.length)} />
           {rec.charges?.length ? <Row label="Extra charges" value={`${dollars(rec.charges.reduce((t, x) => t + x.cents, 0))}: ${rec.charges.map((x) => `${x.label} ${dollars(x.cents)}`).join(', ')}`} /> : null}
           {rec.paidOtherCents ? <Row label="Paid with points or credit" value={dollars(rec.paidOtherCents)} /> : null}
           {rec.refundCents ? <Row label="Refunded" value={dollars(rec.refundCents)} /> : null}
