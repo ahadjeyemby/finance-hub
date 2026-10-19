@@ -14,7 +14,9 @@ import { C, F, S } from '@/theme/tokens';
 import { Banner, Button, Card, Row, Screen, T, TapeCard, useWide } from '@/theme/ui';
 
 export default function Overview() {
-  const { ctx, scope, scoped, range, period, dataTo, questions, forecastMonth: fcMonth, completeTo } = useRepo();
+  const { ctx, scope, scoped, range, period, dataTo, questions, forecastMonth: fcMonth, completeTo, links } = useRepo();
+  // receipts are evidence, not transactions: ones dated after the newest statement have no month here until their statement is imported
+  const waiting = (links?.receipts ?? []).filter((r) => r.date && r.date > dataTo);
   const wide = useWide();
   const s = summarize(ctx, range.from, range.to, scope);
   const f = scoped({ from: range.from, to: range.to });
@@ -46,6 +48,8 @@ export default function Overview() {
 
   const banners = (
     <View style={{ gap: S.sm }}>
+      {waiting.length ? <Banner tone="info" title={`${waiting.length} receipt${waiting.length > 1 ? 's are' : ' is'} dated after ${dayLabel(dataTo)}, the end of your newest statement.`}>This page is built from statements, so a month appears only when a statement covers it. The receipts are saved and will be linked and counted once that statement is imported. Open Receipt links to see them.</Banner> : null}
+      {waiting.length ? <View style={{ flexDirection: 'row' }}><Button small kind="outline" label="Open Receipt links" onPress={() => router.push('/links')} /></View> : null}
       {s.incomeIncomplete && scope !== 'business' ? <Banner title="Income looks incomplete.">Only deposits into the connected checking account count. Other accounts that receive pay are not connected, so Earned may be low.</Banner> : null}
       {s.unconfirmedIncome > 0 ? <Banner title={`${dollars(s.unconfirmedIncome)} of Earned is unconfirmed.`}>The bank statement hides who sent these deposits. If any is a reimbursement or a move from your own account, answer in the Inbox and it comes out of Earned.</Banner> : null}
       {s.partialAccounts.length ? <Banner tone="info" title="Some statements end before this period does.">{s.partialAccounts.map((a) => `${a.name} to ${dayLabel(a.coveredTo)}`).join(', ')}. Late days may be missing.</Banner> : null}
