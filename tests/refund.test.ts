@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { likelyRefundCredits, receiptToLines, receiptToRow, rowToReceipt } from '../src/core/evidence';
+import { likelyRefundCredits, receiptToLines, receiptToRow, receiptUnits, rowToReceipt } from '../src/core/evidence';
 import { acceptReceiptReading, analyseReceipt, diffReceipts, noAnswers, receiptAsText, receiptFieldText, receiptFromRead, receiptMisfits, setReceiptField, settleReceiptReads } from '../src/core/intake';
 import type { ReadReceipt } from '../src/core/intake';
 import type { Txn } from '../src/core/types';
@@ -216,4 +216,86 @@ test('when an amount for points or credit is still subtracted, the message point
   const p = analyseReceipt(r, noAnswers(), TODAY).problems[0];
   assert.equal(p.id, 'sum');
   assert.match(p.text, /likely culprit if it was really your card payment/);
+});
+
+
+// The ALDI receipt from the screen: zucchini sold by weight, two bags of chips, and "8 @ 0.59" avocados. It prints "11 items".
+const aldi = (avocadoQty: number | undefined, zucchini: number | undefined): ReadReceipt => ({
+  merchant: 'ALDI', date: '2026-09-12', subtotal: 13.37, total: 13.37, item_count: 11, payment_method: 'Mastercard', card_last4: '7645', store_address: 'Peachtree Corners, GA',
+  items: [{ item: 'Organic Zucchini', price: 4.41, qty: zucchini, unit_price: 2.69 }, { item: 'Hint of Lime Chips', price: 1.99, qty: 1, unit_price: 1.99 }, { item: 'Hint of Lime Chips', price: 1.99, qty: 1, unit_price: 1.99 }, { item: 'Avocados', price: 4.72, qty: avocadoQty, unit_price: 0.59 }],
+});
+
+test('a weight the reader put in the quantity field is kept as a weight, and a weighed item counts as one', () => {
+  const r = receiptFromRead(aldi(8, 1.64), { fileName: 'a.jpg' });
+  assert.equal(r.lines[0].qty, undefined);
+  assert.equal(r.lines[0].weight, 1.64);
+  assert.equal(r.lines[3].qty, 8);
+  assert.equal(receiptUnits(r.lines), 11);
+  assert.deepEqual(analyseReceipt(r, noAnswers(), TODAY).problems.filter((p) => p.id === 'count'), []);
+});
+
+test('with the avocado quantity missing the count check fails, and says how to fix it', () => {
+  const r = receiptFromRead(aldi(undefined, 1.64), { fileName: 'a.jpg' });
+  assert.equal(receiptUnits(r.lines), 4);
+  assert.match(analyseReceipt(r, noAnswers(), TODAY).problems.find((p) => p.id === 'count')!.text, /prints 11 items sold, but 4 lines were read.*add “x8” after the name/);
+});
+
+test('quantity and weight can be typed as "AVOCADOS x8" and "ZUCCHINI 1.64 lb", and read back the same way', () => {
+  const r = receiptFromRead(aldi(undefined, 1.64), { fileName: 'a.jpg' });
+  assert.equal(receiptFieldText(r, 'lines').split('\n')[0], 'Organic Zucchini 1.64 lb 4.41');
+  const fixed = setReceiptField(r, 'lines', 'Organic Zucchini 1.64 lb 4.41\nHint of Lime Chips 1.99\nHint of Lime Chips 1.99\nAvocados x8 4.72').record;
+  assert.equal(fixed.lines[3].qty, 8);
+  assert.equal(fixed.lines[3].unitCents, 59, 'the unit price the reader found is kept for a line whose name and price did not change');
+  assert.equal(fixed.lines[0].weight, 1.64);
+  assert.equal(setReceiptField(r, 'lines', 'Organic Zucchini 1.65 kg 4.41\nHint of Lime Chips 1.99\nHint of Lime Chips 1.99\nAvocados x8 4.72').record.lines[0].weightUnit, 'kg');
+  assert.equal(receiptUnits(fixed.lines), 11);
+  assert.deepEqual(analyseReceipt(fixed, noAnswers(), TODAY).problems.filter((p) => p.id === 'count'), []);
+  assert.equal(receiptFieldText(fixed, 'lines').split('\n')[3], 'Avocados x8 4.72');
+});
+
+test('a line left as shown keeps what the reader found, and removing x8 removes the quantity', () => {
+  const r = receiptFromRead(aldi(8, 1.64), { fileName: 'a.jpg' });
+  const same = setReceiptField(r, 'lines', receiptFieldText(r, 'lines')).record;
+  assert.deepEqual(same.lines, r.lines);
+  const one = setReceiptField(r, 'lines', receiptFieldText(r, 'lines').replace('Avocados x8', 'Avocados')).record;
+  assert.equal(one.lines[3].qty, undefined);
+});
+
+// ALDI again: "Organic Spring Mix 4.99" followed by the row "New price $2.49  -2.50". Eleven things bought, one discount line. Prints "11 items".
+const aldi18 = (withDiscountLine: boolean): ReadReceipt => ({
+  merchant: 'ALDI', date: '2026-09-27', subtotal: 21.58, tax: 0.81, total: 22.39, item_count: 11, payment_method: 'Mastercard', card_last4: '7645', store_address: 'Johns Creek, GA',
+  items: [['Whole Milk', 2.72], ['Organic Spring Mix', 4.99], ...(withDiscountLine ? [['New price', -2.5]] : []), ['Green Onions', 0.89], ['Green Onions', 0.89], ['Green Onions', 0.89], ['Cavatappi', 0.99], ['Fajita Tortilla', 1.85], ['Potato Chips', 1.79], ['Gala Apples', 1.99], ['Navel Oranges', 3.39], ['Org Strawberries', 3.69]]
+    .map(([item, price]) => ({ item: item as string, price: price as number })),
+});
+
+test('a negative line is a discount: it counts in the money but not in the number of items', () => {
+  const r = receiptFromRead(aldi18(true), { fileName: 'a.jpg' });
+  assert.equal(r.lines.length, 12);
+  assert.equal(receiptUnits(r.lines), 11);
+  const a = analyseReceipt(r, noAnswers(), TODAY);
+  assert.deepEqual(a.problems, []);
+});
+
+test('the same receipt with the discount row dropped fails the amounts, and the reading that keeps it is the one that passes both', () => {
+  const kept = receiptFromRead(aldi18(true), { fileName: 'a.jpg' });
+  const dropped = receiptFromRead(aldi18(false), { fileName: 'a.jpg' });
+  assert.equal(receiptMisfits(kept), 0);
+  assert.ok(receiptMisfits(dropped) >= 1);
+  const out = settleReceiptReads(dropped, kept);
+  assert.equal(out.lines.length, 12, 'the reading with the discount row is kept');
+  assert.match(out.corrections![0], /second reading did/);
+});
+
+test('a count that is wrong says so without counting the discount line', () => {
+  const r = receiptFromRead({ ...aldi18(true), item_count: 12 }, { fileName: 'a.jpg' });
+  assert.match(analyseReceipt(r, noAnswers(), TODAY).problems.find((p) => p.id === 'count')!.text, /but 11 lines were read \(not counting 1 discount line\)/);
+});
+
+test('a discount line keeps its minus sign when the items are edited as text', () => {
+  const r = receiptFromRead(aldi18(true), { fileName: 'a.jpg' });
+  const text = receiptFieldText(r, 'lines');
+  assert.equal(text.split('\n')[2], 'New price -2.50');
+  assert.deepEqual(setReceiptField(r, 'lines', text).record.lines, r.lines);
+  const typed = setReceiptField(r, 'lines', 'Milk 2.72\nCoupon -1.00\nBread - 3.00').record.lines;
+  assert.deepEqual(typed.map((l) => l.cents), [272, -100, 300], 'a dash between name and price is not a minus sign');
 });

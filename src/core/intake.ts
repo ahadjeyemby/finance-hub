@@ -9,7 +9,7 @@
 import { classifyRow, makeId, pairTransfers } from './classify';
 import { findTwins } from './dedupe';
 import type { Sameness, Twin } from './dedupe';
-import { matchReceipt } from './evidence';
+import { itemLines, matchReceipt, receiptUnits } from './evidence';
 import type { MatchOptions, RawRecord, ReceiptCharge, ReceiptLine, ReceiptRecord, StatementRecord } from './evidence';
 import { hasNumber } from './accounts';
 import { parseLines } from './questions';
@@ -110,8 +110,9 @@ export function analyseReceipt(r: ReceiptRecord, a: Answers, today: string, same
 
   // the printed count is the cheapest way to catch an item printed over two rows and read as two
   if (r.itemCount && r.lines.length) {
-    const units = r.lines.reduce((t, l) => t + (l.qty && l.qty > 0 ? l.qty : 1), 0);
-    if (r.lines.length !== r.itemCount && units !== r.itemCount) problems.push({ id: 'count', text: `The receipt prints ${r.itemCount} item${r.itemCount > 1 ? 's' : ''} sold, but ${r.lines.length} line${r.lines.length > 1 ? 's were' : ' was'} read. An item printed over two rows may have been read as two, or a line is missing. Fix the items under Check or edit details, or keep as printed.` });
+    const units = receiptUnits(r.lines);
+    const bought = itemLines(r.lines).length; const discounts = r.lines.length - bought;
+    if (bought !== r.itemCount && units !== r.itemCount) problems.push({ id: 'count', text: `The receipt prints ${r.itemCount} item${r.itemCount > 1 ? 's' : ''} sold, but ${bought} line${bought > 1 ? 's were' : ' was'} read${discounts ? ` (not counting ${discounts} discount line${discounts > 1 ? 's' : ''})` : ''}. An item printed over two rows may have been read as two, or a line is missing. Items bought in a quantity count as that many (8 avocados is 8): add “x8” after the name under Check or edit details, then press Apply and re-check. A weighed item counts as one.` });
   }
 
   if (r.cardLast4 && !/^\d{4}$/.test(r.cardLast4)) problems.push({ id: 'last4', text: `Card digits "${r.cardLast4}" are not four digits. Correct them, or keep as printed.` });
@@ -176,17 +177,30 @@ export function setReceiptField(r: ReceiptRecord, field: string, text: string): 
     case 'orderRef': return { record: { ...r, orderRef: t } };
     case 'dup': return t === 'extra' || t === 'different' ? { record: { ...r, dup: t } } : { record: r, error: 'Choose one.' };
     case 'lines': {
-      const p = parseLines(t);
-      if (p.bad.length) return { record: r, error: `Could not read: ${p.bad.join(', ')}. Use "item price".` };
+      const p = parseLines(t, true);
+      if (p.bad.length) return { record: r, error: `Could not read: ${p.bad.join(', ')}. Use "item price", and a minus sign for a discount line, for example "New price -2.50".` };
       // keep the SKU, quantity and unit price the reader found for any line the person left unchanged
-      const lines: ReceiptLine[] = p.lines.map((l) => { const cents = Math.round(l.amount * 100); return r.lines.find((x) => x.item === l.item && x.cents === cents) ?? { item: l.item, cents }; });
+      // a line the person left as it was keeps everything the reader found (SKU, unit price); a changed or new line takes its quantity or weight from what was typed
+      const lines: ReceiptLine[] = p.lines.map((l) => { const cents = Math.round(l.amount * 100); const same = r.lines.find((x) => lineName(x) === l.item && x.cents === cents); if (same) return same; const q = splitQuantity(l.item); const old = r.lines.find((x) => x.item === q.item && x.cents === cents); return { ...(old ?? {}), item: q.item, cents, ...(q.qty ? { qty: q.qty } : { qty: undefined }), ...(q.weight ? { weight: q.weight, weightUnit: q.weightUnit } : { weight: undefined, weightUnit: undefined }) }; });
       return { record: { ...r, lines } };
     }
     default: return { record: r, error: `Unknown field ${field}` };
   }
 }
 
-export const linesToText = (lines: ReceiptLine[]) => lines.map((l) => `${l.item} ${(l.cents / 100).toFixed(2)}`).join('\n');
+/** A line as the person sees and edits it, without its price: "AVOCADOS x8", "ZUCCHINI 1.64 lb". */
+const lineName = (l: ReceiptLine) => `${l.item}${l.qty && l.qty > 1 ? ` x${l.qty}` : ''}${l.weight ? ` ${l.weight} ${l.weightUnit ?? 'lb'}` : ''}`;
+export const linesToText = (lines: ReceiptLine[]) => lines.map((l) => `${lineName(l)} ${(l.cents / 100).toFixed(2)}`).join('\n');
+
+/** "AVOCADOS x8" -> name AVOCADOS, quantity 8. "ZUCCHINI 1.64 lb" -> weight 1.64 lb. Anything else is just a name. */
+function splitQuantity(text: string): { item: string; qty?: number; weight?: number; weightUnit?: string } {
+  let item = text.trim(); let qty: number | undefined; let weight: number | undefined; let weightUnit: string | undefined;
+  const q = item.match(/\s+x\s?(\d+)\s*$/i);
+  if (q) { qty = Number(q[1]); item = item.slice(0, q.index).trim(); }
+  const w = item.match(/\s+(\d+(?:\.\d+)?)\s?(lbs?|kg|oz|g)\s*$/i);
+  if (w) { weight = Number(w[1]); weightUnit = w[2].toLowerCase().replace(/^lbs$/, 'lb'); item = item.slice(0, w.index).trim(); }
+  return { item: item || text.trim(), ...(qty && qty > 1 ? { qty } : {}), ...(weight ? { weight, weightUnit } : {}) };
+}
 
 /** how a receipt relates to the ledger: one charge, several, or none */
 export function linkReceipt(r: ReceiptRecord, txns: Txn[], opts?: MatchOptions) { return matchReceipt(r, txns, 4, opts); }
@@ -530,7 +544,9 @@ export function receiptFromRead(o: ReadReceipt, meta: { fileName: string; sha256
     currency: s(o.currency) ?? 'USD', paymentMethod: s(o.payment_method) ?? (misfiled ? s(o.paid_other_label) : undefined), cardLast4: s(o.card_last4)?.replace(/\D/g, '').slice(-4) || undefined,
     storeAddress: s(o.store_address), storeRef: s(o.store_ref), orderRef: s(o.order_ref),
     lines: (o.items ?? []).filter((i) => s(i.item) && typeof i.price === 'number').map((i) => ({
-      item: i.item.trim(), cents: c(i.price)!, qty: i.qty, unitCents: c(i.unit_price), code: s(i.code), discountCents: c(i.discount),
+      // the reader sometimes puts a weight (1.64 lb) in the quantity field: a whole number is a count, anything else is a weight
+      item: i.item.trim(), cents: c(i.price)!, ...(Number.isInteger(i.qty) && (i.qty as number) > 0 ? { qty: i.qty } : {}),
+      ...(typeof i.qty === 'number' && i.qty > 0 && !Number.isInteger(i.qty) ? { weight: i.qty } : {}), unitCents: c(i.unit_price), code: s(i.code), discountCents: c(i.discount),
     })),
     sourceFile: meta.fileName, sha256: meta.sha256, origin: 'app_upload', capturedAt: new Date().toISOString(), readBy: s(o.read_by),
     raw: { reader: o, ...(o.other_text ? { otherText: o.other_text } : {}) },

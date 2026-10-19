@@ -147,9 +147,12 @@ export function nextCashStep(d: CashDraft): CashStep | null {
 }
 
 /** Parse "tomatoes 4.50, rice 12" into line items. Anything unparseable is reported so the app can ask again. */
-export function parseLines(input: string): { lines: { item: string; amount: number }[]; bad: string[] } {
+export function parseLines(input: string, allowNegative = false): { lines: { item: string; amount: number }[]; bad: string[] } {
   const lines: { item: string; amount: number }[] = []; const bad: string[] = [];
   for (const part of input.split(/[,\n;]+/).map((s) => s.trim()).filter(Boolean)) {
+    // "New price -2.50" is a discount line when negatives are allowed (receipts); "Item - 4.50" is just a dash between the name and the price
+    const neg = allowNegative ? part.match(/^(.*\S)\s+-\$?(\d+(?:\.\d{1,2})?)$/) : null;
+    if (neg && neg[1].replace(/[\s:]+$/, '')) { lines.push({ item: neg[1].replace(/[\s:]+$/, ''), amount: -Number(neg[2]) }); continue; }
     const m = part.match(/^(.*?)[\s:$-]*\$?(\d+(?:\.\d{1,2})?)$/);
     if (m && m[1].trim()) lines.push({ item: m[1].trim(), amount: Number(m[2]) }); else bad.push(part);
   }
