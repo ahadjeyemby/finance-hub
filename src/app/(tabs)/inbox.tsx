@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/header';
+import { dayLabel } from '@/core/dates';
 import { dollars } from '@/core/queries';
 import type { Question } from '@/core/types';
 import { useRepo } from '@/data/repo';
@@ -15,8 +16,10 @@ const LABEL: Record<string, string> = {
 };
 
 function QuestionCard({ q, onDone }: { q: Question; onDone: (q: Question) => void }) {
-  const { answer } = useRepo();
+  const { answer, txns, accounts } = useRepo();
   const [all, setAll] = useState(true);
+  const [see, setSee] = useState(false);
+  const rows = q.txnIds.map((id) => txns.find((t) => t.id === id)).filter((t): t is NonNullable<typeof t> => !!t);
   return (
     <Card>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: S.sm }}>
@@ -25,6 +28,24 @@ function QuestionCard({ q, onDone }: { q: Question; onDone: (q: Question) => voi
       </View>
       <H size={16}>{q.prompt}</H>
       <T size={13} tone="ink2">{q.detail}</T>
+      {rows.length ? <View style={{ flexDirection: 'row' }}><Button small kind="ghost" label={see ? 'Hide the details' : rows.length > 1 ? `See the ${rows.length} transactions` : 'See the transaction'} onPress={() => setSee((v) => !v)} /></View> : null}
+      {see ? (
+        <View style={{ gap: S.sm, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
+          {rows.slice(0, 6).map((t) => {
+            const a = accounts.find((x) => x.id === t.accountId);
+            return (
+              <View key={t.id} style={{ gap: 2, borderBottomWidth: 1, borderBottomColor: C.line, paddingBottom: S.sm }}>
+                <T size={14} bold>{t.merchant}: {dollars(t.cents, { sign: true })}</T>
+                <T size={13} tone="ink2">{dayLabel(t.date)}, {a ? `${a.name}${a.last4 ? ` (${a.institution} ${a.last4})` : ''}` : t.accountId}</T>
+                <T size={13} tone="ink2">As the bank printed it: {t.description || 'no description'}</T>
+                {t.source ? <T size={12} tone="ink3">From: {t.source}{t.ref ? `, reference ${t.ref}` : ''}</T> : null}
+                <View style={{ flexDirection: 'row' }}><Button small kind="outline" label="Open details and statement line" onPress={() => router.push({ pathname: '/txn/[id]', params: { id: t.id } })} /></View>
+              </View>
+            );
+          })}
+          {rows.length > 6 ? <View style={{ gap: S.xs }}><T size={12} tone="ink3">{rows.length - 6} more not shown.</T><View style={{ flexDirection: 'row' }}><Button small kind="outline" label={`All ${q.merchant} transactions`} onPress={() => router.push({ pathname: '/ledger', params: { merchant: q.merchant } })} /></View></View> : null}
+        </View>
+      ) : null}
       {q.canApplyToMerchant ? (
         <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: all }} onPress={() => setAll(!all)} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: S.sm }}>
           <View style={{ width: 22, height: 22, borderRadius: 5, borderWidth: 2, borderColor: C.accent, backgroundColor: all ? C.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{all ? <T size={13} tone="paper" bold>{'✓'}</T> : null}</View>
