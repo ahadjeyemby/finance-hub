@@ -15,7 +15,7 @@ export interface Evidence {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function signed(bucket: 'statements' | 'receipts', path: string | null): Promise<string | null> {
+export async function signed(bucket: 'statements' | 'receipts', path: string | null): Promise<string | null> {
   if (!supabase || !path) return null;
   const { data } = await supabase.storage.from(bucket).createSignedUrl(path, 600);
   return data?.signedUrl ?? null;
