@@ -58,16 +58,23 @@ test('a complete receipt has nothing to ask', () => {
 test('an empty receipt asks for every required detail and refuses to be saved', () => {
   const a = analyseReceipt({ lines: [] }, noAnswers(), TODAY);
   const ids = a.gaps.map((g) => g.id);
-  for (const id of ['merchant', 'date', 'total', 'lines', 'time', 'paymentMethod', 'storeAddress']) assert.ok(ids.includes(id), `asks for ${id}`);
+  for (const id of ['merchant', 'date', 'total', 'lines', 'paymentMethod', 'storeAddress']) assert.ok(ids.includes(id), `asks for ${id}`);
+  assert.ok(!ids.includes('time'), 'a missing time is never asked about');
   assert.ok(!ids.includes('cardLast4'), 'no card digits question when payment is unknown');
   assert.ok(!a.ok);
 });
 
+test('a fuel receipt whose items equal the total is not asked about sales tax', () => {
+  const fuel: ReceiptRecord = { merchant: "sam's club", date: '2026-07-07', totalCents: 4066, lines: [{ item: 'Pump# 11 UNLEAD Fuel Sale', cents: 4066 }], paymentMethod: 'MASTERCARD CREDIT TEND', cardLast4: '9780', storeAddress: 'ALPHARETTA, GA' };
+  assert.ok(!analyseReceipt(fuel, noAnswers(), TODAY).gaps.some((g) => g.id === 'tax'));
+  assert.ok(analyseReceipt({ ...fuel, totalCents: 4400 }, noAnswers(), TODAY).gaps.some((g) => g.id === 'tax'), 'still asked when tax could be the missing part');
+});
+
 test('"not printed" settles recommended details but never required ones', () => {
-  const rec: ReceiptRecord = { ...full, merchant: '', time: undefined, storeAddress: undefined, taxCents: undefined, subtotalCents: undefined, totalCents: 1000 };
+  const rec: ReceiptRecord = { ...full, merchant: '', time: undefined, storeAddress: undefined, taxCents: undefined, subtotalCents: undefined, totalCents: 1100 };
   const first = analyseReceipt(rec, noAnswers(), TODAY);
-  assert.deepEqual(first.gaps.map((g) => g.id).sort(), ['merchant', 'storeAddress', 'tax', 'time']);
-  const skip = analyseReceipt(rec, { notPrinted: ['merchant', 'time', 'storeAddress', 'tax'], acknowledged: [] }, TODAY);
+  assert.deepEqual(first.gaps.map((g) => g.id).sort(), ['merchant', 'storeAddress', 'tax']);
+  const skip = analyseReceipt(rec, { notPrinted: ['merchant', 'storeAddress', 'tax'], acknowledged: [] }, TODAY);
   assert.deepEqual(skip.gaps.map((g) => g.id), ['merchant'], 'the store name can not be skipped');
 });
 

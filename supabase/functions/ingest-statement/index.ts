@@ -2,7 +2,7 @@
 // Nothing is saved here. The app checks the rows against the printed balances, asks about anything missing
 // or inconsistent, and saves only after the person confirms.
 import { cors, json, requireUser } from '../_shared/auth.ts';
-import { callModel } from '../_shared/model.ts';
+import { callModel, isReaderAllowed, readerChoices } from '../_shared/model.ts';
 
 const tool = {
   name: 'record_statement',
@@ -72,6 +72,9 @@ Deno.serve(async (req) => {
   const denied = await requireUser(req);
   if (denied) return denied;
   const body = await req.json().catch(() => ({}));
+  if (body.action === 'models') return json(readerChoices());
+  const choice: string | undefined = body.model === undefined || body.model === null || body.model === '' ? undefined : body.model;
+  if (choice !== undefined && !isReaderAllowed(choice)) return json({ error: 'That reader is not on the allowed list. Add it to OPENROUTER_MODEL_CHOICES first.' }, 400);
   const data: unknown = body.file_base64;
   const type: string = body.media_type ?? '';
   const isPdf = type === 'application/pdf';
@@ -79,15 +82,21 @@ Deno.serve(async (req) => {
   const file = isPdf
     ? { type: 'document' as const, filename: typeof body.filename === 'string' ? body.filename.slice(0, 120) : 'statement.pdf', source: { type: 'base64' as const, media_type: 'application/pdf' as const, data } }
     : { type: 'image' as const, source: { type: 'base64' as const, media_type: type, data } };
+  // a re-read at the person's request: their note says what looks wrong and the previous reading says what it was. The note is a pointer, never a fact.
+  const hint = typeof body.hint === 'string' ? body.hint.trim().slice(0, 600) : '';
+  const previous = typeof body.previous === 'string' ? body.previous.slice(0, 30_000) : '';
+  const review = hint
+    ? `\n\nThis is a second look. The person checking your first reading wrote this note about it: "${hint}"\nYour first reading was:\n${previous}\nUse the note to decide where to look closely, then read those parts of the document again. The note may be wrong: report only what is printed on the document, never what the note says should be there. If the document disagrees with the note, report the document and say so in \`unreadable\`. Read every row again, not only the ones the note mentions.`
+    : '';
   const r = await callModel({
     max_tokens: 12000,
     tools: [tool],
     tool_choice: { type: 'tool', name: 'record_statement' },
     messages: [{ role: 'user', content: [
       file,
-      { type: 'text', text: 'Read this statement with record_statement. List every transaction row on every page, none skipped or merged. Copy descriptions and amounts exactly as printed. Do not make the rows add up: report what is printed and nothing else. If the statement has a points or rewards summary or a table with a Rewards or Points column, report it in `rewards` and keep those lines out of `rows`.' },
+      { type: 'text', text: 'Read this statement with record_statement. List every transaction row on every page, none skipped or merged. Copy descriptions and amounts exactly as printed. Do not make the rows add up: report what is printed and nothing else. If the statement has a points or rewards summary or a table with a Rewards or Points column, report it in `rewards` and keep those lines out of `rows`.' + review },
     ] }],
-  }, 'vision');
+  }, body.second_opinion === true || hint ? 'verify' : 'vision', choice);
   if (!r.ok) return r;
   const out = await r.json();
   const use = out.content?.find((b: { type: string }) => b.type === 'tool_use');
@@ -95,5 +104,5 @@ Deno.serve(async (req) => {
   if (out.stop_reason === 'max_tokens' || !use || use.input?.__invalid_arguments) {
     return json({ error: 'The statement is too long to read in one pass, or the reader stopped early. Split the PDF by month, or load it with the desktop script (bun run ledger).' }, 422);
   }
-  return json(use.input);
+  return json({ ...use.input, read_by: r.headers.get('x-model') ?? undefined });
 });

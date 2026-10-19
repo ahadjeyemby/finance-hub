@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
-import type { Analysis, Gap, StatementDraft } from '@/core/intake';
-import { addRow, flipRow, removeRow } from '@/core/intake';
+import type { Analysis, Gap, ReadingDiff, ReceiptDiff, StatementDraft } from '@/core/intake';
+import type { ReceiptRecord } from '@/core/evidence';
+import { addRow, flipRow, MAX_HINT, removeRow } from '@/core/intake';
 import { dollars } from '@/core/queries';
 import { C, F, R, S } from '@/theme/tokens';
 import { Banner, Button, Chip, T } from '@/theme/ui';
@@ -35,17 +36,21 @@ export function GapForm({ gap, onAnswer, onSkip, error }: { gap: Gap; onAnswer: 
       {gap.input === 'choice' ? (
         options.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{options.map((o) => <Chip key={o.value} label={o.label} onPress={() => onAnswer(o.value)} />)}</View> : null
       ) : (
+        <>
+        {gap.suggest?.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{gap.suggest.map((o) => <Chip key={o.value} label={o.label} onPress={() => onAnswer(o.value)} />)}</View> : null}
         <View style={{ flexDirection: 'row', gap: S.sm, alignItems: 'flex-end' }}>
           <TextInput
             style={[input, { flex: 1, backgroundColor: C.paper }, gap.input === 'items' && { minHeight: 96, textAlignVertical: 'top', paddingTop: S.md }]}
             value={text} onChangeText={setText} multiline={gap.input === 'items'} accessibilityLabel={gap.label} placeholderTextColor={C.ink3}
             keyboardType={gap.input === 'money' ? 'numbers-and-punctuation' : gap.input === 'last4' ? 'number-pad' : 'default'} maxLength={gap.input === 'last4' ? 4 : undefined}
-            placeholder={gap.input === 'date' ? 'YYYY-MM-DD' : gap.input === 'money' ? '0.00' : gap.input === 'items' ? 'milk 4.50\nrice 12.00' : ''}
+            placeholder={gap.input === 'date' ? 'YYYY-MM-DD' : gap.input === 'money' ? 'Amount, e.g. 12.50' : gap.input === 'items' ? 'milk 4.50\nrice 12.00' : ''}
             onSubmitEditing={() => { if (gap.input !== 'items' && text.trim()) onAnswer(text); }} />
           <Button small label="Save" disabled={!text.trim()} onPress={() => onAnswer(text)} />
         </View>
+        </>
       )}
       {error ? <T size={12} tone="bad">{error}</T> : null}
+      {gap.id === 'tax' ? <View style={{ flexDirection: 'row' }}><Button small kind="outline" label="No tax: save as 0.00" onPress={() => onAnswer('0')} /></View> : null}
       {gap.canSkip ? <View style={{ flexDirection: 'row' }}><Button small kind="ghost" label={gap.id === 'rows' ? 'This statement has no transactions' : gap.id === 'lines' ? 'No items are listed on it' : 'Not printed on it'} onPress={onSkip} /></View> : null}
     </View>
   );
@@ -99,6 +104,104 @@ export function RowsEditor({ draft, onChange }: { draft: StatementDraft; onChang
         <Button small kind="outline" label="Add row" onPress={() => { const r = addRow(draft, date, desc, amt); if (r.error) setErr(r.error); else { setErr(''); setDate(''); setDesc(''); setAmt(''); onChange(r.draft); } }} />
       </View>
       {err ? <T size={12} tone="bad">{err}</T> : null}
+    </View>
+  );
+}
+
+/** "Automatic" or one of the readers the backend allows: the choice for the next read. */
+export function ReaderPicker({ models, value, onChange }: { models: string[]; value: string | undefined; onChange: (m: string | undefined) => void }) {
+  if (models.length < 2) return null;
+  const short = (m: string) => m.split('/').pop() ?? m;
+  return (
+    <View style={{ gap: 2 }}>
+      <T size={12} tone="ink3">Read with</T>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+        <Chip label="Automatic" on={value === undefined} onPress={() => onChange(undefined)} />
+        {models.map((m) => <Chip key={m} label={short(m)} on={value === m} onPress={() => onChange(m)} />)}
+      </View>
+    </View>
+  );
+}
+
+export interface Proposal { draft: StatementDraft; diff: ReadingDiff; hint: string }
+
+const gapText = (g: number | null) => (g == null ? 'cannot be checked' : g === 0 ? 'adds up to the printed balance' : `is off by ${dollars(Math.abs(g))}`);
+
+/** Say what looks wrong and have the file read again. The new reading is shown next to the old one and replaces it only when the person says so. */
+export function RereadBox({ open, busy, error, proposal, used, max, models, onToggle, onSend, onUse, onKeep }: {
+  open: boolean; busy: boolean; error?: string; proposal?: Proposal; used: number; max: number; models: string[];
+  onToggle: () => void; onSend: (text: string, model?: string) => void; onUse: () => void; onKeep: () => void;
+}) {
+  const [text, setText] = useState('');
+  const [model, setModel] = useState<string | undefined>(undefined);
+  const left = max - used;
+  return (
+    <View style={{ gap: S.xs }}>
+      {!open && !proposal ? <View style={{ flexDirection: 'row' }}><Button small kind="outline" label="Tell the reader what is wrong" onPress={onToggle} /></View> : null}
+      {open && !proposal ? (
+        <View style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
+          <T bold size={13}>What looks wrong?</T>
+          <T size={13} tone="ink2">Write it as you would say it, for example “the year is 2026, not 2028” or “row 7 is $19.99”. The file is read again with your note. Your note points the reader at where to look; it still reports only what is printed, and nothing changes until you accept the new reading.</T>
+          <TextInput style={[input, { minHeight: 80, textAlignVertical: 'top', paddingTop: S.md, backgroundColor: C.paper }]} multiline value={text} maxLength={MAX_HINT} onChangeText={setText} editable={!busy} placeholder="What should the reader look at again?" placeholderTextColor={C.ink3} accessibilityLabel="Note for the reader" />
+          <ReaderPicker models={models} value={model} onChange={setModel} />
+          <View style={{ flexDirection: 'row', gap: S.sm, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button small label={busy ? 'Reading again' : 'Read again with this note'} disabled={busy || !text.trim() || left <= 0} onPress={() => onSend(text.trim(), model)} />
+            <Button small kind="outline" label="Just read it again" disabled={busy || left <= 0} onPress={() => onSend('', model)} />
+            <Button small kind="ghost" label="Cancel" disabled={busy} onPress={onToggle} />
+            <T size={12} tone="ink3">{left > 0 ? `${left} re-read${left > 1 ? 's' : ''} left for this file` : 'No re-reads left for this file. Edit the details by hand.'}</T>
+          </View>
+          {error ? <T size={13} tone="bad">{error}</T> : null}
+        </View>
+      ) : null}
+      {proposal ? (
+        <View style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
+          <T bold size={13}>{proposal.hint ? `The new reading, for your note “${proposal.hint}”` : 'The new reading'}</T>
+          {proposal.diff.lines.length ? proposal.diff.lines.map((l, i) => <T key={i} size={13} tone="ink2">{l}</T>) : <T size={13} tone="ink2">It reads the same as before. Nothing changed.</T>}
+          <T size={13} tone="ink2">Rows {gapText(proposal.diff.gapBefore)} now; with the new reading they {gapText(proposal.diff.gapAfter)}.</T>
+          {proposal.draft.truncated ? <T size={13} tone="bad">The reader stopped before the end of this file, so the new reading is incomplete.</T> : null}
+          <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+            <Button small label="Use the new reading" disabled={!!proposal.draft.truncated || !proposal.diff.lines.length} onPress={() => { setText(''); onUse(); }} />
+            <Button small kind="ghost" label="Keep what I had" onPress={() => { setText(''); onKeep(); }} />
+          </View>
+          <T size={12} tone="ink3">Either way the checks run again before Save unlocks. Compare with the PDF if you are unsure.</T>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+export interface ReceiptProposal { record: ReceiptRecord; diff: ReceiptDiff }
+
+/** Read a receipt again, on request. The new reading is shown next to the one on screen and replaces it only when the person says so. */
+export function ReceiptAgainBox({ busy, error, proposal, used, max, models, onRetry, onUse, onKeep }: {
+  busy: boolean; error?: string; proposal?: ReceiptProposal; used: number; max: number; models: string[]; onRetry: (model?: string) => void; onUse: () => void; onKeep: () => void;
+}) {
+  const left = max - used;
+  const [model, setModel] = useState<string | undefined>(undefined);
+  const checks = (n: number) => (n === 0 ? 'agrees with its printed amounts' : `disagrees with its printed amounts in ${n} place${n > 1 ? 's' : ''}`);
+  return (
+    <View style={{ gap: S.xs }}>
+      {!proposal ? (
+        <View style={{ gap: S.xs }}>
+          <ReaderPicker models={models} value={model} onChange={setModel} />
+          <View style={{ flexDirection: 'row', gap: S.sm, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button small kind="outline" label={busy ? 'Reading again' : model ? `Read again with ${model.split('/').pop()}` : 'Read again'} disabled={busy || left <= 0} onPress={() => onRetry(model)} />
+            <T size={12} tone="ink3">{left > 0 ? `${left} re-read${left > 1 ? 's' : ''} left for this file.${model ? '' : ' Automatic alternates between two ways of asking the reader.'}` : 'No re-reads left for this file.'}</T>
+          </View>
+        </View>
+      ) : (
+        <View style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
+          <T bold size={13}>The new reading{proposal.record.readBy ? `, by ${proposal.record.readBy}` : ''}</T>
+          {proposal.diff.lines.length ? proposal.diff.lines.map((l, i) => <T key={i} size={13} tone="ink2">{l}</T>) : <T size={13} tone="ink2">It reads the same as before. Nothing changed.</T>}
+          <T size={13} tone="ink2">The reading on screen {checks(proposal.diff.before)}. The new one {checks(proposal.diff.after)}.</T>
+          <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+            <Button small label="Use the new reading" disabled={!proposal.diff.lines.length} onPress={onUse} />
+            <Button small kind="ghost" label="Keep what I had" onPress={onKeep} />
+          </View>
+          <T size={12} tone="ink3">Either way the checks run again before Save unlocks. Compare with the original if you are unsure.</T>
+        </View>
+      )}
+      {error ? <T size={13} tone="bad">{error}</T> : null}
     </View>
   );
 }

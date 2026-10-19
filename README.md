@@ -146,7 +146,9 @@ The model is fixed, never chosen per request. It defaults to `anthropic/claude-h
 
 ```bash
 supabase secrets set OPENROUTER_MODEL=anthropic/claude-sonnet-5.5    # optional
-supabase secrets set OPENROUTER_VISION_MODEL=<model id>               # optional, receipts only
+supabase secrets set OPENROUTER_VISION_MODEL=<model id>               # optional, receipts and statements
+supabase secrets set OPENROUTER_VERIFY_MODEL=<model id>               # optional, second reading of a statement that fails its balance check (use a different model from the one above)
+supabase secrets set OPENROUTER_MODEL_CHOICES=anthropic/claude-sonnet-5.5,google/gemini-3.8-flash   # optional: extra readers offered on a review card (the models above are offered already)
 supabase secrets set OPENROUTER_DATA_COLLECTION=allow                 # optional, default is deny
 supabase secrets set OPENROUTER_PDF_ENGINE=mistral-ocr                # optional: native | mistral-ocr | cloudflare-ai (see below)
 ```

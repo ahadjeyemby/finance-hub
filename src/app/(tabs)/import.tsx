@@ -1,23 +1,26 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, View, useWindowDimensions } from 'react-native';
 
-import { FieldInput, Findings, RowsEditor } from '@/components/intake';
+import { FieldInput, Findings, ReceiptAgainBox, RereadBox, RowsEditor } from '@/components/intake';
+import type { Proposal, ReceiptProposal } from '@/components/intake';
 import { ScreenHeader } from '@/components/header';
+import { FilePreview } from '@/components/preview';
 import { matchesFilter, progressLine, runPool, separateByKind, splitRepeats, tally } from '@/core/bulk';
 import type { BulkStatus, Filter } from '@/core/bulk';
 import { CATEGORIES } from '@/core/categories';
 import { todayISO } from '@/core/dates';
 import { findSameReceipt, keyOf, likelyCharges } from '@/core/dedupe';
+import { AUTO_AFTER, applyCardHabit, learnAliases, learnCard, linkTrust, methodKey } from '@/core/learn';
 import type { ReceiptKey, Sameness } from '@/core/dedupe';
-import { receiptToLines } from '@/core/evidence';
+import { likelyRefundCredits, receiptToLines } from '@/core/evidence';
 import type { ReceiptRecord } from '@/core/evidence';
-import { analyseReceipt, analyseStatement, linkReceipt, noAnswers, planStatement, receiptFieldText, resolveAccount, setReceiptField, setStatementField, statementFieldText } from '@/core/intake';
+import { acceptReading, acceptReceiptReading, analyseReceipt, analyseStatement, diffReadings, diffReceipts, linkReceipt, noAnswers, planStatement, receiptFieldText, resolveAccount, setReceiptField, setStatementField, statementFieldText } from '@/core/intake';
 import type { Analysis, Answers, DocKind, Gap, StatementDraft } from '@/core/intake';
 import { dollars } from '@/core/queries';
 import { suggestCategory } from '@/core/questions';
 import type { Account, Txn } from '@/core/types';
-import { canPickFolder, findDuplicate, loadStoredReceipts, pickFiles, pickFolder, readReceiptFile, readStatementFile, saveReceiptRecord, saveStatementPlan } from '@/data/intake';
+import { canPickFolder, findDuplicate, loadStoredReceipts, pickFiles, pickFolder, readReceiptFile, listReaders, readStatementFile, rereadReceiptFile, rereadStatementWithHint, saveReceiptRecord, saveStatementPlan } from '@/data/intake';
 import type { PickedFile } from '@/data/intake';
 import { useRepo } from '@/data/repo';
 import { supabase } from '@/data/supabase';
@@ -30,10 +33,16 @@ interface Item {
   answers: Answers; errors: Record<string, string>;
   /** receipts: 'auto' follows the match, 'none' keeps it as evidence only, 'cash' makes a cash purchase, otherwise a ledger transaction id */
   link: string; cat: string | null; edit: boolean;
+  /** the original file is shown beside the reading, to compare the two */
+  peek?: boolean;
   /** in a long list a row is one line until opened */
   open: boolean;
   /** set once saved: the stored receipt, and the charge it ended up on, so later files can be checked against it */
   savedId?: string; savedTxnId?: string | null;
+  /** statements: the person's notes to the reader. `tries` counts re-reads (each is a paid model call), `notes` the notes already accepted. */
+  ask?: { open: boolean; busy: boolean; error?: string; proposal?: Proposal; tries: number; notes: string[] };
+  /** receipts: a plain "read again", with the new reading held until the person accepts it */
+  again?: { busy: boolean; error?: string; proposal?: ReceiptProposal; tries: number };
 }
 type Stored = { id: string; accountId: string | null; periodFrom: string | null; periodTo: string | null };
 
@@ -43,8 +52,10 @@ const READ_LANES = 3;
 const PAGE = 40;
 /** A list this long switches to one-line rows. */
 const COMPACT_FROM = 4;
+/** Re-reads with a note, per file. */
+const MAX_REREADS = 6;
 
-const RECEIPT_FIELDS: [string, string][] = [['merchant', 'Store'], ['date', 'Date'], ['time', 'Time'], ['total', 'Total paid'], ['subtotal', 'Subtotal'], ['tax', 'Sales tax'], ['tip', 'Tip'], ['paymentMethod', 'Paid with'], ['cardLast4', 'Card last 4'], ['storeAddress', 'Store address'], ['storeRef', 'Store number'], ['orderRef', 'Order number']];
+const RECEIPT_FIELDS: [string, string][] = [['merchant', 'Store'], ['date', 'Date'], ['time', 'Time'], ['total', 'Total paid'], ['subtotal', 'Subtotal'], ['tax', 'Sales tax'], ['tip', 'Tip'], ['paidOther', 'Paid with points, gift card or credit (not the card)'], ['refundTotal', 'Refund total, if any'], ['paymentMethod', 'Paid with'], ['cardLast4', 'Card last 4'], ['storeAddress', 'Store address'], ['storeRef', 'Store number'], ['orderRef', 'Order number']];
 const STATEMENT_FIELDS: [string, string][] = [['institution', 'Bank or issuer'], ['last4', 'Account last 4'], ['periodFrom', 'Period start'], ['periodTo', 'Period end'], ['opening', 'Opening balance (card: previous balance owed)'], ['closing', 'Closing balance (card: new balance owed)']];
 
 async function loadStored(): Promise<Stored[]> {
@@ -54,7 +65,9 @@ async function loadStored(): Promise<Stored[]> {
 }
 
 let counter = 0;
-const newItem = (kind: DocKind, file: PickedFile | null, extra: Partial<Item> = {}): Item => ({ key: `i${++counter}`, kind, file, status: 'queued', answers: noAnswers(), errors: {}, link: 'auto', cat: null, edit: false, open: false, ...extra });
+/** Keys must stay unique for as long as the list is on screen. A hot reload restarts `counter` while the list survives, so each load of this file also gets its own prefix. */
+const RUN = Math.random().toString(36).slice(2, 6);
+const newItem = (kind: DocKind, file: PickedFile | null, extra: Partial<Item> = {}): Item => ({ key: `i${RUN}-${++counter}`, kind, file, status: 'queued', answers: noAnswers(), errors: {}, link: 'auto', cat: null, edit: false, open: false, ...extra });
 const NONE: ReadonlySet<string> = new Set<string>();
 
 interface Ctx {
@@ -63,6 +76,9 @@ interface Ctx {
   receipts: ReceiptKey[];
   /** charges that got a receipt earlier in this same save run (the screen has not caught up yet) */
   claimed: ReadonlySet<string>;
+  /** store-name pairs and per-card link counts learned from what was confirmed before */
+  aliases: ReadonlySet<string>;
+  trust: ReadonlyMap<string, number>;
 }
 
 /** Everything the card and the Save buttons need to agree on. `before` = receipts earlier in this batch, so of two copies of one purchase the first is the original. */
@@ -70,11 +86,20 @@ function evaluate(item: Item, ctx: Ctx, before: ReceiptKey[]) {
   const today = todayISO();
   let analysis: Analysis;
   let linkTxn: Txn | null = null; let candidates: Txn[] = []; let linkPending = false; let cash = false; let cashCat: string | null = null; let second = false;
-  let same: Sameness | null = null; let extra = false; let waitingFor: string | null = null; let cashClash: Txn[] = [];
+  let same: Sameness | null = null; let extra = false; let waitingFor: string | null = null; let cashClash: Txn[] = []; let refundCredits: Txn[] = [];
+  let matchWhy: string | null = null; let likelyWhy: string | null = null;
   if (item.kind === 'receipt') {
     const rec = item.receipt!;
     same = rec.dup === 'different' ? null : findSameReceipt(rec, [...ctx.receipts, ...before]);
     analysis = analyseReceipt(rec, item.answers, today, same);
+    // card digits the person usually uses with this payment method, offered with one tap
+    const habit = learnCard([...ctx.receipts, ...before], rec.paymentMethod);
+    if (habit) {
+      const seen = [{ value: habit.value, count: habit.count }, ...habit.others].slice(0, 3);
+      const suggest = seen.map((h, i) => ({ value: h.value, label: `Use ${h.value} (${h.count} earlier ${methodKey(rec.paymentMethod)} receipt${h.count > 1 ? 's' : ''}${i === 0 && seen.length > 1 ? ', the most used' : ''})` }));
+      analysis = { ...analysis, gaps: analysis.gaps.map((g) => (g.id === 'cardLast4' ? { ...g, suggest } : g)) };
+    }
+    refundCredits = likelyRefundCredits(rec, ctx.txns);
     // another document for a purchase already held: it never creates a purchase and never re-splits the items
     extra = !!same && (same.level === 'same' || rec.dup === 'extra');
     if (extra) {
@@ -84,8 +109,10 @@ function evaluate(item: Item, ctx: Ctx, before: ReceiptKey[]) {
     } else {
       // prefer charges that have no receipt yet, so two identical purchases do not collapse into one; fall back to all charges for a second document of the same purchase
       const free = ctx.txns.filter((t) => !t.receiptId && !ctx.claimed.has(t.id));
-      let m = linkReceipt(rec, free);
-      if (!m.txnId && !m.candidates.length) m = linkReceipt(rec, ctx.txns);
+      const opts = { accounts: ctx.accounts, aliases: ctx.aliases, trusted: (id: string) => (ctx.trust.get(id) ?? 0) >= AUTO_AFTER };
+      let m = linkReceipt(rec, free, opts);
+      if (!m.txnId && !m.candidates.length) m = linkReceipt(rec, ctx.txns, opts);
+      if (m.txnId) matchWhy = m.reason; else if (m.likely) likelyWhy = m.reason;
       candidates = m.candidates.map((id) => ctx.txns.find((t) => t.id === id)).filter((t): t is Txn => !!t);
       if (item.link === 'cash') { cash = true; cashCat = item.cat ?? suggestCategory(rec.merchant ?? '') ?? null; if (!item.answers.acknowledged.includes('cash-dup')) cashClash = likelyCharges(rec, ctx.txns); }
       else if (item.link === 'none') linkTxn = null;
@@ -98,7 +125,7 @@ function evaluate(item: Item, ctx: Ctx, before: ReceiptKey[]) {
     analysis = analyseStatement(item.statement!, { accounts: ctx.accounts, statements: ctx.stored, existing: ctx.txns }, item.answers, today);
   }
   const canSave = analysis.ok && !linkPending && !waitingFor && cashClash.length === 0 && (!cash || !!cashCat);
-  return { analysis, linkTxn, candidates, linkPending, cash, cashCat, second, same, extra, waitingFor, cashClash, canSave };
+  return { analysis, linkTxn, candidates, linkPending, cash, cashCat, second, same, extra, waitingFor, cashClash, refundCredits, matchWhy, likelyWhy, canSave };
 }
 type Ev = ReturnType<typeof evaluate>;
 
@@ -120,6 +147,7 @@ export default function Import() {
   const [kind, setKind] = useState<DocKind>(params.kind === 'receipt' ? 'receipt' : 'statement');
   const [items, setItems] = useState<Item[]>([]);
   const [stored, setStored] = useState<Stored[]>([]);
+  const [readers, setReaders] = useState<string[]>([]);
   const [receipts, setReceipts] = useState<ReceiptKey[]>([]);
   const [notice, setNotice] = useState('');
   const [info, setInfo] = useState('');
@@ -131,9 +159,10 @@ export default function Import() {
 
   // The async work below must see the newest list and ledger, not the ones from the render that started it.
   const itemsRef = useRef<Item[]>([]);
-  const ctx: Ctx = { accounts, txns, stored, receipts, claimed: NONE };
+  const learned = useMemo(() => ({ aliases: learnAliases(receipts, txns), trust: linkTrust(receipts, txns, accounts) }), [receipts, txns, accounts]);
+  const ctx: Ctx = { accounts, txns, stored, receipts, claimed: NONE, ...learned };
   const ctxRef = useRef<Ctx>(ctx);
-  useEffect(() => { ctxRef.current = { accounts, txns, stored, receipts, claimed: NONE }; });
+  useEffect(() => { ctxRef.current = { accounts, txns, stored, receipts, claimed: NONE, ...learned }; });
   const savedKeysRef = useRef<ReceiptKey[]>([]);
   const claimedRef = useRef<Set<string>>(new Set());
   const stopRef = useRef(false);
@@ -142,6 +171,7 @@ export default function Import() {
     let on = true;
     loadStored().then((s) => { if (on) setStored(s); });
     loadStoredReceipts().then((r) => { if (on) setReceipts(r); });
+    listReaders().then((m) => { if (on) setReaders(m); });
     return () => { on = false; };
   }, []);
 
@@ -160,7 +190,7 @@ export default function Import() {
         const dup = await findDuplicate(item.kind, item.file.sha256);
         if (dup.duplicateOf) return patch(item.key, (x) => ({ ...x, status: 'duplicate', message: `Already stored: ${dup.duplicateOf}. Nothing was changed.` }));
       }
-      if (item.kind === 'receipt') { const r = await readReceiptFile(item.file!); patch(item.key, (x) => ({ ...x, status: 'review', receipt: r })); }
+      if (item.kind === 'receipt') { const r = applyCardHabit(await readReceiptFile(item.file!), [...ctxRef.current.receipts, ...savedKeysRef.current]); patch(item.key, (x) => ({ ...x, status: 'review', receipt: r })); }
       else { const d = await readStatementFile(item.file!); patch(item.key, (x) => ({ ...x, status: 'review', statement: d })); }
     } catch (e) { patch(item.key, (x) => ({ ...x, status: 'failed', message: (e as Error).message })); }
   };
@@ -215,6 +245,41 @@ export default function Import() {
       patch(item.key, (x) => (r.error ? { ...x, errors: { ...x.errors, [id]: r.error! } } : edited(x, { statement: r.draft })));
     }
   };
+  const setAsk = (key: string, over: Partial<NonNullable<Item['ask']>>) => patch(key, (x) => ({ ...x, ask: { open: false, busy: false, tries: 0, notes: [], ...x.ask, ...over } }));
+  const reread = async (item: Item, hint: string, model?: string) => {
+    const cur = live(item.key);
+    if (!cur?.file || !cur.statement || cur.ask?.busy || (cur.ask?.tries ?? 0) >= MAX_REREADS) return;
+    setAsk(item.key, { busy: true, error: undefined, tries: (cur.ask?.tries ?? 0) + 1 });
+    try {
+      const draft = await rereadStatementWithHint(cur.file, cur.statement, hint, model);
+      const now = live(item.key);
+      // the person may have edited the draft while the reader worked: compare with what is on screen now
+      setAsk(item.key, { busy: false, open: false, proposal: { draft, diff: diffReadings(now?.statement ?? cur.statement, draft), hint } });
+    } catch (e) { setAsk(item.key, { busy: false, error: (e as Error).message }); }
+  };
+  const setAgain = (key: string, over: Partial<NonNullable<Item['again']>>) => patch(key, (x) => ({ ...x, again: { busy: false, tries: 0, ...x.again, ...over } }));
+  const retryReceipt = async (item: Item, model?: string) => {
+    const cur = live(item.key);
+    if (!cur?.file || !cur.receipt || cur.again?.busy || (cur.again?.tries ?? 0) >= MAX_REREADS) return;
+    const tries = (cur.again?.tries ?? 0) + 1;
+    setAgain(item.key, { busy: true, error: undefined, tries });
+    try {
+      const record = applyCardHabit(await rereadReceiptFile(cur.file, tries, model), [...ctxRef.current.receipts, ...savedKeysRef.current]);
+      const now = live(item.key);
+      setAgain(item.key, { busy: false, proposal: { record, diff: diffReceipts(now?.receipt ?? cur.receipt, record) } });
+    } catch (e) { setAgain(item.key, { busy: false, error: (e as Error).message }); }
+  };
+  const takeReceiptReading = (item: Item) => patch(item.key, (x) => {
+    const p = x.again?.proposal;
+    if (!p || !x.receipt) return x;
+    return { ...edited(x, { receipt: acceptReceiptReading(x.receipt, p.record) }), again: { busy: false, tries: x.again?.tries ?? 0 } };
+  });
+  const takeReading = (item: Item) => patch(item.key, (x) => {
+    const p = x.ask?.proposal;
+    if (!p) return x;
+    const notes = [...(x.ask?.notes ?? []), p.hint].filter(Boolean);
+    return { ...edited(x, { statement: acceptReading(p.draft, notes) }), ask: { open: false, busy: false, tries: x.ask?.tries ?? 0, notes } };
+  });
   const skip = (item: Item, g: Gap) => patch(item.key, (x) => ({ ...x, answers: { ...x.answers, notPrinted: [...x.answers.notPrinted, g.id] } }));
   const acknowledge = (item: Item, id: string) => patch(item.key, (x) => ({ ...x, answers: { ...x.answers, acknowledged: [...x.answers.acknowledged, id] } }));
 
@@ -288,11 +353,13 @@ export default function Import() {
   const evals = evaluateAll(items, ctx);
   const t = tally(items.map((i) => ({ status: i.status, ready: !!evals.get(i.key)?.canSave })));
   const compact = items.length >= COMPACT_FROM;
+  const sideBySide = useWindowDimensions().width >= 1000;
+  const anyPeek = items.some((i) => i.peek);
   const visible = items.filter((i) => matchesFilter(filter, i.status, !!evals.get(i.key)?.canSave));
   const shown = visible.slice(0, limit);
 
   return (
-    <Screen max={760}>
+    <Screen max={anyPeek && sideBySide ? 1400 : 760}>
       <ScreenHeader back title="Import" sub="Every receipt and statement is read and checked first. Nothing is saved until every detail is accounted for." />
       {!connected ? <Banner title="No database is connected.">Set the Supabase URL and anon key in .env first. Nothing can be saved without it.</Banner> : null}
       <Card title="What are you adding?">
@@ -340,17 +407,26 @@ export default function Import() {
 
       {shown.map((item) => {
         const ev = evals.get(item.key);
+        const peeking = !!item.peek && !!item.file && item.file.bytes.length > 0 && (item.status === 'review' || item.status === 'saving');
         if (compact && !item.open && (item.status === 'queued' || item.status === 'reading' || item.status === 'saving' || item.status === 'saved')) return <Line key={item.key} item={item} />;
         if (compact && !item.open && item.status === 'review' && ev) return <Summary key={item.key} item={item} ev={ev} accounts={accounts} onOpen={() => patch(item.key, (x) => ({ ...x, open: true }))} onSave={() => save(item.key)} onRemove={() => update((xs) => xs.filter((x) => x.key !== item.key))} />;
-        return (
+        const card = (
           <ItemCard key={item.key} item={item} ev={ev} accounts={accounts}
             onAnswer={(field, id, text) => answer(item, field, id, text)} onSkip={(g) => skip(item, g)} onAcknowledge={(id) => acknowledge(item, id)}
             onStatement={(d) => patch(item.key, (x) => edited(x, { statement: d }))}
             onSet={(over) => patch(item.key, (x) => ({ ...x, ...over }))} onSave={() => save(item.key)}
             onCollapse={compact && item.status === 'review' ? () => patch(item.key, (x) => ({ ...x, open: false })) : undefined}
+            readers={readers} onReread={(text, model) => reread(item, text, model)} onToggleAsk={() => setAsk(item.key, { open: !item.ask?.open, error: undefined })} onUseReading={() => takeReading(item)} onKeepReading={() => setAsk(item.key, { proposal: undefined })}
+            onRetryReceipt={(model) => retryReceipt(item, model)} onUseReceipt={() => takeReceiptReading(item)} onKeepReceipt={() => setAgain(item.key, { proposal: undefined })}
             onRetryByHand={() => patch(item.key, (x) => ({ ...x, status: 'review', message: undefined, open: true, receipt: x.kind === 'receipt' ? { lines: [] } : undefined, statement: x.kind === 'statement' ? { rows: [] } : undefined }))}
             onRemove={() => update((xs) => xs.filter((x) => x.key !== item.key))} />
         );
+        if (!peeking) return card;
+        // the original goes to the right of the reading on a wide screen, and under it on a narrow one
+        const original = <FilePreview file={item.file!} onClose={() => patch(item.key, (x) => ({ ...x, peek: false }))} />;
+        return sideBySide
+          ? <View key={item.key} style={{ flexDirection: 'row', gap: S.lg, alignItems: 'flex-start' }}><View style={{ flex: 1, minWidth: 0 }}>{card}</View><View style={{ flex: 1, minWidth: 0, ...(Platform.OS === 'web' ? ({ position: 'sticky', top: S.lg } as object) : {}) }}>{original}</View></View>
+          : <View key={item.key} style={{ gap: S.md }}>{card}{original}</View>;
       })}
       {visible.length > shown.length ? <Button kind="outline" label={`Show ${Math.min(PAGE, visible.length - shown.length)} more (${visible.length - shown.length} hidden)`} onPress={() => setLimit(limit + PAGE)} /> : null}
       {items.length && !visible.length ? <T size={13} tone="ink3">Nothing in this list.</T> : null}
@@ -410,9 +486,12 @@ function Summary({ item, ev, accounts, onOpen, onSave, onRemove }: { item: Item;
   );
 }
 
-function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onStatement, onSet, onSave, onCollapse, onRetryByHand, onRemove }: {
+function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onStatement, onSet, onSave, onCollapse, onRetryByHand, onRemove, onReread, onToggleAsk, onUseReading, onKeepReading, onRetryReceipt, onUseReceipt, onKeepReceipt, readers }: {
   item: Item; ev?: Ev; accounts: Account[]; onAnswer: (field: string, id: string, text: string) => void; onSkip: (g: Gap) => void; onAcknowledge: (id: string) => void;
   onStatement: (d: StatementDraft) => void; onSet: (over: Partial<Item>) => void; onSave: () => void; onCollapse?: () => void; onRetryByHand: () => void; onRemove: () => void;
+  readers: string[];
+  onReread: (text: string, model?: string) => void; onToggleAsk: () => void; onUseReading: () => void; onKeepReading: () => void;
+  onRetryReceipt: (model?: string) => void; onUseReceipt: () => void; onKeepReceipt: () => void;
 }) {
   const title = item.file?.name ?? 'Receipt typed by hand';
   const tag = item.kind === 'statement' ? 'Statement' : 'Receipt';
@@ -438,13 +517,18 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
       {rec ? (
         <>
           <Row label="Store" value={rec.merchant || 'missing'} /><Row label="Date" value={rec.date ?? 'missing'} />
+          {rec.readBy ? <Row label="Read by" value={rec.readBy} /> : null}
           <Row label="Total paid" value={rec.totalCents != null ? dollars(rec.totalCents) : 'missing'} /><Row label="Items read" value={String(rec.lines.length)} />
+          {rec.charges?.length ? <Row label="Extra charges" value={`${dollars(rec.charges.reduce((t, x) => t + x.cents, 0))}: ${rec.charges.map((x) => `${x.label} ${dollars(x.cents)}`).join(', ')}`} /> : null}
+          {rec.paidOtherCents ? <Row label="Paid with points or credit" value={dollars(rec.paidOtherCents)} /> : null}
+          {rec.refundCents ? <Row label="Refunded" value={dollars(rec.refundCents)} /> : null}
           {rec.paymentMethod ? <Row label="Paid with" value={`${rec.paymentMethod}${rec.cardLast4 ? ` ending ${rec.cardLast4}` : ''}`} /> : null}
         </>
       ) : null}
       {st ? (
         <>
           <Row label="Account" value={acct ? acct.name : st.institution && st.last4 ? `New: ${st.institution} ${st.last4}` : 'unknown'} />
+          {st.readBy ? <Row label="Read by" value={st.readBy} /> : null}
           <Row label="Period" value={st.periodFrom && st.periodTo ? `${st.periodFrom} to ${st.periodTo}` : 'missing'} />
           <Row label={st.accountType === 'credit' ? 'Previous / new balance' : 'Opening / closing'} value={st.openingCents != null && st.closingCents != null ? `${dollars(st.openingCents)} / ${dollars(st.closingCents)}` : 'missing'} />
           <Row label="Transactions read" value={`${st.rows.length}, net ${dollars(net)}`} />
@@ -453,6 +537,18 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
 
       <Findings analysis={ev.analysis} errors={item.errors}
         onAnswer={(g, text) => onAnswer(g.field, g.id, text)} onSkip={onSkip} onAcknowledge={onAcknowledge} />
+
+      {rec && item.file && item.file.bytes.length > 0 ? (
+        <ReceiptAgainBox busy={!!item.again?.busy} error={item.again?.error} proposal={item.again?.proposal} used={item.again?.tries ?? 0} max={MAX_REREADS} models={readers}
+          onRetry={onRetryReceipt} onUse={onUseReceipt} onKeep={onKeepReceipt} />
+      ) : null}
+
+      {st && item.file && !ev.canSave && item.file.bytes.length > 0 ? (
+        <RereadBox open={!!item.ask?.open} busy={!!item.ask?.busy} error={item.ask?.error} proposal={item.ask?.proposal} used={item.ask?.tries ?? 0} max={MAX_REREADS} models={readers}
+          onToggle={onToggleAsk} onSend={onReread} onUse={onUseReading} onKeep={onKeepReading} />
+      ) : null}
+
+      {rec?.refundCents && ev.refundCredits.length ? <T size={13} tone="ink2">A credit that may be this refund is already in your ledger: {ev.refundCredits.slice(0, 3).map((c) => `${c.merchant}, ${c.date}, ${dollars(c.cents)}`).join('; ')}. It is only a hint. Nothing is linked.</T> : null}
 
       {rec && ev.extra && ev.same ? (
         <View style={{ gap: S.xs }}>
@@ -470,12 +566,13 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
       ) : null}
       {rec && !ev.extra && ev.linkPending && item.link === 'auto' ? (
         <View style={{ gap: S.xs }}>
-          <Banner title={ev.candidates.length > 1 ? 'More than one charge could be this receipt' : 'A charge has this amount, but another store name'}>{ev.candidates.length > 1 ? 'Choose the right one, or keep the receipt unlinked.' : 'Link it if it is the same purchase, or keep the receipt unlinked.'}</Banner>
+          <Banner title={ev.candidates.length > 1 ? 'More than one charge could be this receipt' : ev.likelyWhy ? 'This looks like the charge below' : 'A charge has this amount, but another store name'}>{ev.candidates.length > 1 ? 'Choose the right one, or keep the receipt unlinked.' : ev.likelyWhy ? `${ev.likelyWhy.charAt(0).toUpperCase()}${ev.likelyWhy.slice(1)}. The store name on the bank side differs. Confirm it if it is the same purchase; after ${AUTO_AFTER} confirmations on this card, matches like this are linked without asking.` : 'Link it if it is the same purchase, or keep the receipt unlinked.'}</Banner>
           {ev.candidates.map((c) => <Button key={c.id} small kind="outline" label={`${c.merchant}, ${c.date}, ${dollars(-c.cents)}${c.receiptId ? ' (has a receipt)' : ''}`} onPress={() => onSet({ link: c.id })} />)}
           <Button small kind="ghost" label="Keep it unlinked" onPress={() => onSet({ link: 'none' })} />
         </View>
       ) : null}
-      {rec && !ev.extra && ev.analysis.ok && ev.linkTxn ? <T size={13} tone="ink2">{ev.second ? `Belongs to ${ev.linkTxn.merchant}, ${ev.linkTxn.date}, ${dollars(-ev.linkTxn.cents)}, which already has a receipt. This one is kept as an additional document and its items are not split again.` : `Links to ${ev.linkTxn.merchant}, ${ev.linkTxn.date}, ${dollars(-ev.linkTxn.cents)}. Its items will be split out.`}</T> : null}
+      {rec && !ev.extra && ev.analysis.ok && ev.linkTxn ? <T size={13} tone="ink2">{ev.second ? `Belongs to ${ev.linkTxn.merchant}, ${ev.linkTxn.date}, ${dollars(-ev.linkTxn.cents)}, which already has a receipt. This one is kept as an additional document and its items are not split again.` : `Links to ${ev.linkTxn.merchant}, ${ev.linkTxn.date}, ${dollars(-ev.linkTxn.cents)}${ev.matchWhy ? ` (matched on ${ev.matchWhy})` : ''}. Its items will be split out.`}</T> : null}
+      {rec && !ev.extra && ev.analysis.ok && ev.linkTxn && item.link === 'auto' && !ev.second ? <View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Not this charge: keep it unlinked" onPress={() => onSet({ link: 'none' })} /></View> : null}
       {rec && !ev.extra && ev.analysis.ok && !ev.linkTxn && !ev.linkPending && !ev.cashClash.length ? (
         <View style={{ gap: S.xs }}>
           <T size={13} tone="ink2">{ev.cash ? 'Will be added as a cash purchase. Pick its category.' : 'No charge in your ledger matches this receipt. It is kept as evidence. If you paid cash, make it a cash purchase.'}</T>
@@ -490,6 +587,7 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
       <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap', alignItems: 'center' }}>
         <Button label={saving ? 'Saving' : 'Save'} disabled={!ev.canSave || saving} onPress={onSave} />
         <Button small kind="ghost" label={item.edit ? 'Hide details' : 'Check or edit details'} onPress={() => onSet({ edit: !item.edit })} />
+        {item.file && item.file.bytes.length > 0 ? <Button small kind="outline" label={item.peek ? 'Hide original' : 'Show original'} onPress={() => onSet({ peek: !item.peek })} /> : null}
         {onCollapse ? <Button small kind="ghost" label="Collapse" onPress={onCollapse} /> : null}
         <Button small kind="ghost" label="Discard" disabled={saving} onPress={onRemove} />
       </View>
@@ -501,6 +599,7 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
           {rec ? (
             <>
               {RECEIPT_FIELDS.map(([f, label]) => <FieldInput key={`${f}:${receiptFieldText(rec, f)}`} label={label} value={receiptFieldText(rec, f)} error={item.errors[`edit.${f}`]} onCommit={(t) => onAnswer(f, `edit.${f}`, t)} />)}
+              <FieldInput key={`charges:${receiptFieldText(rec, 'charges')}`} label="Extra charges (service, delivery, fees), one per line as “label amount”" multiline value={receiptFieldText(rec, 'charges')} error={item.errors['edit.charges']} onCommit={(t) => onAnswer('charges', 'edit.charges', t)} />
               <FieldInput key={`lines:${receiptFieldText(rec, 'lines')}`} label="Items, one per line as “item price”" multiline value={receiptFieldText(rec, 'lines')} error={item.errors['edit.lines']} onCommit={(t) => onAnswer('lines', 'edit.lines', t)} />
             </>
           ) : null}
