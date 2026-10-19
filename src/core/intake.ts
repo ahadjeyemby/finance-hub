@@ -11,6 +11,7 @@ import { findTwins } from './dedupe';
 import type { Sameness, Twin } from './dedupe';
 import { matchReceipt } from './evidence';
 import type { MatchOptions, RawRecord, ReceiptCharge, ReceiptLine, ReceiptRecord, StatementRecord } from './evidence';
+import { hasNumber } from './accounts';
 import { parseLines } from './questions';
 import type { Account, AccountType, Txn } from './types';
 
@@ -265,7 +266,7 @@ const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/
 export function resolveAccount(d: StatementDraft, accounts: Account[]): Account | null {
   if (!d.last4 || blank(d.institution)) return null;
   const w = new Set(words(d.institution!));
-  return accounts.find((a) => a.last4 === d.last4 && (w.size === 0 || words(a.institution).some((x) => w.has(x)) || words(a.name).some((x) => w.has(x)))) ?? null;
+  return accounts.find((a) => hasNumber(a, d.last4) && (w.size === 0 || words(a.institution).some((x) => w.has(x)) || words(a.name).some((x) => w.has(x)))) ?? null;
 }
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

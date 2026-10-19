@@ -128,6 +128,10 @@ Choosing "keep as printed" on a difference saves the document as it is and recor
 
 The reader runs on your backend, so the file is sent to the model provider you configured. Statements contain account numbers. A statement longer than one model answer can hold (roughly a few hundred rows) is refused with a message; split it by month or use `bun run ledger`. Reading quality on your own banks' layouts is not guaranteed: the balance check exists because the reader can be wrong.
 
+## Several numbers for one account
+
+A card is reissued, an account number changes, a debit or credit card belongs to a checking account: all of them are the same account. **Accounts** (Overview > Accounts and data, or the Import screen) lists every account and lets you add numbers to it (migration `0004_account_numbers.sql`, run once). A statement or receipt that carries any of an account's numbers counts as that account. When you import a statement whose number is new but whose bank you already have, the card asks "Same as <account>?" so its statements stay in one account. Not built: merging two accounts that already exist separately.
+
 ## Receipt links
 
 A link says which receipt belongs to which statement charge. It is its own record, in the `receipt_links` table (migration `0003_links.sql`, run it once), many to many: a receipt can explain more than one charge and a charge can have more than one receipt (an order confirmation and a store receipt).

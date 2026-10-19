@@ -12,12 +12,18 @@ export type Kind =
 
 export type AccountType = 'checking' | 'credit' | 'cash';
 
+export type AccountNumberKind = 'account' | 'credit_card' | 'debit_card' | 'replaced' | 'other';
+/** A further number for the same account: a reissued card, an old account number, a debit or credit card that belongs to it. */
+export interface AccountNumber { last4: string; kind: AccountNumberKind; note?: string }
+
 export interface Account {
   id: string;
   name: string;
   institution: string;
   type: AccountType;
   last4: string;
+  /** other numbers that mean this same account (see accounts.ts) */
+  extraNumbers?: AccountNumber[];
   /** First and last day (inclusive, ISO) for which we hold complete statements. */
   coverage: { from: string; to: string };
   /** false = we cannot yet claim every deposit for this person is visible (other accounts exist). */

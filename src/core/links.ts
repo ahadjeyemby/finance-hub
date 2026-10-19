@@ -3,6 +3,7 @@
 // A link is a stored relationship (receipt_links), many to many: a receipt can explain several charges and a charge can have several receipts.
 // Nothing here guesses silently. The engine only proposes; each proposal says how sure it is and why, and the person's choices are kept as
 // confirmed links and as "no link expected" flags (cash, another account, a charge that never has a receipt).
+import { accountNumbers, hasNumber } from './accounts';
 import { findSameReceipt, keyOf } from './dedupe';
 import type { ReceiptKey } from './dedupe';
 import { matchReceipt, receiptToLines } from './evidence';
@@ -75,8 +76,8 @@ export function explainUnlinked(r: ReceiptRecord, txns: Txn[], accounts: Account
   const real = accounts.filter((a) => a.type !== 'cash');
   const covered = real.some((a) => r.date! >= shift(a.coverage.from, -5) && r.date! <= shift(a.coverage.to, 5));
   if (real.length && !covered) return { why: 'outside_statements', text: `No statement you have loaded covers ${r.date}. Import the statement for that month, or mark it as paid another way.` };
-  const tracked = real.filter((a) => a.last4);
-  if (r.cardLast4 && tracked.length && !tracked.some((a) => a.last4 === r.cardLast4)) return { why: 'card_not_tracked', text: `The card ending ${r.cardLast4} is not one of your loaded accounts. Import its statement, or mark it as paid another way.` };
+  const tracked = real.filter((a) => accountNumbers(a).length);
+  if (r.cardLast4 && tracked.length && !tracked.some((a) => hasNumber(a, r.cardLast4))) return { why: 'card_not_tracked', text: `The card ending ${r.cardLast4} is not one of your loaded accounts. Import its statement, or mark it as paid another way.` };
   return { why: 'no_charge', text: `No charge of ${(r.totalCents / 100).toFixed(2)} near ${r.date} on your loaded statements.` };
 }
 const shift = (iso: string, days: number) => new Date(Date.parse(iso) + days * dayMs).toISOString().slice(0, 10);

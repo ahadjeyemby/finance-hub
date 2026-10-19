@@ -20,6 +20,7 @@ import type { Analysis, Answers, DocKind, Gap, StatementDraft } from '@/core/int
 import { dollars } from '@/core/queries';
 import { suggestCategory } from '@/core/questions';
 import type { Account, Txn } from '@/core/types';
+import { accountsWithNumber } from '@/core/accounts';
 import { saveLinks, setFlag } from '@/data/links';
 import { sweepLinks } from '@/data/linking';
 import { NO_LINK_LABEL, RECEIPT_NO_LINK, storedKeys } from '@/core/links';
@@ -39,6 +40,8 @@ interface Item {
   link: string; cat: string | null; edit: boolean;
   /** the original file is shown beside the reading, to compare the two */
   peek?: boolean;
+  /** statements: this number belongs to an existing account (a reissued card, a changed account number), not a new one */
+  mergeInto?: string;
   /** receipts with link 'flag': why no charge is expected (paid in cash, from another account...) */
   noLink?: NoLinkReason;
   /** in a long list a row is one line until opened */
@@ -50,6 +53,10 @@ interface Item {
   /** receipts: a plain "read again", with the new reading held until the person accepts it */
   again?: { busy: boolean; error?: string; proposal?: ReceiptProposal; tries: number };
 }
+/** The accounts as this statement should be read: with its printed number added to the account the person said it belongs to. */
+const statementAccounts = (item: Item, base: Account[]): Account[] => (item.mergeInto && item.statement?.last4 ? accountsWithNumber(base, item.mergeInto, item.statement.last4, 'replaced') : base);
+const sameBank = (a: Account, institution?: string) => a.type !== 'cash' && !!institution && institution.toLowerCase().split(/[^a-z0-9]+/).some((w) => w.length > 2 && `${a.institution} ${a.name}`.toLowerCase().includes(w));
+
 type Stored = { id: string; accountId: string | null; periodFrom: string | null; periodTo: string | null };
 
 /** How many files are read at the same time. Each is a paid model call, so this stays small. */
@@ -128,7 +135,7 @@ function evaluate(item: Item, ctx: Ctx, before: ReceiptKey[]) {
       second = !!linkTxn && (!!linkTxn.receiptId || ctx.claimed.has(linkTxn.id));
     }
   } else {
-    analysis = analyseStatement(item.statement!, { accounts: ctx.accounts, statements: ctx.stored, existing: ctx.txns }, item.answers, today);
+    analysis = analyseStatement(item.statement!, { accounts: statementAccounts(item, ctx.accounts), statements: ctx.stored, existing: ctx.txns }, item.answers, today);
   }
   const canSave = analysis.ok && !linkPending && !waitingFor && cashClash.length === 0 && (!cash || !!cashCat);
   return { analysis, linkTxn, candidates, linkPending, cash, cashCat, second, same, extra, waitingFor, cashClash, refundCredits, matchWhy, likelyWhy, canSave };
@@ -337,7 +344,7 @@ export default function Import() {
         if (toSave.length) await saveLinks(toSave);
         await reloadLinks();
       } else {
-        const plan = planStatement(item.statement!, { accounts: cx.accounts, statements: cx.stored, existing: cx.txns }, { name: item.file?.name ?? 'statement', sha256: item.file?.sha256 });
+        const plan = planStatement(item.statement!, { accounts: statementAccounts(item, cx.accounts), statements: cx.stored, existing: cx.txns }, { name: item.file?.name ?? 'statement', sha256: item.file?.sha256 });
         await saveStatementPlan(plan, item.file);
         await sync.now();
         setStored(await loadStored());
@@ -385,7 +392,7 @@ export default function Import() {
 
   return (
     <Screen max={anyPeek && sideBySide ? 1400 : 760}>
-      <ScreenHeader back title="Import" sub="Every receipt and statement is read and checked first. Nothing is saved until every detail is accounted for." right={<Button small kind="outline" label="Receipt links" onPress={() => router.push('/links')} />} />
+      <ScreenHeader back title="Import" sub="Every receipt and statement is read and checked first. Nothing is saved until every detail is accounted for." right={<View style={{ flexDirection: 'row', gap: S.sm }}><Button small kind="outline" label="Accounts" onPress={() => router.push('/accounts')} /><Button small kind="outline" label="Receipt links" onPress={() => router.push('/links')} /></View>} />
       {!connected ? <Banner title="No database is connected.">Set the Supabase URL and anon key in .env first. Nothing can be saved without it.</Banner> : null}
       <Card title="What are you adding?">
         <Segmented value={kind} onChange={setKind} options={[{ value: 'statement', label: 'Statements' }, { value: 'receipt', label: 'Receipts' }]} />
@@ -498,7 +505,7 @@ function needsText(ev: Ev): string {
 function Summary({ item, ev, accounts, onOpen, onSave, onRemove }: { item: Item; ev: Ev; accounts: Account[]; onOpen: () => void; onSave: () => void; onRemove: () => void }) {
   return (
     <Card title={item.file?.name ?? 'Receipt typed by hand'} right={<T size={12} tone={ev.canSave ? 'good' : 'ink3'} bold>{ev.canSave ? 'Ready' : 'Needs attention'}</T>}>
-      <T size={13} tone="ink2">{summaryLine(item, accounts)}</T>
+      <T size={13} tone="ink2">{summaryLine(item, statementAccounts(item, accounts))}</T>
       {item.receipt && ev.canSave ? <T size={12} tone="ink3">{ev.extra ? `Another document for ${ev.same!.of.label}. Adds no new purchase.` : ev.linkTxn ? (ev.second ? `Extra document for the ${ev.linkTxn.date} charge at ${ev.linkTxn.merchant}.` : `Matches ${ev.linkTxn.merchant}, ${ev.linkTxn.date}, ${dollars(-ev.linkTxn.cents)}.`) : ev.cash ? 'Will be added as a cash purchase.' : 'No matching charge yet. Kept as evidence.'}</T> : null}
       {!ev.canSave ? <T size={12} tone="bad">{needsText(ev)}</T> : null}
       {item.message ? <T size={12} tone="bad">{item.message}</T> : null}
@@ -535,7 +542,8 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
 
   const saving = item.status === 'saving';
   const rec = item.receipt; const st = item.statement;
-  const acct = st ? resolveAccount(st, accounts) : null;
+  const acct = st ? resolveAccount(st, statementAccounts(item, accounts)) : null;
+  const sameAccountOptions = st && !acct ? accounts.filter((a) => sameBank(a, st.institution)) : [];
   const net = st ? st.rows.reduce((s, r) => s + (r.cents ?? 0), 0) : 0;
   return (
     <Card title={title} right={<T size={12} tone={ev.canSave ? 'good' : 'ink3'} bold>{ev.canSave ? 'Ready' : 'Needs attention'}</T>}>
@@ -554,6 +562,16 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
         <>
           <Row label="Account" value={acct ? acct.name : st.institution && st.last4 ? `New: ${st.institution} ${st.last4}` : 'unknown'} />
           {st.readBy ? <Row label="Read by" value={st.readBy} /> : null}
+          {item.mergeInto && acct ? <T size={12} tone="ink3">Number {st.last4} will be added to {acct.name}, so its statements stay in one account.</T> : null}
+          {sameAccountOptions.length ? (
+            <View style={{ gap: 2 }}>
+              <T size={12} tone="ink3">Is {st.last4} a new number for an account you already have (a reissued card, a changed account number)?</T>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                <Chip label="A new account" on={!item.mergeInto} onPress={() => onSet({ mergeInto: undefined })} />
+                {sameAccountOptions.map((a) => <Chip key={a.id} label={`Same as ${a.name}`} on={item.mergeInto === a.id} onPress={() => onSet({ mergeInto: a.id })} />)}
+              </View>
+            </View>
+          ) : null}
           <Row label="Period" value={st.periodFrom && st.periodTo ? `${st.periodFrom} to ${st.periodTo}` : 'missing'} />
           <Row label={st.accountType === 'credit' ? 'Previous / new balance' : 'Opening / closing'} value={st.openingCents != null && st.closingCents != null ? `${dollars(st.openingCents)} / ${dollars(st.closingCents)}` : 'missing'} />
           <Row label="Transactions read" value={`${st.rows.length}, net ${dollars(net)}`} />
