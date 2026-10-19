@@ -170,28 +170,39 @@ export function RereadBox({ open, busy, error, proposal, used, max, models, onTo
   );
 }
 
-export interface ReceiptProposal { record: ReceiptRecord; diff: ReceiptDiff }
+export interface ReceiptProposal { record: ReceiptRecord; diff: ReceiptDiff; hint?: string }
 
 /** Read a receipt again, on request. The new reading is shown next to the one on screen and replaces it only when the person says so. */
 export function ReceiptAgainBox({ busy, error, proposal, used, max, models, onRetry, onUse, onKeep }: {
-  busy: boolean; error?: string; proposal?: ReceiptProposal; used: number; max: number; models: string[]; onRetry: (model?: string) => void; onUse: () => void; onKeep: () => void;
+  busy: boolean; error?: string; proposal?: ReceiptProposal; used: number; max: number; models: string[]; onRetry: (model?: string, hint?: string) => void; onUse: () => void; onKeep: () => void;
 }) {
   const left = max - used;
   const [model, setModel] = useState<string | undefined>(undefined);
+  const [noting, setNoting] = useState(false);
+  const [text, setText] = useState('');
+  const hint = noting ? text.trim() : '';
   const checks = (n: number) => (n === 0 ? 'agrees with its printed amounts' : `disagrees with its printed amounts in ${n} place${n > 1 ? 's' : ''}`);
   return (
     <View style={{ gap: S.xs }}>
       {!proposal ? (
         <View style={{ gap: S.xs }}>
           <ReaderPicker models={models} value={model} onChange={setModel} />
+          {noting ? (
+            <View style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
+              <T bold size={13}>What looks wrong?</T>
+              <T size={13} tone="ink2">Write it as you would say it, for example “item 3 is $1.69, not $5.99” or “there is a service charge of 2%”. The receipt is read again with your note. The note points the reader at where to look; it still reports only what is printed, and nothing changes until you accept the new reading.</T>
+              <TextInput style={[input, { minHeight: 80, textAlignVertical: 'top', paddingTop: S.md, backgroundColor: C.paper }]} multiline value={text} maxLength={MAX_HINT} onChangeText={setText} editable={!busy} placeholder="What should the reader look at again?" placeholderTextColor={C.ink3} accessibilityLabel="Note for the reader" />
+            </View>
+          ) : null}
           <View style={{ flexDirection: 'row', gap: S.sm, alignItems: 'center', flexWrap: 'wrap' }}>
-            <Button small kind="outline" label={busy ? 'Reading again' : model ? `Read again with ${model.split('/').pop()}` : 'Read again'} disabled={busy || left <= 0} onPress={() => onRetry(model)} />
+            <Button small kind="outline" label={busy ? 'Reading again' : hint ? 'Read again with this note' : model ? `Read again with ${model.split('/').pop()}` : 'Read again'} disabled={busy || left <= 0 || (noting && !text.trim() && false)} onPress={() => onRetry(model, hint || undefined)} />
+            <Button small kind="ghost" label={noting ? 'Hide the note' : 'Tell the reader what is wrong'} disabled={busy} onPress={() => setNoting((v) => !v)} />
             <T size={12} tone="ink3">{left > 0 ? `${left} re-read${left > 1 ? 's' : ''} left for this file.${model ? '' : ' Automatic alternates between two ways of asking the reader.'}` : 'No re-reads left for this file.'}</T>
           </View>
         </View>
       ) : (
         <View style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
-          <T bold size={13}>The new reading{proposal.record.readBy ? `, by ${proposal.record.readBy}` : ''}</T>
+          <T bold size={13}>The new reading{proposal.record.readBy ? `, by ${proposal.record.readBy}` : ''}{proposal.hint ? `, for your note “${proposal.hint}”` : ''}</T>
           {proposal.diff.lines.length ? proposal.diff.lines.map((l, i) => <T key={i} size={13} tone="ink2">{l}</T>) : <T size={13} tone="ink2">It reads the same as before. Nothing changed.</T>}
           <T size={13} tone="ink2">The reading on screen {checks(proposal.diff.before)}. The new one {checks(proposal.diff.after)}.</T>
           <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>

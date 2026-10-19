@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 import type { ReceiptKey } from '@/core/dedupe';
 import type { ReceiptRecord } from '@/core/evidence';
 import { receiptToRow } from '@/core/evidence';
-import { MAX_HINT, readingAsText, receiptFromRead, receiptMisfits, settleReads, settleReceiptReads, statementFromRead, statementGap } from '@/core/intake';
+import { MAX_HINT, readingAsText, receiptAsText, receiptFromRead, receiptMisfits, settleReads, settleReceiptReads, statementFromRead, statementGap } from '@/core/intake';
 import type { ReadReceipt, ReadStatement, StatementDraft, StatementPlan } from '@/core/intake';
 import { uploadEvidence, uploadLedger } from '@/core/ledgerio';
 import { selectReadable, withRetry } from '@/core/bulk';
@@ -119,9 +119,11 @@ export async function listReaders(): Promise<string[]> {
 }
 
 /** One more reading of a receipt, on request. A chosen reader reads in plain JSON, the mode measured for every reader offered. Odd attempts use the plain-JSON request and even ones the tool-call request, because the two fail on different receipts. Never replaces anything by itself. */
-export async function rereadReceiptFile(f: PickedFile, attempt: number, model?: string): Promise<ReceiptRecord> {
+export async function rereadReceiptFile(f: PickedFile, attempt: number, model?: string, hint?: string, current?: ReceiptRecord): Promise<ReceiptRecord> {
   if (f.bytes.length > MAX_BYTES) throw new Error('This file is over 10 MB. Use a smaller photo or PDF.');
-  const body = { file_base64: toBase64(f.bytes), media_type: f.type, filename: f.name, ...(model ? { model } : attempt % 2 === 1 ? { second_opinion: true } : {}) };
+  const body = { file_base64: toBase64(f.bytes), media_type: f.type, filename: f.name, ...(model ? { model } : hint?.trim() || attempt % 2 === 0 ? {} : { second_opinion: true }),
+    // with a note, the reader is also given the note and the reading on screen (it reads in plain JSON, like every chosen or second reading)
+    ...(hint?.trim() && current ? { hint: hint.trim().slice(0, MAX_HINT), previous: receiptAsText(current) } : {}) };
   return receiptFromRead(await withRetry(() => callFunction<ReadReceipt>('ingest-receipt', body)), { fileName: f.name, sha256: f.sha256 });
 }
 

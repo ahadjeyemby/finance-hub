@@ -36,8 +36,9 @@ export default function Overview() {
         <T size={13} tone="ink2" style={{ marginLeft: 4 }}>spent</T>
       </View>
       <View style={{ gap: 6, marginTop: S.xs }}>
-        <Row label="Earned" value={dollars(s.earned)} />
-        <Row label="Rewards" value={dollars(s.rewards)} />
+        <Row label="Earned" value={dollars(s.earned)} onPress={() => router.push({ pathname: '/ledger', params: { kinds: 'income', from: s.from, to: s.to } })} />
+        <Row label="Rewards" value={dollars(s.rewards)} onPress={() => router.push({ pathname: '/ledger', params: { kinds: 'rewards', from: s.from, to: s.to } })} />
+        <T size={12} tone="ink3">Tap Earned or Rewards to see every deposit behind the number.</T>
         <Row strong label="Left after spending" value={dollars(s.net, { sign: true })} tone={s.net < 0 ? 'bad' : undefined} />
       </View>
     </TapeCard>

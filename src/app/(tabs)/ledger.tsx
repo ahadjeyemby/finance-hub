@@ -23,14 +23,15 @@ export default function Ledger() {
     kinds: p.kinds ? (p.kinds.split(',') as Kind[]) : undefined,
   }), [scope, text, p.from, p.to, p.category, p.merchant, p.kinds]);
   const rows = useMemo(() => listTxns(ctx, filter, 400), [ctx, filter]);
+  const incoming = p.kinds === 'income' || p.kinds === 'rewards';
   const total = rows.reduce((s, t) => s - t.cents, 0);
-  const label = [p.category && categoryLabel(p.category), p.merchant, p.from && p.to ? `${p.from} to ${p.to}` : ''].filter(Boolean).join(', ');
+  const label = [p.kinds === 'income' ? 'Earned' : p.kinds === 'rewards' ? 'Rewards' : '', p.category && categoryLabel(p.category), p.merchant, p.from && p.to ? `${p.from} to ${p.to}` : ''].filter(Boolean).join(', ');
   return (
     <Screen>
       <ScreenHeader back title="Transactions" sub={label || 'Everything in the ledger'} />
       <TextInput value={text} onChangeText={setText} placeholder="Search merchant or description" placeholderTextColor={C.ink3} accessibilityLabel="Search transactions"
         style={{ minHeight: 44, borderRadius: R.md, backgroundColor: C.paper, paddingHorizontal: S.md, fontFamily: F.body, fontSize: 14, color: C.ink }} />
-      <T size={12} tone="ink3">{rows.length} shown{rows.length === 400 ? ' (first 400)' : ''}. Net outflow of these rows: {dollars(total)}</T>
+      <T size={12} tone="ink3">{rows.length} shown{rows.length === 400 ? ' (first 400)' : ''}. {incoming ? `Total of these rows: ${dollars(-total)}. Open one to see its statement line.` : `Net outflow of these rows: ${dollars(total)}`}</T>
       <Card><View>{rows.map((t) => <TxnRow key={t.id} t={t} />)}{rows.length === 0 ? <T tone="ink2">Nothing matches. Clear the search or pick a wider period.</T> : null}</View></Card>
     </Screen>
   );

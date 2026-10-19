@@ -266,21 +266,21 @@ export default function Import() {
     } catch (e) { setAsk(item.key, { busy: false, error: (e as Error).message }); }
   };
   const setAgain = (key: string, over: Partial<NonNullable<Item['again']>>) => patch(key, (x) => ({ ...x, again: { busy: false, tries: 0, ...x.again, ...over } }));
-  const retryReceipt = async (item: Item, model?: string) => {
+  const retryReceipt = async (item: Item, model?: string, hint?: string) => {
     const cur = live(item.key);
     if (!cur?.file || !cur.receipt || cur.again?.busy || (cur.again?.tries ?? 0) >= MAX_REREADS) return;
     const tries = (cur.again?.tries ?? 0) + 1;
     setAgain(item.key, { busy: true, error: undefined, tries });
     try {
-      const record = applyCardHabit(await rereadReceiptFile(cur.file, tries, model), [...ctxRef.current.receipts, ...savedKeysRef.current]);
+      const record = applyCardHabit(await rereadReceiptFile(cur.file, tries, model, hint, cur.receipt), [...ctxRef.current.receipts, ...savedKeysRef.current]);
       const now = live(item.key);
-      setAgain(item.key, { busy: false, proposal: { record, diff: diffReceipts(now?.receipt ?? cur.receipt, record) } });
+      setAgain(item.key, { busy: false, proposal: { record, diff: diffReceipts(now?.receipt ?? cur.receipt, record), hint } });
     } catch (e) { setAgain(item.key, { busy: false, error: (e as Error).message }); }
   };
   const takeReceiptReading = (item: Item) => patch(item.key, (x) => {
     const p = x.again?.proposal;
     if (!p || !x.receipt) return x;
-    return { ...edited(x, { receipt: acceptReceiptReading(x.receipt, p.record) }), again: { busy: false, tries: x.again?.tries ?? 0 } };
+    return { ...edited(x, { receipt: acceptReceiptReading(x.receipt, p.record, p.hint) }), again: { busy: false, tries: x.again?.tries ?? 0 } };
   });
   const takeReading = (item: Item) => patch(item.key, (x) => {
     const p = x.ask?.proposal;
@@ -442,7 +442,7 @@ export default function Import() {
             onSet={(over) => patch(item.key, (x) => ({ ...x, ...over }))} onSave={() => save(item.key)}
             onCollapse={compact && item.status === 'review' ? () => patch(item.key, (x) => ({ ...x, open: false })) : undefined}
             readers={readers} onReread={(text, model) => reread(item, text, model)} onToggleAsk={() => setAsk(item.key, { open: !item.ask?.open, error: undefined })} onUseReading={() => takeReading(item)} onKeepReading={() => setAsk(item.key, { proposal: undefined })}
-            onRetryReceipt={(model) => retryReceipt(item, model)} onUseReceipt={() => takeReceiptReading(item)} onKeepReceipt={() => setAgain(item.key, { proposal: undefined })}
+            onRetryReceipt={(model, hint) => retryReceipt(item, model, hint)} onUseReceipt={() => takeReceiptReading(item)} onKeepReceipt={() => setAgain(item.key, { proposal: undefined })}
             onRetryByHand={() => patch(item.key, (x) => ({ ...x, status: 'review', message: undefined, open: true, receipt: x.kind === 'receipt' ? { lines: [] } : undefined, statement: x.kind === 'statement' ? { rows: [] } : undefined }))}
             onRemove={() => update((xs) => xs.filter((x) => x.key !== item.key))} />
         );
@@ -516,7 +516,7 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
   onStatement: (d: StatementDraft) => void; onSet: (over: Partial<Item>) => void; onSave: () => void; onCollapse?: () => void; onRetryByHand: () => void; onRemove: () => void;
   readers: string[];
   onReread: (text: string, model?: string) => void; onToggleAsk: () => void; onUseReading: () => void; onKeepReading: () => void;
-  onRetryReceipt: (model?: string) => void; onUseReceipt: () => void; onKeepReceipt: () => void;
+  onRetryReceipt: (model?: string, hint?: string) => void; onUseReceipt: () => void; onKeepReceipt: () => void;
 }) {
   const title = item.file?.name ?? 'Receipt typed by hand';
   const tag = item.kind === 'statement' ? 'Statement' : 'Receipt';

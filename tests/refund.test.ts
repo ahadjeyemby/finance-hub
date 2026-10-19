@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { likelyRefundCredits, receiptToLines, receiptToRow, rowToReceipt } from '../src/core/evidence';
-import { acceptReceiptReading, analyseReceipt, diffReceipts, noAnswers, receiptFieldText, receiptFromRead, receiptMisfits, setReceiptField, settleReceiptReads } from '../src/core/intake';
+import { acceptReceiptReading, analyseReceipt, diffReceipts, noAnswers, receiptAsText, receiptFieldText, receiptFromRead, receiptMisfits, setReceiptField, settleReceiptReads } from '../src/core/intake';
 import type { ReadReceipt } from '../src/core/intake';
 import type { Txn } from '../src/core/types';
 
@@ -177,4 +177,18 @@ test('the person can edit charges one per line, the reader\'s rate is kept for a
 test('a receipt whose items plus a charge equal the total is not asked about sales tax', () => {
   const r = receiptFromRead({ ...diner, tax: undefined, total: 48.04 + 0.96 }, { fileName: 'd.jpg' });
   assert.ok(!analyseReceipt(r, noAnswers(), TODAY).gaps.some((g) => g.id === 'tax'));
+});
+
+
+test('the receipt on screen goes back to the reader as numbered lines, with tax, charges and total, so a note can say "item 3"', () => {
+  const r = receiptFromRead(diner, { fileName: 'd.jpg' });
+  const t = receiptAsText(r).split('\n');
+  assert.match(t[0], /store Diner; date 2026-07-10; subtotal \$48\.04; tax \$1\.80; Service Charge \(2\.0%\) \$0\.96; total \$50\.80/);
+  assert.equal(t[1], '1. Platter | $30.04');
+  assert.equal(t[2], '2. Drinks | $18.00');
+});
+
+test('accepting a reading made with a note records the note', () => {
+  const out = acceptReceiptReading(receiptFromRead(shifted, { fileName: 'b.jpg' }), receiptFromRead(aligned, { fileName: 'b.jpg' }), 'item 4 is 1.69');
+  assert.match(out.corrections!.at(-1)!, /with your note “item 4 is 1\.69”/);
 });
