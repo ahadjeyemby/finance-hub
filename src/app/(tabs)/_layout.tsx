@@ -38,15 +38,16 @@ export default function TabsLayout() {
       <Tabs.Screen name="add" options={tab('Add', 'add')} />
       <Tabs.Screen name="inbox" options={tab('Inbox', 'inbox', questions.length)} />
       <Tabs.Screen name="reports" options={tab('Reports', 'reports')} />
+      <Tabs.Screen name="accounts" options={tab('Accounts', 'accounts')} />
+      {/* on a phone the bottom bar is full: Receipt links stay reachable from the Overview and Import */}
+      <Tabs.Screen name="links" options={wide ? tab('Receipt links', 'links') : hidden} />
       <Tabs.Screen name="ledger" options={hidden} />
       <Tabs.Screen name="txn/[id]" options={hidden} />
       <Tabs.Screen name="forecast" options={hidden} />
-      <Tabs.Screen name="accounts" options={hidden} />
       <Tabs.Screen name="prices" options={hidden} />
       <Tabs.Screen name="ask" options={hidden} />
       <Tabs.Screen name="cash" options={hidden} />
       <Tabs.Screen name="import" options={hidden} />
-      <Tabs.Screen name="links" options={hidden} />
     </Tabs>
   );
 }
