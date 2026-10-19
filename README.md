@@ -130,7 +130,7 @@ The reader runs on your backend, so the file is sent to the model provider you c
 
 ## Several numbers for one account
 
-A card is reissued, an account number changes, a debit or credit card belongs to a checking account: all of them are the same account. **Accounts** (Overview > Accounts and data, or the Import screen) lists every account and lets you add numbers to it (migration `0004_account_numbers.sql`, run once). A statement or receipt that carries any of an account's numbers counts as that account. When you import a statement whose number is new but whose bank you already have, the card asks "Same as <account>?" so its statements stay in one account. Not built: merging two accounts that already exist separately.
+A card is reissued, an account number changes, a debit or credit card belongs to a checking account: all of them are the same account. **Accounts** (Overview > Accounts and data, or the Import screen) lists every account and lets you add numbers to it (migration `0004_account_numbers.sql`, run once). A statement or receipt that carries any of an account's numbers counts as that account. When you import a statement whose number is new but whose bank you already have, the card asks "Same as <account>?" so its statements stay in one account. **Merging** (migration `0005_merge_accounts.sql`): if a statement with a changed number already created a second account, press **Merge into another account** on it. Its transactions and statements move to the account you keep, its numbers are added to that account, and it is hidden, not deleted. The whole merge is one database transaction, and **Undo** (bottom of Accounts) moves everything back. Only accounts of the same type can be merged, never the cash account.
 
 ## Receipt links
 

@@ -18,7 +18,8 @@ async function all<T>(table: string, order: string): Promise<T[]> {
 
 /** Statement-derived rows from the database, or null when the person has none yet. */
 export async function fetchLedger(): Promise<{ accounts: Account[]; txns: Txn[] } | null> {
-  const accounts = await all<AccountRow>('accounts', 'id');
+  // an account that was merged into another is hidden; its transactions already belong to the account it went into
+  const accounts = (await all<AccountRow & { merged_into?: string | null }>('accounts', 'id')).filter((a) => !a.merged_into);
   if (!accounts.length) return null;
   const txns = await all<TxnRow>('txns', 'id');
   return { accounts: accounts.map(rowToAccount), txns: txns.map(rowToTxn) };

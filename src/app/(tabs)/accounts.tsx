@@ -1,19 +1,61 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Linking, TextInput, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/header';
 import { sourceWhen } from '@/components/source';
-import { NUMBER_KINDS, NUMBER_KIND_LABEL, parseLast4, withNumber, withoutNumber } from '@/core/accounts';
+import { NUMBER_KINDS, NUMBER_KIND_LABEL, accountNumbers, parseLast4, whyNotMerge, withNumber, withoutNumber } from '@/core/accounts';
 import { dayLabel } from '@/core/dates';
 import { dollars } from '@/core/queries';
 import type { Account, AccountNumberKind } from '@/core/types';
-import { fetchStatements, saveAccountNumbers, statementFileUrl } from '@/data/accounts';
+import { fetchMergedAccounts, fetchStatements, mergeAccounts, saveAccountNumbers, statementFileUrl, unmergeAccount } from '@/data/accounts';
 import type { StatementRef } from '@/data/accounts';
 import { useRepo } from '@/data/repo';
 import { C, F, R, S } from '@/theme/tokens';
 import { Banner, Button, Card, Chip, Row, Screen, T } from '@/theme/ui';
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+
+/** Merge this account into another one that is really the same account. Nothing is deleted: its transactions and statements move, and it can be undone. */
+function Merge({ account, accounts, txnCount, onDone }: { account: Account; accounts: Account[]; txnCount: number; onDone: (msg: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState<Account | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const first = (account.institution || '').toLowerCase().split(/[^a-z0-9]+/).find((w) => w.length > 2) ?? '';
+  const options = accounts.filter((a) => !whyNotMerge(account, a)).sort((a, b) => Number(b.institution.toLowerCase().includes(first)) - Number(a.institution.toLowerCase().includes(first)));
+  if (!options.length) return null;
+  const go = async () => {
+    if (!target) return;
+    setBusy(true); setError('');
+    try {
+      const r = await mergeAccounts(account, target);
+      onDone(`Merged ${account.name} into ${target.name}: ${r.transactions} transactions and ${r.statements} statements moved. You can undo this at the bottom of the page.`);
+    } catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  };
+  return (
+    <View style={{ gap: S.xs, borderTopWidth: 1, borderTopColor: C.line, paddingTop: S.sm }}>
+      <View style={{ flexDirection: 'row' }}><Button small kind="outline" label={open ? 'Cancel merge' : 'Merge into another account'} onPress={() => { setOpen((v) => !v); setTarget(null); setError(''); }} /></View>
+      {open ? (
+        <View style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
+          <T size={13} bold>Which account is this the same as?</T>
+          <T size={12} tone="ink3">{account.name} will be merged into the one you pick, and the one you pick is kept.</T>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{options.map((a) => <Chip key={a.id} label={a.name} on={target?.id === a.id} onPress={() => setTarget(a)} />)}</View>
+          {target ? (
+            <View style={{ gap: S.xs }}>
+              <T size={13}>{txnCount} transactions and all statements of {account.name} move to {target.name}. {account.name}’s number{accountNumbers(account).length > 1 ? 's' : ''} ({accountNumbers(account).join(', ') || 'none'}) {accountNumbers(account).length > 1 ? 'are' : 'is'} added to {target.name}, so future statements with {accountNumbers(account).length > 1 ? 'them' : 'it'} land there. {account.name} is hidden, not deleted, and you can undo the merge.</T>
+              <View style={{ flexDirection: 'row', gap: S.sm }}>
+                <Button small label={busy ? 'Merging' : `Merge into ${target.name}`} disabled={busy} onPress={go} />
+                <Button small kind="ghost" label="Cancel" disabled={busy} onPress={() => { setOpen(false); setTarget(null); }} />
+              </View>
+            </View>
+          ) : null}
+          {error ? <T size={12} tone="bad">{error}</T> : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 /** The statements saved for an account, newest first, each with its balances, whether it added up, and a button that opens the original file. */
 function Statements({ accountId, title }: { accountId: string | null; title: string }) {
@@ -96,6 +138,11 @@ export default function Accounts() {
   const cardSide = orphan.filter((t) => accounts.find((a) => a.id === t.accountId)?.type === 'credit');
   const bankSide = orphan.filter((t) => accounts.find((a) => a.id === t.accountId)?.type === 'checking');
   const cardTotal = cardSide.reduce((s, t) => s + t.cents, 0);
+  const [merged, setMerged] = useState<Awaited<ReturnType<typeof fetchMergedAccounts>>>([]);
+  const [mergeMsg, setMergeMsg] = useState('');
+  const [undoError, setUndoError] = useState('');
+  const refreshMerged = () => { fetchMergedAccounts().then(setMerged).catch(() => setMerged([])); };
+  useEffect(() => { if (auth.configured) refreshMerged(); }, [auth.configured, accounts.length]);
   const incomeOpen = accounts.some((a) => a.type === 'checking' && a.incomeComplete === false);
   return (
     <Screen max={820}>
@@ -133,10 +180,27 @@ export default function Accounts() {
             <Row label="Transactions" value={String(n)} />
             {a.type !== 'cash' && auth.configured ? <Statements accountId={a.id} title="Statements" /> : null}
             {a.type !== 'cash' && auth.configured ? <Numbers account={a} onSaved={() => sync.now()} /> : null}
+            {a.type !== 'cash' && auth.configured ? <Merge account={a} accounts={accounts} txnCount={n} onDone={(m) => { setMergeMsg(m); sync.now().then(refreshMerged); }} /> : null}
             {a.coverage.to < dataTo && a.type !== 'cash' ? <T size={12} tone="ink3">{daysBetween(a.coverage.to, dataTo)} days behind the newest statement. Totals for those days are incomplete.</T> : null}
           </Card>
         );
       })}
+      {mergeMsg ? <Banner tone="info" title={mergeMsg}>{''}</Banner> : null}
+      {merged.length ? (
+        <Card title="Merged accounts">
+          <T size={12} tone="ink3">Hidden, not deleted. Undo puts every transaction and statement back where it came from.</T>
+          {merged.map((m) => {
+            const into = accounts.find((a) => a.id === m.mergedInto);
+            return (
+              <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: S.sm }}>
+                <T size={13} style={{ flex: 1 }}>{m.name} ({accountNumbers(m).join(', ')}) was merged into {into?.name ?? m.mergedInto}</T>
+                {into ? <Button small kind="outline" label="Undo" onPress={() => { setUndoError(''); unmergeAccount(m, into).then(() => { setMergeMsg(`Undid the merge of ${m.name}.`); return sync.now(); }).then(refreshMerged).catch((e) => setUndoError((e as Error).message)); }} /> : null}
+              </View>
+            );
+          })}
+          {undoError ? <T size={12} tone="bad">{undoError}</T> : null}
+        </Card>
+      ) : null}
       {auth.configured ? <Card title="Not tied to an account"><T size={12} tone="ink3">Statements kept as evidence for an account you do not track.</T><Statements accountId={null} title="Show these statements" /></Card> : null}
       <View style={{ height: S.md }} />
     </Screen>

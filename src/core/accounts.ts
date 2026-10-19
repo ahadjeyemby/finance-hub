@@ -33,3 +33,34 @@ export const accountsWithNumber = (accounts: Account[], accountId: string, last4
   accounts.map((a) => (a.id === accountId ? withNumber(a, last4, kind) : a));
 
 export const numberLabel = (n: AccountNumber) => `${n.last4} (${NUMBER_KIND_LABEL[n.kind].toLowerCase()})`;
+
+// ---------------------------------------------------------------------------
+// Merging two accounts that are really one
+// ---------------------------------------------------------------------------
+
+/** Why these two cannot be merged, or null when they can: the one that is merged away goes into the one that is kept. */
+export function whyNotMerge(source: Account, target: Account): string | null {
+  if (source.id === target.id) return 'Choose two different accounts.';
+  if (source.type === 'cash' || target.type === 'cash') return 'The cash account cannot be merged.';
+  if (source.type !== target.type) return `A ${source.type} account cannot be merged into a ${target.type} account.`;
+  return null;
+}
+
+/** The kept account's numbers after the merge: its own, then the merged-away account's main number (as an old number) and its extras, each once. */
+export function mergedNumbers(target: Account, source: Account): AccountNumber[] {
+  const have = new Set(accountNumbers(target));
+  const out = [...(target.extraNumbers ?? [])];
+  for (const n of [{ last4: source.last4, kind: 'replaced' as const }, ...(source.extraNumbers ?? [])]) {
+    if (n.last4 && !have.has(n.last4)) { have.add(n.last4); out.push(n); }
+  }
+  return out;
+}
+
+/** The kept account's extra numbers with the ones a merge added taken away again (an undo). */
+export function unmergedNumbers(target: Account, source: Account): AccountNumber[] {
+  const added = new Set(accountNumbers(source));
+  return (target.extraNumbers ?? []).filter((n) => !added.has(n.last4));
+}
+
+/** Coverage of the kept account after the merge: from the earlier start to the later end. */
+export const mergedCoverage = (a: Account, b: Account) => ({ from: a.coverage.from < b.coverage.from ? a.coverage.from : b.coverage.from, to: a.coverage.to > b.coverage.to ? a.coverage.to : b.coverage.to });

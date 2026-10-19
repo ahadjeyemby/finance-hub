@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { accountNumbers, accountsWithNumber, hasNumber, parseLast4, withNumber, withoutNumber } from '../src/core/accounts';
+import { accountNumbers, accountsWithNumber, hasNumber, mergedCoverage, mergedNumbers, parseLast4, unmergedNumbers, whyNotMerge, withNumber, withoutNumber } from '../src/core/accounts';
 import { matchReceipt } from '../src/core/evidence';
 import { analyseStatement, noAnswers, planStatement, resolveAccount, statementFromRead } from '../src/core/intake';
 import { explainUnlinked } from '../src/core/links';
@@ -73,4 +73,32 @@ test('confirmed links count toward an account through any of its numbers', () =>
   const saved = [{ id: 'r1', label: 'x', txnId: 't1', cardLast4: '7788' }];
   assert.equal(linkTrust(saved, [t], [checking]).size, 0);
   assert.equal(linkTrust(saved, [t], [twoNumbers]).get(checking.id), 1);
+});
+
+
+// Two accounts for one real account: a statement with a changed number created the second.
+const old: Account = { id: 'boa-checking-4152', name: 'Bank of America checking 4152', institution: 'Bank of America', type: 'checking', last4: '4152', coverage: { from: '2026-04-01', to: '2026-06-16' }, extraNumbers: [{ last4: '5566', kind: 'debit_card' }] };
+const fresh: Account = { id: 'boa-checking-7788', name: 'Bank of America checking 7788', institution: 'Bank of America', type: 'checking', last4: '7788', coverage: { from: '2026-06-17', to: '2026-09-15' } };
+
+test('only accounts of one type can be merged, and never the cash account or an account into itself', () => {
+  assert.equal(whyNotMerge(old, fresh), null);
+  assert.match(whyNotMerge(old, old)!, /two different/);
+  assert.match(whyNotMerge(old, { ...fresh, type: 'credit' })!, /checking account cannot be merged into a credit/);
+  assert.match(whyNotMerge({ ...old, type: 'cash' }, fresh)!, /cash/);
+});
+
+test('merging adds the merged-away account\'s own and extra numbers to the kept account, each once', () => {
+  const n = mergedNumbers(fresh, old);
+  assert.deepEqual(n, [{ last4: '4152', kind: 'replaced' }, { last4: '5566', kind: 'debit_card' }]);
+  assert.deepEqual(mergedNumbers({ ...fresh, extraNumbers: [{ last4: '4152', kind: 'account' }] }, old).map((x) => x.last4), ['4152', '5566']);
+  assert.deepEqual(accountNumbers({ last4: fresh.last4, extraNumbers: n }), ['7788', '4152', '5566']);
+});
+
+test('undoing a merge takes those numbers away again and keeps the ones that were already there', () => {
+  const kept: Account = { ...fresh, extraNumbers: [{ last4: '9999', kind: 'credit_card' }, ...mergedNumbers(fresh, old)] };
+  assert.deepEqual(unmergedNumbers(kept, old), [{ last4: '9999', kind: 'credit_card' }]);
+});
+
+test('the kept account covers both accounts\' statements', () => {
+  assert.deepEqual(mergedCoverage(fresh, old), { from: '2026-04-01', to: '2026-09-15' });
 });
