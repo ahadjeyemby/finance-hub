@@ -9,7 +9,8 @@ export interface Evidence {
   online: boolean;
   raw: RawLine | null;
   statement: (StatementView & { url: string | null }) | null;
-  receipts: (ReceiptView & { url: string | null })[];
+  /** `link` says how this receipt came to be linked to the charge (from receipt_links) */
+  receipts: (ReceiptView & { url: string | null; link?: { role: string; method: string; reason: string | null; confirmed: boolean } })[];
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -39,15 +40,24 @@ export async function fetchEvidence(t: Txn): Promise<Evidence> {
         }
       }
     }
+    // the links are the record of which receipts belong to this charge; the older receipts.txn_id and the charge's own receiptId are still read so nothing saved before links is hidden
+    const lk = await supabase.from('receipt_links').select('receipt_id, role, method, reason, confirmed').eq('txn_id', t.id);
+    const linkRows = lk.error ? [] : (lk.data ?? []);
+    const viaLinks = linkRows.length ? await supabase.from('receipts').select('*').in('id', linkRows.map((l) => l.receipt_id as string)) : { data: [], error: null };
+    if (viaLinks.error) throw viaLinks.error;
     const byTxn = await supabase.from('receipts').select('*').eq('txn_id', t.id);
     if (byTxn.error) throw byTxn.error;
-    const rows = [...(byTxn.data ?? [])];
+    const rows = [...(viaLinks.data ?? [])];
+    for (const x of byTxn.data ?? []) if (!rows.some((y) => y.id === x.id)) rows.push(x);
     if (t.receiptId && UUID.test(t.receiptId) && !rows.some((x) => x.id === t.receiptId)) {
       const byId = await supabase.from('receipts').select('*').eq('id', t.receiptId).maybeSingle();
       if (byId.error) throw byId.error;
       if (byId.data) rows.push(byId.data);
     }
-    const receipts = await Promise.all(rows.map(async (x) => { const v = rowToReceipt(x); return { ...v, url: await signed('receipts', v.storagePath) }; }));
+    const receipts = await Promise.all(rows.map(async (x) => {
+      const v = rowToReceipt(x); const l = linkRows.find((y) => y.receipt_id === x.id);
+      return { ...v, url: await signed('receipts', v.storagePath), ...(l ? { link: { role: l.role as string, method: l.method as string, reason: (l.reason as string | null) ?? null, confirmed: !!l.confirmed } } : {}) };
+    }));
     return { online: true, raw, statement, receipts };
   } catch {
     return empty;

@@ -53,6 +53,8 @@ export interface Txn {
   manual?: boolean;
   /** receipt document attached to this transaction (a row in the receipts table) */
   receiptId?: string;
+  /** derived from the links: why this charge has no receipt on purpose (cash, no receipt expected...). Never stored on the transaction. */
+  receiptFlag?: string;
   /** manual entries: when the person entered it, ISO UTC with time */
   createdAt?: string;
   /** manual entries: when it first reached the database. Stays empty until a push succeeds. */

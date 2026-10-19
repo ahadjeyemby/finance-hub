@@ -80,6 +80,7 @@ function Body({ t, ev, loading }: { t: Txn; ev: Evidence | null; loading: boolea
 
       {ev?.receipts.map((r) => (
         <Section key={r.id} title={`Receipt${r.merchant ? `: ${r.merchant}` : ''}`}>
+          {r.link ? <Field label="Linked" value={`${r.link.role === 'extra' ? 'As an extra document. ' : ''}${r.link.confirmed ? 'You confirmed it' : 'Linked automatically'}${r.link.reason ? `: ${r.link.reason}` : ''}`} /> : null}
           <Field label="Uploaded" value={formatStamp(r.uploadedAt)} />
           <Field label="Taken" value={r.capturedAt ? formatStamp(r.capturedAt) : ''} />
           <Field label="Receipt date" value={[r.date, r.time].filter(Boolean).join(' ')} />

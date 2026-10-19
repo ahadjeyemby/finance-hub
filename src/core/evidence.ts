@@ -120,6 +120,16 @@ export const receiptToRow = (r: ReceiptRecord, storagePath: string | null, txnId
     ...(r.itemCount ? { itemCount: r.itemCount } : {}), ...(r.charges?.length ? { charges: r.charges } : {}), ...(r.paidOtherCents ? { paidOther: { cents: r.paidOtherCents, label: r.paidOtherLabel ?? null } } : {}), ...(r.refundCents ? { refund: { totalCents: r.refundCents, lines: r.refundedLines ?? [] } } : {}) },
 });
 
+/** A stored receipt row back into a record, so stored receipts can be matched and split exactly like a freshly read one. */
+export const rowToRecord = (r: Record<string, any>): ReceiptRecord & { id: string } => ({
+  id: r.id, kind: r.kind ?? 'store_receipt', merchant: r.merchant ?? undefined, date: r.date ?? undefined, time: r.time ?? undefined,
+  totalCents: r.total_cents ?? undefined, subtotalCents: r.subtotal_cents ?? undefined, taxCents: r.tax_cents ?? undefined, tipCents: r.tip_cents ?? undefined, discountCents: r.discount_cents ?? undefined,
+  currency: r.currency ?? 'USD', paymentMethod: r.payment_method ?? undefined, cardLast4: r.card_last4 ?? undefined, storeAddress: r.store_address ?? undefined, storeRef: r.store_ref ?? undefined, orderRef: r.order_ref ?? undefined,
+  lines: Array.isArray(r.lines) ? r.lines : [], sourceFile: r.source_file ?? undefined, sha256: r.sha256 ?? undefined, origin: r.origin ?? 'app_upload', capturedAt: r.captured_at ?? undefined,
+  charges: Array.isArray(r.raw?.charges) ? r.raw.charges : undefined, paidOtherCents: r.raw?.paidOther?.cents ?? undefined, paidOtherLabel: r.raw?.paidOther?.label ?? undefined,
+  refundCents: r.raw?.refund?.totalCents ?? undefined, refundedLines: r.raw?.refund?.lines ?? undefined, itemCount: r.raw?.itemCount ?? undefined,
+});
+
 /** What a receipt row looks like when read back, shaped for the evidence pop-up. */
 export interface ReceiptView {
   id: string; kind: string; merchant: string | null; date: string | null; time: string | null; totalCents: number | null; subtotalCents: number | null; taxCents: number | null;

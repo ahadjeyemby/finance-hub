@@ -46,6 +46,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="ask" options={hidden} />
       <Tabs.Screen name="cash" options={hidden} />
       <Tabs.Screen name="import" options={hidden} />
+      <Tabs.Screen name="links" options={hidden} />
     </Tabs>
   );
 }

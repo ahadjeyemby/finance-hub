@@ -20,6 +20,10 @@ import type { Analysis, Answers, DocKind, Gap, StatementDraft } from '@/core/int
 import { dollars } from '@/core/queries';
 import { suggestCategory } from '@/core/questions';
 import type { Account, Txn } from '@/core/types';
+import { saveLinks, setFlag } from '@/data/links';
+import { sweepLinks } from '@/data/linking';
+import { NO_LINK_LABEL, RECEIPT_NO_LINK, storedKeys } from '@/core/links';
+import type { Link, NoLinkReason } from '@/core/links';
 import { canPickFolder, findDuplicate, loadStoredReceipts, pickFiles, pickFolder, readReceiptFile, listReaders, readStatementFile, rereadReceiptFile, rereadStatementWithHint, saveReceiptRecord, saveStatementPlan } from '@/data/intake';
 import type { PickedFile } from '@/data/intake';
 import { useRepo } from '@/data/repo';
@@ -35,6 +39,8 @@ interface Item {
   link: string; cat: string | null; edit: boolean;
   /** the original file is shown beside the reading, to compare the two */
   peek?: boolean;
+  /** receipts with link 'flag': why no charge is expected (paid in cash, from another account...) */
+  noLink?: NoLinkReason;
   /** in a long list a row is one line until opened */
   open: boolean;
   /** set once saved: the stored receipt, and the charge it ended up on, so later files can be checked against it */
@@ -115,7 +121,7 @@ function evaluate(item: Item, ctx: Ctx, before: ReceiptKey[]) {
       if (m.txnId) matchWhy = m.reason; else if (m.likely) likelyWhy = m.reason;
       candidates = m.candidates.map((id) => ctx.txns.find((t) => t.id === id)).filter((t): t is Txn => !!t);
       if (item.link === 'cash') { cash = true; cashCat = item.cat ?? suggestCategory(rec.merchant ?? '') ?? null; if (!item.answers.acknowledged.includes('cash-dup')) cashClash = likelyCharges(rec, ctx.txns); }
-      else if (item.link === 'none') linkTxn = null;
+      else if (item.link === 'none' || item.link === 'flag') linkTxn = null;
       else if (item.link !== 'auto') linkTxn = ctx.txns.find((t) => t.id === item.link) ?? null;
       else if (m.txnId) linkTxn = ctx.txns.find((t) => t.id === m.txnId) ?? null;
       else if (candidates.length >= 1) linkPending = true;      // one charge with this amount but another store name is still a question
@@ -142,13 +148,15 @@ function evaluateAll(items: Item[], ctx: Ctx): Map<string, Ev> {
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export default function Import() {
-  const { accounts, txns, hasData, sync, addCash, attachReceipt, patchTxn } = useRepo();
+  const { accounts, txns, hasData, sync, addCash, links, reloadLinks } = useRepo();
   const params = useLocalSearchParams<{ kind?: string }>();
   const [kind, setKind] = useState<DocKind>(params.kind === 'receipt' ? 'receipt' : 'statement');
   const [items, setItems] = useState<Item[]>([]);
   const [stored, setStored] = useState<Stored[]>([]);
   const [readers, setReaders] = useState<string[]>([]);
-  const [receipts, setReceipts] = useState<ReceiptKey[]>([]);
+  const [fallbackReceipts, setFallbackReceipts] = useState<ReceiptKey[]>([]);
+  // stored receipts with the charge each is linked to: from the links when they are available, else straight from the receipts table
+  const receipts = useMemo(() => (links ? storedKeys(links) : fallbackReceipts), [links, fallbackReceipts]);
   const [notice, setNotice] = useState('');
   const [info, setInfo] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
@@ -170,7 +178,7 @@ export default function Import() {
   useEffect(() => {
     let on = true;
     loadStored().then((s) => { if (on) setStored(s); });
-    loadStoredReceipts().then((r) => { if (on) setReceipts(r); });
+    loadStoredReceipts().then((r) => { if (on) setFallbackReceipts(r); });
     listReaders().then((m) => { if (on) setReaders(m); });
     return () => { on = false; };
   }, []);
@@ -297,37 +305,54 @@ export default function Import() {
         const rec = item.receipt!;
         const link = ev.linkTxn;
         const original = ev.extra && ev.same && !ev.same.of.id.startsWith('q:') ? ev.same.of : null;
-        const rid = await saveReceiptRecord(original ? { ...rec, duplicateOf: original.id } : rec, item.file, link?.id ?? original?.txnId ?? null);
+        // the link is its own record (receipt_links), so the receipt row is saved without one
+        const rid = await saveReceiptRecord(original ? { ...rec, duplicateOf: original.id } : rec, item.file, null);
         savedId = rid; savedTxnId = link?.id ?? original?.txnId ?? null;
+        const mk = (txnId: string, role: Link['role']): Link => {
+          const chosen = item.link !== 'auto';
+          const method = chosen ? 'confirmed' : ev.matchWhy === 'order number' ? 'order_number' : /card/.test(ev.matchWhy ?? '') ? 'card' : 'store';
+          return { receiptId: rid, txnId, role, method, reason: chosen ? 'chosen by you' : ev.matchWhy ?? null, confirmed: chosen };
+        };
+        const toSave: Link[] = [];
         if (ev.extra) {
           if (link) claimedRef.current.add(link.id);
+          if (savedTxnId) toSave.push({ ...mk(savedTxnId, 'extra'), method: 'store', reason: ev.same!.why, confirmed: false });
           message = `Saved as an extra document for ${ev.same!.of.label}${link ? `, the ${link.date} charge at ${link.merchant}` : ''}. No new purchase was added and its items were not split again.`;
         } else if (link) {
           claimedRef.current.add(link.id);
-          if (ev.second) message = `Saved as an extra document for ${link.merchant}, ${link.date}, ${dollars(-link.cents)}. That charge already had a receipt, so its items were not split again.`;
+          if (ev.second) { toSave.push(mk(link.id, 'extra')); message = `Saved as an extra document for ${link.merchant}, ${link.date}, ${dollars(-link.cents)}. That charge already had a receipt, so its items were not split again.`; }
           else {
-            const lines = receiptToLines(rec, -link.cents);
-            if (lines.length) attachReceipt(link.id, lines, rid); else patchTxn(link.id, { receiptId: rid });
+            toSave.push(mk(link.id, 'primary'));
             message = `Saved and linked to ${link.merchant}, ${link.date}, ${dollars(-link.cents)}.`;
           }
         } else if (ev.cash) {
           const t = addCash({ amount: (rec.totalCents ?? 0) / 100, merchant: rec.merchant ?? 'Receipt', what: 'Receipt', category: ev.cashCat!, date: rec.date!, business: false, oneOff: false, splitAsked: true, receiptId: rid, lines: receiptToLines(rec, rec.totalCents ?? 0).map((l) => ({ item: l.item, amount: l.cents / 100 })) });
           savedTxnId = t.id;
+          toSave.push({ receiptId: rid, txnId: t.id, role: 'primary', method: 'manual', reason: 'entered as a cash purchase', confirmed: true });
           message = 'Saved and added as a cash purchase.';
-        } else message = 'Saved as evidence. It is not linked to a charge yet.';
+        } else if (item.link === 'flag') {
+          await setFlag('receipt', rid, item.noLink ?? 'cash');
+          message = `Saved. Marked as: ${NO_LINK_LABEL[item.noLink ?? 'cash'].toLowerCase()}, so no charge is expected.`;
+        } else message = 'Saved as evidence. It is not linked to a charge yet. Open Links to match it when its statement is imported.';
+        if (toSave.length) await saveLinks(toSave);
+        await reloadLinks();
       } else {
         const plan = planStatement(item.statement!, { accounts: cx.accounts, statements: cx.stored, existing: cx.txns }, { name: item.file?.name ?? 'statement', sha256: item.file?.sha256 });
         await saveStatementPlan(plan, item.file);
         await sync.now();
         setStored(await loadStored());
         await settle(cx.txns);
+        // receipts saved earlier may now have their charge: link the clear ones, leave the likely ones for the person to confirm
+        let swept: Awaited<ReturnType<typeof sweepLinks>> = null;
+        try { swept = await sweepLinks(ctxRef.current.txns, ctxRef.current.accounts); if (swept) await reloadLinks(); } catch { /* the statement is saved; links can be found later from the Links screen */ }
         message = plan.txns.length === 0 && plan.skipped.length
           ? `Nothing new: all ${plan.skipped.length} rows were already in your ledger. The statement itself was recorded.`
           : `Saved ${plan.txns.length} transactions to ${plan.account.name}${plan.isNewAccount ? ' (new account)' : ''}${plan.pairUpdates.length ? `, linked ${plan.pairUpdates.length} card payment${plan.pairUpdates.length > 1 ? 's' : ''}` : ''}.${plan.skipped.length ? ` ${plan.skipped.length} ${plan.skipped.length === 1 ? 'row was' : 'rows were'} already in your ledger and not added again.` : ''}`;
+        if (swept?.saved) message += ` Linked ${swept.saved} receipt${swept.saved > 1 ? 's' : ''} you had saved earlier.`;
+        if (swept?.suggested) message += ` ${swept.suggested} more look${swept.suggested > 1 ? '' : 's'} like a match: confirm ${swept.suggested > 1 ? 'them' : 'it'} in Links.`;
       }
       // the original is stored; drop its bytes from memory so a long run does not hold every photo
       if (savedId) savedKeysRef.current.push(keyOf(item.receipt!, savedId, item.file?.name ?? 'a receipt typed by hand', savedTxnId));
-      if (savedId) setReceipts((xs) => [...xs, keyOf(item.receipt!, savedId!, item.file?.name ?? 'a receipt typed by hand', savedTxnId)]);
       patch(key, (x) => ({ ...x, status: 'saved', message, open: false, savedId, savedTxnId, file: x.file ? { ...x.file, bytes: new Uint8Array(0) } : null }));
     } catch (e) { patch(key, (x) => ({ ...x, status: 'review', message: (e as Error).message })); }
   };
@@ -360,7 +385,7 @@ export default function Import() {
 
   return (
     <Screen max={anyPeek && sideBySide ? 1400 : 760}>
-      <ScreenHeader back title="Import" sub="Every receipt and statement is read and checked first. Nothing is saved until every detail is accounted for." />
+      <ScreenHeader back title="Import" sub="Every receipt and statement is read and checked first. Nothing is saved until every detail is accounted for." right={<Button small kind="outline" label="Receipt links" onPress={() => router.push('/links')} />} />
       {!connected ? <Banner title="No database is connected.">Set the Supabase URL and anon key in .env first. Nothing can be saved without it.</Banner> : null}
       <Card title="What are you adding?">
         <Segmented value={kind} onChange={setKind} options={[{ value: 'statement', label: 'Statements' }, { value: 'receipt', label: 'Receipts' }]} />
@@ -568,18 +593,21 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
         <View style={{ gap: S.xs }}>
           <Banner title={ev.candidates.length > 1 ? 'More than one charge could be this receipt' : ev.likelyWhy ? 'This looks like the charge below' : 'A charge has this amount, but another store name'}>{ev.candidates.length > 1 ? 'Choose the right one, or keep the receipt unlinked.' : ev.likelyWhy ? `${ev.likelyWhy.charAt(0).toUpperCase()}${ev.likelyWhy.slice(1)}. The store name on the bank side differs. Confirm it if it is the same purchase; after ${AUTO_AFTER} confirmations on this card, matches like this are linked without asking.` : 'Link it if it is the same purchase, or keep the receipt unlinked.'}</Banner>
           {ev.candidates.map((c) => <Button key={c.id} small kind="outline" label={`${c.merchant}, ${c.date}, ${dollars(-c.cents)}${c.receiptId ? ' (has a receipt)' : ''}`} onPress={() => onSet({ link: c.id })} />)}
-          <Button small kind="ghost" label="Keep it unlinked" onPress={() => onSet({ link: 'none' })} />
+          <Button small kind="ghost" label="Keep it unlinked for now" onPress={() => onSet({ link: 'none' })} />
+          <Button small kind="ghost" label="Paid another way (no charge expected)" onPress={() => onSet({ link: 'flag', noLink: 'cash' })} />
         </View>
       ) : null}
       {rec && !ev.extra && ev.analysis.ok && ev.linkTxn ? <T size={13} tone="ink2">{ev.second ? `Belongs to ${ev.linkTxn.merchant}, ${ev.linkTxn.date}, ${dollars(-ev.linkTxn.cents)}, which already has a receipt. This one is kept as an additional document and its items are not split again.` : `Links to ${ev.linkTxn.merchant}, ${ev.linkTxn.date}, ${dollars(-ev.linkTxn.cents)}${ev.matchWhy ? ` (matched on ${ev.matchWhy})` : ''}. Its items will be split out.`}</T> : null}
       {rec && !ev.extra && ev.analysis.ok && ev.linkTxn && item.link === 'auto' && !ev.second ? <View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Not this charge: keep it unlinked" onPress={() => onSet({ link: 'none' })} /></View> : null}
       {rec && !ev.extra && ev.analysis.ok && !ev.linkTxn && !ev.linkPending && !ev.cashClash.length ? (
         <View style={{ gap: S.xs }}>
-          <T size={13} tone="ink2">{ev.cash ? 'Will be added as a cash purchase. Pick its category.' : 'No charge in your ledger matches this receipt. It is kept as evidence. If you paid cash, make it a cash purchase.'}</T>
+          <T size={13} tone="ink2">{ev.cash ? 'Will be added as a cash purchase. Pick its category.' : item.link === 'flag' ? 'Saved as paid another way: no charge is expected, and it will not be listed as unlinked.' : 'No charge in your ledger matches this receipt, so it is flagged as not linked. If its statement is not imported yet it will be linked when it is. If you paid cash, add it as a cash purchase; if it was paid some other way, say so.'}</T>
           <View style={{ flexDirection: 'row', gap: S.xs, flexWrap: 'wrap' }}>
-            <Chip label="Keep as evidence" on={!ev.cash} onPress={() => onSet({ link: 'none' })} />
-            <Chip label="Cash purchase" on={ev.cash} onPress={() => onSet({ link: 'cash' })} />
+            <Chip label="Keep as evidence, link later" on={!ev.cash && item.link !== 'flag'} onPress={() => onSet({ link: 'none' })} />
+            <Chip label="Cash purchase (add to ledger)" on={ev.cash} onPress={() => onSet({ link: 'cash' })} />
+            <Chip label="Paid another way (no charge expected)" on={item.link === 'flag'} onPress={() => onSet({ link: 'flag', noLink: item.noLink ?? 'cash' })} />
           </View>
+          {item.link === 'flag' ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{RECEIPT_NO_LINK.map((r) => <Chip key={r} label={NO_LINK_LABEL[r]} on={(item.noLink ?? 'cash') === r} onPress={() => onSet({ noLink: r })} />)}</View> : null}
           {ev.cash ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{CATEGORIES.filter((c) => c.id !== 'uncategorized').map((c) => <Chip key={c.id} label={c.label} on={ev.cashCat === c.id} onPress={() => onSet({ cat: c.id })} />)}</View> : null}
         </View>
       ) : null}

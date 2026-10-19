@@ -17,6 +17,9 @@ import { emptyOverlay } from '@/core/types';
 import type { Account, CategoryId, Overlay, Question, Txn } from '@/core/types';
 import { C, SERIES } from '@/theme/tokens';
 import { fetchLedger, fetchOverlay, pushOverlay } from './sync';
+import { fetchLinkData, NO_LINKS } from './links';
+import type { LinkData } from './links';
+import { applyLinks } from '@/core/links';
 import { projectRef, supabase } from './supabase';
 
 const KEY = 'audit.overlay.v1';
@@ -86,6 +89,10 @@ export interface Repo {
   deleteReport: (id: string) => void;
   patchTxn: (id: string, patch: Overlay['patches'][string]) => void;
   attachReceipt: (txnId: string, lines: { item: string; cents: number }[], uri: string) => void;
+  /** receipt-to-charge links, flags and stored receipts (null until loaded, or when migration 0003 has not been run) */
+  links: LinkData | null;
+  /** fetch the links again, after one was saved or changed */
+  reloadLinks: () => Promise<void>;
   /** stable colour per category: top five by all-time spend get a series colour, the rest are grey */
   colorOf: (category: string) => string;
   reset: () => void;
@@ -97,6 +104,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   const configured = !!supabase;
   const [overlay, setOverlay] = useState<Overlay>(emptyOverlay());
   const [ledger, setLedger] = useState<Seed>(EMPTY);
+  const [linkData, setLinkData] = useState<LinkData | null>(null);
   const [ledgerFrom, setLedgerFrom] = useState<{ kind: LedgerKind; at: string | null }>({ kind: 'none', at: null });
   const [loaded, setLoaded] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
@@ -179,6 +187,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
       if (remoteLedger.accounts.length && projectRef && userIdRef.current) AsyncStorage.setItem(LEDGER_KEY, JSON.stringify(makeLedgerCache(projectRef, userIdRef.current, at, remoteLedger))).catch(() => {});
       else AsyncStorage.removeItem(LEDGER_KEY).catch(() => {});
 
+      setLinkData(await fetchLinkData());
       const remote = await fetchOverlay();
       const local = overlayRef.current;
       let next = remote ? (dirtyRef.current ? mergeOverlays(local, remote) : remote) : local;
@@ -205,7 +214,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
           if (pushTimer.current) clearTimeout(pushTimer.current);
           await AsyncStorage.multiRemove([KEY, LEDGER_KEY, DIRTY_KEY, SYNCED_KEY]).catch(() => {});
           dirtyRef.current = false; overlayRef.current = emptyOverlay();
-          if (live) { setOverlay(emptyOverlay()); setLedger(EMPTY); setLedgerFrom({ kind: 'none', at: null }); }
+          if (live) { setOverlay(emptyOverlay()); setLedger(EMPTY); setLinkData(null); setLedgerFrom({ kind: 'none', at: null }); }
         }
         await AsyncStorage.setItem(OWNER_KEY, tag).catch(() => {});
         const copy = parseLedgerCache(await AsyncStorage.getItem(LEDGER_KEY), projectRef, userId);
@@ -241,7 +250,9 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   const ready = loaded && authReady;
   const source = useMemo<SourceInfo>(() => ({ kind: ledgerFrom.kind, project: projectRef, at: ledgerFrom.at, accounts: ledger.accounts.length, rows: ledger.txns.length }), [ledgerFrom, ledger]);
 
-  const txns = useMemo(() => applyOverlay(ledger.txns, overlay), [ledger, overlay]);
+  const receiptsById = useMemo(() => new Map((linkData ?? NO_LINKS).receipts.map((r) => [r.id, r])), [linkData]);
+  const reloadLinks = useCallback(async () => { setLinkData(await fetchLinkData()); }, []);
+  const txns = useMemo(() => applyLinks(applyOverlay(ledger.txns, overlay), linkData?.links ?? [], receiptsById, linkData?.flags ?? []), [ledger, overlay, linkData, receiptsById]);
   const accounts = ledger.accounts;
   const ctx = useMemo<Ctx>(() => ({ txns, accounts }), [txns, accounts]);
   const questions = useMemo(() => buildQuestions(txns, overlay), [txns, overlay]);
@@ -277,10 +288,11 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     saveReport: (prompt, spec) => { const id = `r${Date.now()}`; commit({ ...overlay, savedReports: [{ id, createdAt: new Date().toISOString(), prompt, spec }, ...overlay.savedReports] }); return id; },
     deleteReport: (id) => commit({ ...overlay, savedReports: overlay.savedReports.filter((r) => r.id !== id) }),
     patchTxn: (id, patch) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [id]: { ...o.patches[id], ...patch } } }); },
+    links: linkData, reloadLinks,
     attachReceipt: (txnId, lines, uri) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [txnId]: { ...o.patches[txnId], lines, receiptId: uri } } }); },
     colorOf: (category) => colors.get(category) ?? C.other,
     reset: () => commit(emptyOverlay()),
-  }), [ready, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, colors, commit]);
+  }), [ready, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, colors, commit, linkData, reloadLinks]);
 
   return <Ctx_.Provider value={value}>{children}</Ctx_.Provider>;
 }
