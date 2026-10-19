@@ -10,7 +10,7 @@ import { Banner, Button, Chip, T } from '@/theme/ui';
 
 export const input = { minHeight: 44, borderRadius: R.md, backgroundColor: C.ground, paddingHorizontal: S.md, fontFamily: F.body, fontSize: 15, color: C.ink } as const;
 
-/** One text box that applies its value when the person leaves it. Remounts (via key) when the stored value changes. */
+/** One text box. Its value is applied when the person leaves the box, presses Enter, or presses the button that appears as soon as the text differs, so an edit is never silently waiting. Remounts (via key) when the stored value changes. */
 export function FieldInput({ label, value, onCommit, multiline, error }: { label: string; value: string; onCommit: (text: string) => void; multiline?: boolean; error?: string }) {
   const [text, setText] = useState(value);
   return (
@@ -20,6 +20,7 @@ export function FieldInput({ label, value, onCommit, multiline, error }: { label
         style={[input, multiline && { minHeight: 96, textAlignVertical: 'top', paddingTop: S.md }]} value={text} multiline={multiline} accessibilityLabel={label}
         onChangeText={setText} onBlur={() => { if (text !== value) onCommit(text); }} onSubmitEditing={() => { if (!multiline && text !== value) onCommit(text); }}
         placeholderTextColor={C.ink3} />
+      {text !== value ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.sm }}><Button small label="Apply and re-check" onPress={() => onCommit(text)} /><T size={12} tone="ink3">Not applied yet.</T></View> : null}
       {error ? <T size={12} tone="bad">{error}</T> : null}
     </View>
   );

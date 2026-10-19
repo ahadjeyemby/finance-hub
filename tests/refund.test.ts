@@ -192,3 +192,28 @@ test('accepting a reading made with a note records the note', () => {
   const out = acceptReceiptReading(receiptFromRead(shifted, { fileName: 'b.jpg' }), receiptFromRead(aligned, { fileName: 'b.jpg' }), 'item 4 is 1.69');
   assert.match(out.corrections!.at(-1)!, /with your note “item 4 is 1\.69”/);
 });
+
+// The case from the screen: a Walmart receipt paid by Walmart Pay on card 9780. The reader filed the whole card payment as "paid with points or credit".
+const walmart: ReadReceipt = { merchant: 'Walmart', date: '2026-07-20', subtotal: 29.32, tax: 1.0, total: 30.33, payment_method: 'Walmart Pay', card_last4: '9780',
+  paid_other: 30.33, paid_other_label: 'Walmart Pay account 9780', items: [{ item: 'EGGS 12CT', price: 2.34 }, { item: 'SWT POTATOES', price: 4.97 }, { item: 'REST OF BASKET', price: 22.01 }] };
+
+test('a card or wallet payment read as "paid with points or credit" is the card payment: it is not subtracted, and the card says so', () => {
+  const r = receiptFromRead(walmart, { fileName: 'w.jpg' });
+  assert.equal(r.paidOtherCents, undefined);
+  assert.equal(r.paymentMethod, 'Walmart Pay');
+  assert.match(r.corrections![0], /\$30\.33 \(Walmart Pay account 9780\) was read as paid with points or credit/);
+  assert.deepEqual(analyseReceipt(r, noAnswers(), TODAY).problems, []);
+});
+
+test('real points and gift cards are still subtracted, and an amount equal to the total with no label is treated as the card payment', () => {
+  assert.equal(receiptFromRead({ ...walmart, paid_other_label: '2,024 Amazon Visa rewards points', paid_other: 20.24, total: 5.59 }, { fileName: 'a.jpg' }).paidOtherCents, 2024);
+  assert.equal(receiptFromRead({ ...walmart, paid_other_label: 'Gift card', paid_other: 10, total: 20.33 }, { fileName: 'a.jpg' }).paidOtherCents, 1000);
+  assert.equal(receiptFromRead({ ...walmart, paid_other_label: undefined }, { fileName: 'a.jpg' }).paidOtherCents, undefined);
+});
+
+test('when an amount for points or credit is still subtracted, the message points at it as the likely culprit', () => {
+  const r = { ...receiptFromRead(walmart, { fileName: 'w.jpg' }), paidOtherCents: 3033, paidOtherLabel: 'Walmart Pay account 9780' };
+  const p = analyseReceipt(r, noAnswers(), TODAY).problems[0];
+  assert.equal(p.id, 'sum');
+  assert.match(p.text, /likely culprit if it was really your card payment/);
+});
