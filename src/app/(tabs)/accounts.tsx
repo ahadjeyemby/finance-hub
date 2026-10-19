@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { Linking, TextInput, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/header';
 import { sourceWhen } from '@/components/source';
@@ -7,12 +7,47 @@ import { NUMBER_KINDS, NUMBER_KIND_LABEL, parseLast4, withNumber, withoutNumber 
 import { dayLabel } from '@/core/dates';
 import { dollars } from '@/core/queries';
 import type { Account, AccountNumberKind } from '@/core/types';
-import { saveAccountNumbers } from '@/data/accounts';
+import { fetchStatements, saveAccountNumbers, statementFileUrl } from '@/data/accounts';
+import type { StatementRef } from '@/data/accounts';
 import { useRepo } from '@/data/repo';
 import { C, F, R, S } from '@/theme/tokens';
 import { Banner, Button, Card, Chip, Row, Screen, T } from '@/theme/ui';
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+
+/** The statements saved for an account, newest first, each with its balances, whether it added up, and a button that opens the original file. */
+function Statements({ accountId, title }: { accountId: string | null; title: string }) {
+  const [open, setOpen] = useState(false);
+  const [list, setList] = useState<StatementRef[] | null>(null);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const toggle = async () => {
+    const next = !open; setOpen(next);
+    if (next && list === null) { try { setList(await fetchStatements(accountId)); } catch (e) { setError((e as Error).message); setList([]); } }
+  };
+  const openFile = async (s: StatementRef) => {
+    setBusy(s.id); setError('');
+    try { const url = await statementFileUrl(s.storagePath); if (url) await Linking.openURL(url); else setError('The original file was not stored for this statement.'); } catch (e) { setError((e as Error).message); }
+    setBusy('');
+  };
+  return (
+    <View style={{ gap: S.xs, borderTopWidth: 1, borderTopColor: C.line, paddingTop: S.sm }}>
+      <View style={{ flexDirection: 'row' }}><Button small kind="outline" label={open ? `Hide ${title.toLowerCase()}` : `${title}${list ? ` (${list.length})` : ''}`} onPress={toggle} /></View>
+      {open && list === null ? <T size={12} tone="ink3">Loading.</T> : null}
+      {open && list?.length === 0 && !error ? <T size={12} tone="ink3">No statement is saved for this yet. Import one from Add.</T> : null}
+      {open ? list?.map((s) => (
+        <View key={s.id} style={{ gap: 2, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
+          <T size={13} bold>{s.periodFrom && s.periodTo ? `${dayLabel(s.periodFrom)} to ${dayLabel(s.periodTo)}` : s.label ?? s.id}</T>
+          <T size={12} tone="ink2">{s.openingCents != null && s.closingCents != null ? `Opening ${dollars(s.openingCents)}, closing ${dollars(s.closingCents)}` : 'Balances not recorded'}{s.rows != null ? `, ${s.rows} transactions` : ''}{s.pages ? `, ${s.pages} pages` : ''}</T>
+          <T size={12} tone={s.reconciled === false ? 'bad' : 'ink3'}>{s.reconciled === true ? 'The rows added up to the printed balances.' : s.reconciled === false ? 'Saved although the rows did not add up to the printed balances.' : 'Whether it added up was not recorded.'}</T>
+          {s.sourceFile ? <T size={12} tone="ink3">File: {s.sourceFile}</T> : null}
+          <View style={{ flexDirection: 'row' }}><Button small kind="outline" label={busy === s.id ? 'Opening' : s.storagePath ? 'Open the statement' : 'No original stored'} disabled={!s.storagePath || busy === s.id} onPress={() => openFile(s)} /></View>
+        </View>
+      )) : null}
+      {error ? <T size={12} tone="bad">{error}</T> : null}
+    </View>
+  );
+}
 
 /** The numbers that mean this account, and a way to add more: a reissued card, an old account number, a debit or credit card that belongs to it. */
 function Numbers({ account, onSaved }: { account: Account; onSaved: () => void }) {
@@ -96,11 +131,13 @@ export default function Accounts() {
             </View>
             <Row label="Statements cover" value={a.type === 'cash' ? 'Entered by you' : `${dayLabel(a.coverage.from)} to ${dayLabel(a.coverage.to)}`} />
             <Row label="Transactions" value={String(n)} />
+            {a.type !== 'cash' && auth.configured ? <Statements accountId={a.id} title="Statements" /> : null}
             {a.type !== 'cash' && auth.configured ? <Numbers account={a} onSaved={() => sync.now()} /> : null}
             {a.coverage.to < dataTo && a.type !== 'cash' ? <T size={12} tone="ink3">{daysBetween(a.coverage.to, dataTo)} days behind the newest statement. Totals for those days are incomplete.</T> : null}
           </Card>
         );
       })}
+      {auth.configured ? <Card title="Not tied to an account"><T size={12} tone="ink3">Statements kept as evidence for an account you do not track.</T><Statements accountId={null} title="Show these statements" /></Card> : null}
       <View style={{ height: S.md }} />
     </Screen>
   );
