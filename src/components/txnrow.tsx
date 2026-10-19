@@ -10,6 +10,8 @@ import { T } from '@/theme/ui';
 
 export function TxnRow({ t }: { t: Txn }) {
   const sub = [dayLabel(t.date), t.kind === 'transfer' ? 'Transfer' : t.kind === 'income' ? 'Income' : t.kind === 'rewards' ? 'Rewards' : categoryLabel(t.category)];
+  // for money coming in, the bank's own wording and the account say where it came from
+  if (t.kind === 'income') sub.push(t.subtype === 'unconfirmed' ? 'Unconfirmed' : t.subtype === 'salary' ? 'Salary' : 'Other deposit', t.description);
   if (t.business) sub.push('Business');
   if (t.oneOff) sub.push('One-time');
   if (t.lines?.length) sub.push(`${t.lines.length} items`);

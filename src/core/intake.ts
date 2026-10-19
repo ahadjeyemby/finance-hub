@@ -692,9 +692,17 @@ export function diffReceipts(a: ReceiptRecord, b: ReceiptRecord): ReceiptDiff {
   return { lines, before: receiptMisfits(a), after: receiptMisfits(b) };
 }
 
+/** The receipt on screen as numbered text. It goes back to the reader with the person's note, so "item 3" in the note means the line they saw. */
+export function receiptAsText(r: ReceiptRecord): string {
+  const m = (v?: number) => (v == null ? '?' : usd(v));
+  const head = [`store ${r.merchant ?? '?'}`, `date ${r.date ?? '?'}`, `subtotal ${m(r.subtotalCents)}`, `tax ${m(r.taxCents)}`, ...(r.tipCents ? [`tip ${m(r.tipCents)}`] : []),
+    ...(r.charges ?? []).map((c) => `${c.label} ${usd(c.cents)}`), ...(r.paidOtherCents ? [`paid with points or credit ${usd(r.paidOtherCents)}`] : []), `total ${m(r.totalCents)}`];
+  return [head.join('; '), ...r.lines.map((l, i) => `${i + 1}. ${l.item} | ${usd(l.cents)}`)].join('\n');
+}
+
 /** The person chose the new reading of a receipt. Their earlier answer about a duplicate carries over; everything else is the new reading. */
-export function acceptReceiptReading(current: ReceiptRecord, next: ReceiptRecord): ReceiptRecord {
-  return { ...next, ...(current.dup ? { dup: current.dup } : {}), corrections: [...(next.corrections ?? []), `Read again at your request${next.readBy ? ` (${next.readBy})` : ''}. The new reading replaced the earlier one. Check it against the original.`] };
+export function acceptReceiptReading(current: ReceiptRecord, next: ReceiptRecord, hint?: string): ReceiptRecord {
+  return { ...next, ...(current.dup ? { dup: current.dup } : {}), corrections: [...(next.corrections ?? []), `Read again at your request${next.readBy ? ` (${next.readBy})` : ''}${hint ? ` with your note “${hint}”` : ''}. The new reading replaced the earlier one. Check it against the original.`] };
 }
 
 // ======================================================================

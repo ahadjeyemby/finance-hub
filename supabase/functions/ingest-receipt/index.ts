@@ -111,9 +111,13 @@ Deno.serve(async (req) => {
     ? { type: 'document' as const, filename: typeof body.filename === 'string' ? body.filename.slice(0, 120) : 'receipt.pdf', source: { type: 'base64' as const, media_type: 'application/pdf' as const, data } }
     : { type: 'image' as const, source: { type: 'base64' as const, media_type: type, data } };
   // second look, asked for by the app when the first reading did not add up to the printed subtotal, total or item count: plain JSON, no tool call
+  // a person's note about what looks wrong, with the reading it is about: the note points at where to look and is never a fact
+  const hint = typeof body.hint === 'string' ? body.hint.trim().slice(0, 600) : '';
+  const previous = typeof body.previous === 'string' ? body.previous.slice(0, 20_000) : '';
+  const review = hint ? `\n\nThe person checking your earlier reading wrote this note about it: "${hint}"\nThe earlier reading was:\n${previous}\nUse the note to decide where to look closely, then read those parts again. The note may be wrong: report only what is printed on the receipt, never what the note says should be there. If the receipt disagrees with the note, report the receipt and say so in unreadable. Read every line again, not only the ones the note mentions.` : '';
   // a reader chosen by the person is also read in this mode, which is the one measured for every reader offered
-  if (body.second_opinion === true || choice) {
-    const r2 = await callModel({ max_tokens: 3000, messages: [{ role: 'user', content: [file, { type: 'text', text: JSON_PROMPT }] }] }, 'verify', choice);
+  if (body.second_opinion === true || choice || hint) {
+    const r2 = await callModel({ max_tokens: 3000, messages: [{ role: 'user', content: [file, { type: 'text', text: JSON_PROMPT + review }] }] }, 'verify', choice);
     if (!r2.ok) return r2;
     const out2 = await r2.json();
     const text = (out2.content ?? []).filter((b: { type: string }) => b.type === 'text').map((b: { text?: string }) => b.text ?? '').join('');

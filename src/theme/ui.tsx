@@ -46,14 +46,17 @@ export function TapeCard({ children }: { children: ReactNode }) {
   );
 }
 
-export function Row({ label, value, strong, tone }: { label: string; value: string; strong?: boolean; tone?: 'bad' | 'good' }) {
-  return (
+export function Row({ label, value, strong, tone, onPress }: { label: string; value: string; strong?: boolean; tone?: 'bad' | 'good'; onPress?: () => void }) {
+  const body = (
     <View style={[{ flexDirection: 'row', alignItems: 'baseline', gap: S.sm }, strong && { borderTopWidth: 2, borderTopColor: C.ink, paddingTop: S.sm, marginTop: S.xs }]}>
       <T bold={strong}>{label}</T>
       <View style={{ flex: 1, borderBottomWidth: strong ? 0 : 2, borderBottomColor: C.line, borderStyle: 'dotted', transform: [{ translateY: -3 }] }} />
       <T bold tone={tone}>{value}</T>
+      {onPress ? <T bold tone="ink3">›</T> : null}
     </View>
   );
+  // a tappable row opens the details behind the number
+  return onPress ? <Pressable accessibilityRole="button" accessibilityLabel={`${label} ${value}, see the transactions behind it`} onPress={onPress} style={{ minHeight: 32, justifyContent: 'center' }}>{body}</Pressable> : body;
 }
 
 export function Button({ label, onPress, kind = 'solid', disabled, small, style }: { label: string; onPress?: () => void; kind?: 'solid' | 'outline' | 'ghost'; disabled?: boolean; small?: boolean; style?: StyleProp<ViewStyle> }) {
