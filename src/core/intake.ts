@@ -123,7 +123,7 @@ export function analyseReceipt(r: ReceiptRecord, a: Answers, today: string, same
     const extra = (r.charges ?? []).reduce((t, x) => t + x.cents, 0);
     const expected = items + (r.taxCents ?? 0) + (r.tipCents ?? 0) + extra - Math.abs(r.discountCents ?? 0) - other;
     if (Math.abs(expected - total) > 1) {
-      problems.push({ id: 'sum', text: `Items ${usd(items)}${r.taxCents ? ` plus tax ${usd(r.taxCents)}` : ''}${r.tipCents ? ` plus tip ${usd(r.tipCents)}` : ''}${(r.charges ?? []).map((x) => ` plus ${x.label} ${usd(x.cents)}`).join('')}${r.discountCents ? ` minus discount ${usd(Math.abs(r.discountCents))}` : ''}${other ? ` minus ${usd(other)} paid with ${r.paidOtherLabel ?? 'points or credit'}` : ''} come to ${usd(expected)}, but the total is ${usd(total)} (difference ${usd(total - expected)}). A line may be missing or misread, or the total may include something else.${Math.abs(total - expected) % 100 === 0 ? ` A gap of exactly ${usd(Math.abs(total - expected))} is typical of one digit misread in one price (24.99 read as 7.99, for example): compare the prices with the image.` : ''}` });
+      problems.push({ id: 'sum', text: `Items ${usd(items)}${r.taxCents ? ` plus tax ${usd(r.taxCents)}` : ''}${r.tipCents ? ` plus tip ${usd(r.tipCents)}` : ''}${(r.charges ?? []).map((x) => ` plus ${x.label} ${usd(x.cents)}`).join('')}${r.discountCents ? ` minus discount ${usd(Math.abs(r.discountCents))}` : ''}${other ? ` minus ${usd(other)} paid with ${r.paidOtherLabel ?? 'points or credit'}` : ''} come to ${usd(expected)}, but the total is ${usd(total)} (difference ${usd(total - expected)}). A line may be missing or misread, or the total may include something else.${Math.abs(total - expected) % 100 === 0 ? ` A gap of exactly ${usd(Math.abs(total - expected))} is typical of one digit misread in one price (24.99 read as 7.99, for example): compare the prices with the image.` : ''}${other ? ' The amount subtracted for points or credit is the likely culprit if it was really your card payment: set “Paid with points, gift card or credit” to 0 under Check or edit details, then press Apply and re-check.' : ''}` });
     }
     if (r.subtotalCents != null && Math.abs(items - r.subtotalCents) > 1) {
       problems.push({ id: 'subtotal', text: `The items add up to ${usd(items)} but the printed subtotal is ${usd(r.subtotalCents)}. A line may be missing or misread.` });
@@ -507,16 +507,27 @@ export interface ReadReceipt {
   items?: { item: string; price: number; qty?: number; unit_price?: number; code?: string; discount?: number }[];
 }
 
+/** A card or wallet payment ("Walmart Pay account 9780", "Visa ending 1234") is how the receipt was paid, not points, a gift card or store credit. */
+const CARD_TENDER = /walmart pay|apple pay|google pay|samsung pay|paypal|visa|master\s?card|\bmc\b|amex|american express|discover|debit|credit card|\bcard\b|account\s*#?\s*\d{4}|ending\s*\d{4}|\*{2,}\s*\d{4}/i;
+const OTHER_TENDER = /point|reward|gift|store credit|certificate|voucher|coupon|loyalty|balance|promo/i;
+export const looksLikeCardPayment = (label?: string) => !!label && CARD_TENDER.test(label) && !OTHER_TENDER.test(label);
+
 export function receiptFromRead(o: ReadReceipt, meta: { fileName: string; sha256?: string }): ReceiptRecord {
+  // The reader sometimes files the card payment itself as "paid with points or credit". Subtracting it would make every receipt look short,
+  // so a payment that names a card or wallet, or that equals the whole total, is the card payment: it is kept as the payment method and not subtracted.
+  const otherCents = typeof o.paid_other === 'number' && o.paid_other ? Math.abs(c(o.paid_other)!) : 0;
+  const misfiled = otherCents > 0 && (looksLikeCardPayment(o.paid_other_label) || (c(o.total) != null && c(o.total)! > 0 && Math.abs(otherCents - c(o.total)!) <= 1));
+  const misfiledNote = misfiled ? `A payment of ${usd(otherCents)}${s(o.paid_other_label) ? ` (${s(o.paid_other_label)})` : ''} was read as paid with points or credit. It looks like the card payment itself, so it was not subtracted from the items. If part of this receipt was really paid with points or a gift card, enter that amount under Check or edit details.` : null;
   return {
     kind: o.kind === 'order_confirmation' || o.kind === 'order_history' ? o.kind : 'store_receipt',
     merchant: s(o.merchant), date: isIsoDate(o.date) ? o.date : (s(o.date) ? parseDateISO(o.date!) ?? undefined : undefined), time: s(o.time),
     totalCents: c(o.total), subtotalCents: c(o.subtotal), taxCents: c(o.tax), tipCents: c(o.tip), discountCents: c(o.discount),
     ...(Array.isArray(o.charges) ? (() => { const cs = o.charges.filter((x) => s(x?.label) && typeof x.amount === 'number' && x.amount).map((x) => ({ label: x.label!.trim(), cents: Math.abs(c(x.amount)!), ...(typeof x.rate === 'number' && x.rate > 0 ? { rate: x.rate } : {}), ...(s(x.type) ? { type: x.type!.trim().toLowerCase() } : {}) })); return cs.length ? { charges: cs } : {}; })() : {}),
     ...(typeof o.item_count === 'number' && Number.isInteger(o.item_count) && o.item_count > 0 ? { itemCount: o.item_count } : {}),
-    ...(typeof o.paid_other === 'number' && o.paid_other ? { paidOtherCents: Math.abs(c(o.paid_other)!), paidOtherLabel: s(o.paid_other_label) } : {}),
+    ...(otherCents && !misfiled ? { paidOtherCents: otherCents, paidOtherLabel: s(o.paid_other_label) } : {}),
+    ...(misfiledNote ? { corrections: [misfiledNote] } : {}),
     ...(typeof o.refund?.total === 'number' && o.refund.total ? { refundCents: Math.abs(c(o.refund.total)!), refundedLines: (o.refund.items ?? []).filter((i) => s(i.item) && typeof i.price === 'number').map((i) => ({ item: i.item!.trim(), cents: Math.abs(c(i.price)!) })) } : {}),
-    currency: s(o.currency) ?? 'USD', paymentMethod: s(o.payment_method), cardLast4: s(o.card_last4)?.replace(/\D/g, '').slice(-4) || undefined,
+    currency: s(o.currency) ?? 'USD', paymentMethod: s(o.payment_method) ?? (misfiled ? s(o.paid_other_label) : undefined), cardLast4: s(o.card_last4)?.replace(/\D/g, '').slice(-4) || undefined,
     storeAddress: s(o.store_address), storeRef: s(o.store_ref), orderRef: s(o.order_ref),
     lines: (o.items ?? []).filter((i) => s(i.item) && typeof i.price === 'number').map((i) => ({
       item: i.item.trim(), cents: c(i.price)!, qty: i.qty, unitCents: c(i.unit_price), code: s(i.code), discountCents: c(i.discount),
