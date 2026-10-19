@@ -87,6 +87,7 @@ function Body({ t, ev, loading }: { t: Txn; ev: Evidence | null; loading: boolea
           <Field label="Subtotal" value={cents(r.subtotalCents)} />
           <Field label="Tax" value={cents(r.taxCents)} />
           <Field label="Tip" value={cents(r.tipCents)} />
+          {r.charges.map((x, i) => <Field key={`c${i}`} label={i === 0 ? 'Extra charges' : ''} value={`${x.label}${x.rate ? ` (${x.rate}%)` : ''}  ${cents(x.cents)}`} />)}
           <Field label="Discount" value={cents(r.discountCents)} />
           <Field label="Paid with" value={[r.paymentMethod, r.cardLast4 ? `ending ${r.cardLast4}` : ''].filter(Boolean).join(' ')} />
           <Field label="Store" value={[r.storeAddress, r.storeRef].filter(Boolean).join(', ')} />

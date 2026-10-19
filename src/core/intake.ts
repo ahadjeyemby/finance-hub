@@ -10,7 +10,7 @@ import { classifyRow, makeId, pairTransfers } from './classify';
 import { findTwins } from './dedupe';
 import type { Sameness, Twin } from './dedupe';
 import { matchReceipt } from './evidence';
-import type { RawRecord, ReceiptLine, ReceiptRecord, StatementRecord } from './evidence';
+import type { MatchOptions, RawRecord, ReceiptCharge, ReceiptLine, ReceiptRecord, StatementRecord } from './evidence';
 import { parseLines } from './questions';
 import type { Account, AccountType, Txn } from './types';
 
@@ -27,6 +27,8 @@ export interface Gap {
   options?: { value: string; label: string }[];
   /** true when "this is not printed on the document" is an acceptable answer */
   canSkip: boolean;
+  /** answers worth offering with one tap, learned from what the person confirmed before */
+  suggest?: { value: string; label: string }[];
 }
 export interface Problem { id: string; text: string; /** button text for "go ahead anyway"; default is for numbers that disagree */ confirm?: string }
 export interface Analysis {
@@ -75,6 +77,9 @@ const CARD_WORDS = /visa|master|amex|american express|discover|credit|debit|card
 // Receipts
 // ======================================================================
 
+/** Sales tax is only worth asking about when the items fall short of the total. Fuel and other tax-inclusive sales print no tax line and the items already equal the total. */
+const taxCouldExplainGap = (r: ReceiptRecord) => typeof r.totalCents === 'number' && Math.abs(r.lines.reduce((t, l) => t + l.cents, 0) + (r.charges ?? []).reduce((t, x) => t + x.cents, 0) - r.totalCents) > 1;
+
 /** `same`: what the caller found when it looked for this purchase among stored receipts (see dedupe.findSameReceipt). */
 export function analyseReceipt(r: ReceiptRecord, a: Answers, today: string, same?: Sameness | null): Analysis {
   const gaps: Gap[] = [];
@@ -89,10 +94,10 @@ export function analyseReceipt(r: ReceiptRecord, a: Answers, today: string, same
   ask({ id: 'lines', field: 'lines', label: 'Items', question: 'What did you buy? One per line as "item price", for example "milk 4.50".', input: 'items', canSkip: true }, r.lines.length === 0);
 
   // recommended: kept for evidence and matching, so asked once; "not printed" is a fine answer
-  ask({ id: 'time', field: 'time', label: 'Time', question: 'What time is printed?', input: 'text', canSkip: true }, blank(r.time));
+  // the time is kept when printed and used to tell same-day repeat purchases apart, but a receipt without one is never questioned: the date is what matters
   ask({ id: 'paymentMethod', field: 'paymentMethod', label: 'Paid with', question: 'How was it paid (cash, Visa, Mastercard, gift card...)?', input: 'text', canSkip: true }, blank(r.paymentMethod));
   ask({ id: 'cardLast4', field: 'cardLast4', label: 'Card last 4', question: 'Last 4 digits of the card, as printed?', input: 'last4', canSkip: true }, !blank(r.paymentMethod) && CARD_WORDS.test(r.paymentMethod!) && blank(r.cardLast4));
-  ask({ id: 'tax', field: 'tax', label: 'Sales tax', question: 'How much sales tax is printed? Enter 0 if none.', input: 'money', canSkip: true }, r.lines.length > 0 && r.taxCents == null);
+  ask({ id: 'tax', field: 'tax', label: 'Sales tax', question: 'How much sales tax is printed? Enter 0 if none.', input: 'money', canSkip: true }, r.lines.length > 0 && r.taxCents == null && taxCouldExplainGap(r));
   ask({ id: 'storeAddress', field: 'storeAddress', label: 'Store address', question: 'What store address or location is printed?', input: 'text', canSkip: true }, blank(r.storeAddress) && r.kind !== 'order_confirmation');
   ask({ id: 'orderRef', field: 'orderRef', label: 'Order number', question: 'What is the order number?', input: 'text', canSkip: true }, r.kind === 'order_confirmation' && blank(r.orderRef));
 
@@ -102,18 +107,37 @@ export function analyseReceipt(r: ReceiptRecord, a: Answers, today: string, same
     else ask({ id: 'dup', field: 'dup', label: 'Same purchase?', question: `This looks like ${what}: ${same.why}. Is it the same purchase?`, input: 'choice', options: [{ value: 'extra', label: 'Same purchase, keep as an extra document' }, { value: 'different', label: 'A different purchase' }], canSkip: false }, true);
   }
 
+  // the printed count is the cheapest way to catch an item printed over two rows and read as two
+  if (r.itemCount && r.lines.length) {
+    const units = r.lines.reduce((t, l) => t + (l.qty && l.qty > 0 ? l.qty : 1), 0);
+    if (r.lines.length !== r.itemCount && units !== r.itemCount) problems.push({ id: 'count', text: `The receipt prints ${r.itemCount} item${r.itemCount > 1 ? 's' : ''} sold, but ${r.lines.length} line${r.lines.length > 1 ? 's were' : ' was'} read. An item printed over two rows may have been read as two, or a line is missing. Fix the items under Check or edit details, or keep as printed.` });
+  }
+
   if (r.cardLast4 && !/^\d{4}$/.test(r.cardLast4)) problems.push({ id: 'last4', text: `Card digits "${r.cardLast4}" are not four digits. Correct them, or keep as printed.` });
 
   const total = r.totalCents ?? 0;
   if (r.lines.length && total > 0) {
     const items = r.lines.reduce((s, l) => s + l.cents, 0);
-    const expected = items + (r.taxCents ?? 0) + (r.tipCents ?? 0) - Math.abs(r.discountCents ?? 0);
+    const other = Math.abs(r.paidOtherCents ?? 0);
+    const extra = (r.charges ?? []).reduce((t, x) => t + x.cents, 0);
+    const expected = items + (r.taxCents ?? 0) + (r.tipCents ?? 0) + extra - Math.abs(r.discountCents ?? 0) - other;
     if (Math.abs(expected - total) > 1) {
-      problems.push({ id: 'sum', text: `Items ${usd(items)}${r.taxCents ? ` plus tax ${usd(r.taxCents)}` : ''}${r.tipCents ? ` plus tip ${usd(r.tipCents)}` : ''}${r.discountCents ? ` minus discount ${usd(Math.abs(r.discountCents))}` : ''} come to ${usd(expected)}, but the total is ${usd(total)} (difference ${usd(total - expected)}). A line may be missing or misread, or the total may include something else.` });
+      problems.push({ id: 'sum', text: `Items ${usd(items)}${r.taxCents ? ` plus tax ${usd(r.taxCents)}` : ''}${r.tipCents ? ` plus tip ${usd(r.tipCents)}` : ''}${(r.charges ?? []).map((x) => ` plus ${x.label} ${usd(x.cents)}`).join('')}${r.discountCents ? ` minus discount ${usd(Math.abs(r.discountCents))}` : ''}${other ? ` minus ${usd(other)} paid with ${r.paidOtherLabel ?? 'points or credit'}` : ''} come to ${usd(expected)}, but the total is ${usd(total)} (difference ${usd(total - expected)}). A line may be missing or misread, or the total may include something else.${Math.abs(total - expected) % 100 === 0 ? ` A gap of exactly ${usd(Math.abs(total - expected))} is typical of one digit misread in one price (24.99 read as 7.99, for example): compare the prices with the image.` : ''}` });
     }
     if (r.subtotalCents != null && Math.abs(items - r.subtotalCents) > 1) {
       problems.push({ id: 'subtotal', text: `The items add up to ${usd(items)} but the printed subtotal is ${usd(r.subtotalCents)}. A line may be missing or misread.` });
     }
+  }
+  for (const n of r.corrections ?? []) notes.push(n);
+  if (r.paidOtherCents) notes.push(`${usd(Math.abs(r.paidOtherCents))} of this order was paid with ${r.paidOtherLabel ?? 'points or credit'}, so the card was charged ${r.totalCents != null ? usd(r.totalCents) : 'less than the order total'}. The items are kept as evidence and are not split across the card charge.`);
+  if (r.refundCents) {
+    const back = (r.refundedLines ?? []).reduce((t, l) => t + l.cents, 0);
+    const tax = r.taxCents ?? 0;
+    // a refund covers the returned items and the tax paid on them, so it sits between the two
+    if (r.refundedLines?.length && (r.refundCents < back - 1 || r.refundCents > back + tax + 1)) problems.push({ id: 'refund', text: `The refund total is ${usd(r.refundCents)}, but the returned items come to ${usd(back)}${tax ? ` and the tax on the whole order is ${usd(tax)}` : ''}, so a refund should be between ${usd(back)} and ${usd(back + tax)}. A returned item may be missing or misread.` });
+    else if (!r.refundedLines?.length) notes.push(`A refund of ${usd(r.refundCents)} is shown, but no returned items were read. Add them under Items if you want them recorded.`);
+    const kept = r.lines.reduce((t, l) => t + l.cents, 0) - back;
+    notes.push(`A refund of ${usd(r.refundCents)} was issued${r.refundedLines?.length ? ` for ${r.refundedLines.map((l) => l.item.slice(0, 40)).join(', ')}` : ''}. The receipt does not say whether it went back to the card, to points, or both. ${r.refundedLines?.length ? `The items kept come to ${usd(kept)} before tax. ` : ''}Nothing in your ledger is changed by the refund line: a credit on the card shows up from the statement as a refund.`);
   }
   if (isIsoDate(r.date) && r.date > today) problems.push({ id: 'future', text: `The date ${r.date} is in the future.` });
   if (isIsoDate(r.date) && r.date < `${Number(today.slice(0, 4)) - 3}${today.slice(4)}`) problems.push({ id: 'old', text: `The date ${r.date} is more than three years ago. Check the year.` });
@@ -134,6 +158,16 @@ export function setReceiptField(r: ReceiptRecord, field: string, text: string): 
     case 'subtotal': return money('subtotalCents');
     case 'tax': return money('taxCents');
     case 'tip': return money('tipCents');
+    case 'paidOther': { const c = parseMoneyCents(t || '0'); return c == null ? { record: r, error: 'Enter an amount like 20.24, or 0 for none.' } : { record: { ...r, paidOtherCents: Math.abs(c) || undefined } }; }
+    case 'refundTotal': { const c = parseMoneyCents(t || '0'); return c == null ? { record: r, error: 'Enter an amount like 19.38, or 0 for none.' } : { record: { ...r, refundCents: Math.abs(c) || undefined } }; }
+    case 'charges': {
+      if (!t) return { record: { ...r, charges: undefined } };
+      const p = parseLines(t);
+      if (p.bad.length) return { record: r, error: `Could not read: ${p.bad.join(', ')}. Use "label amount", one per line, for example "Service charge 0.96".` };
+      // keep the percentage and type the reader found for any charge the person left unchanged
+      const charges: ReceiptCharge[] = p.lines.map((l) => { const cents = Math.round(l.amount * 100); return r.charges?.find((x) => x.label === l.item && x.cents === cents) ?? { label: l.item, cents }; });
+      return { record: { ...r, charges } };
+    }
     case 'paymentMethod': return { record: { ...r, paymentMethod: t } };
     case 'cardLast4': return /^\d{4}$/.test(t) ? { record: { ...r, cardLast4: t } } : { record: r, error: 'Four digits.' };
     case 'storeAddress': return { record: { ...r, storeAddress: t } };
@@ -154,7 +188,7 @@ export function setReceiptField(r: ReceiptRecord, field: string, text: string): 
 export const linesToText = (lines: ReceiptLine[]) => lines.map((l) => `${l.item} ${(l.cents / 100).toFixed(2)}`).join('\n');
 
 /** how a receipt relates to the ledger: one charge, several, or none */
-export function linkReceipt(r: ReceiptRecord, txns: Txn[]) { return matchReceipt(r, txns); }
+export function linkReceipt(r: ReceiptRecord, txns: Txn[], opts?: MatchOptions) { return matchReceipt(r, txns, 4, opts); }
 
 // ======================================================================
 // Statements
@@ -193,6 +227,12 @@ export interface StatementDraft {
   rewards?: RewardsInfo;
   /** the reader stopped before the end (output limit) */
   truncated?: boolean;
+  /** the model that read the file */
+  readBy?: string;
+  /** what reading the statement twice changed or found: shown as notes on the review card */
+  corrections?: string[];
+  /** rows whose amount came out differently on a second reading, with that other amount: the first places to look when the balance is off */
+  checkRows?: { index: number; otherCents: number }[];
   /** everything else the reader returned */
   raw?: Record<string, unknown>;
 }
@@ -289,6 +329,7 @@ export function analyseStatement(d: StatementDraft, ctx: StatementContext, a: An
     ask({ id: `row.${i}.cents`, field: `row.${i}.cents`, label: `Row ${n} amount`, question: `Row ${n}${row.description ? ` (${row.description})` : ''}: what is the amount? Money going out is negative.`, input: 'money', canSkip: false }, !Number.isInteger(row.cents));
   });
 
+  for (const n of d.corrections ?? []) notes.push(n);
   if (d.truncated) problems.push({ id: 'truncated', text: 'The reader stopped before the end of the statement, so rows at the end are probably missing.' });
 
   const rowsOk = d.rows.every((r) => Number.isInteger(r.cents));
@@ -305,6 +346,8 @@ export function analyseStatement(d: StatementDraft, ctx: StatementContext, a: An
         if (Math.abs(2 * e) === Math.abs(diff) && Math.sign(e) !== Math.sign(diff)) hints.push(`${what} may have the wrong sign`);
         else if (Math.abs(e) === Math.abs(diff)) hints.push(Math.sign(e) === Math.sign(diff) ? `a second charge like ${what} may be missing` : `${what} may be a duplicate or not on this statement`);
       });
+      // the file was read twice and these rows came out differently: that is where to look first
+      if (d.checkRows?.length) hints.unshift(d.checkRows.slice(0, 3).map((c) => `row ${c.index + 1} (${d.rows[c.index]?.description ?? ''}) was read as ${usd(Math.abs(d.rows[c.index]?.cents ?? 0))} and again as ${usd(Math.abs(c.otherCents))}, so check it against the PDF first`).join('; '));
       // no single row explains it: look for a small group that does, typically a points or rewards table read as charges
       // a block at the end is a strong clue; a scattered group is only offered when something looks like rewards, because among 50 ordinary rows some group of four adds up to almost any small gap by chance
       const rewardsLike = d.rows.some((r) => REWARDS_SECTION.test(r.section ?? '') || /reward|points|cash ?back|redeem/i.test(r.description ?? ''));
@@ -451,6 +494,15 @@ const s = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefi
 export interface ReadReceipt {
   merchant?: string; store_address?: string; store_ref?: string; order_ref?: string; date?: string; time?: string; subtotal?: number; tax?: number; tip?: number; discount?: number; total?: number;
   payment_method?: string; card_last4?: string; currency?: string; kind?: string; other_text?: string; unreadable?: string;
+  /** part of the order paid with points, a gift card or store credit, dollars, positive */
+  paid_other?: number; paid_other_label?: string;
+  /** extra charges besides tax and tip: service charge, delivery or bag fee, surcharge, automatic gratuity */
+  charges?: { label?: string; amount?: number; rate?: number; type?: string }[];
+  /** the item count the receipt prints, e.g. "SOLD ITEM COUNT = 7" */
+  item_count?: number;
+  /** which model read the file, as the edge function reports it */
+  read_by?: string;
+  refund?: { total?: number; items?: { item?: string; price?: number }[] };
   items?: { item: string; price: number; qty?: number; unit_price?: number; code?: string; discount?: number }[];
 }
 
@@ -459,12 +511,16 @@ export function receiptFromRead(o: ReadReceipt, meta: { fileName: string; sha256
     kind: o.kind === 'order_confirmation' || o.kind === 'order_history' ? o.kind : 'store_receipt',
     merchant: s(o.merchant), date: isIsoDate(o.date) ? o.date : (s(o.date) ? parseDateISO(o.date!) ?? undefined : undefined), time: s(o.time),
     totalCents: c(o.total), subtotalCents: c(o.subtotal), taxCents: c(o.tax), tipCents: c(o.tip), discountCents: c(o.discount),
+    ...(Array.isArray(o.charges) ? (() => { const cs = o.charges.filter((x) => s(x?.label) && typeof x.amount === 'number' && x.amount).map((x) => ({ label: x.label!.trim(), cents: Math.abs(c(x.amount)!), ...(typeof x.rate === 'number' && x.rate > 0 ? { rate: x.rate } : {}), ...(s(x.type) ? { type: x.type!.trim().toLowerCase() } : {}) })); return cs.length ? { charges: cs } : {}; })() : {}),
+    ...(typeof o.item_count === 'number' && Number.isInteger(o.item_count) && o.item_count > 0 ? { itemCount: o.item_count } : {}),
+    ...(typeof o.paid_other === 'number' && o.paid_other ? { paidOtherCents: Math.abs(c(o.paid_other)!), paidOtherLabel: s(o.paid_other_label) } : {}),
+    ...(typeof o.refund?.total === 'number' && o.refund.total ? { refundCents: Math.abs(c(o.refund.total)!), refundedLines: (o.refund.items ?? []).filter((i) => s(i.item) && typeof i.price === 'number').map((i) => ({ item: i.item!.trim(), cents: Math.abs(c(i.price)!) })) } : {}),
     currency: s(o.currency) ?? 'USD', paymentMethod: s(o.payment_method), cardLast4: s(o.card_last4)?.replace(/\D/g, '').slice(-4) || undefined,
     storeAddress: s(o.store_address), storeRef: s(o.store_ref), orderRef: s(o.order_ref),
     lines: (o.items ?? []).filter((i) => s(i.item) && typeof i.price === 'number').map((i) => ({
       item: i.item.trim(), cents: c(i.price)!, qty: i.qty, unitCents: c(i.unit_price), code: s(i.code), discountCents: c(i.discount),
     })),
-    sourceFile: meta.fileName, sha256: meta.sha256, origin: 'app_upload', capturedAt: new Date().toISOString(),
+    sourceFile: meta.fileName, sha256: meta.sha256, origin: 'app_upload', capturedAt: new Date().toISOString(), readBy: s(o.read_by),
     raw: { reader: o, ...(o.other_text ? { otherText: o.other_text } : {}) },
   };
 }
@@ -478,6 +534,7 @@ export interface ReadStatement {
   /** points or cash-back tables: kept apart from rows */
   rewards?: { summary?: { label?: string; points?: number }[]; points_available?: number; activity?: { date?: string; description?: string; amount?: number; points?: number; type?: string }[] };
   truncated?: boolean;
+  read_by?: string;
 }
 
 const REWARDS_SECTION = /redemption|points|rewards/i;
@@ -508,7 +565,10 @@ function splitRewards(o: ReadStatement, rows: StatementRow[]): { rows: Statement
 
 export function statementFromRead(o: ReadStatement): StatementDraft {
   const t = (o.account_type ?? '').toLowerCase();
-  const split = splitRewards(o, (o.rows ?? []).map((r) => ({
+  // lines printed as $0.00 ("Interest charged on purchases 0.00") move no money: they are kept with the statement, not added as transactions
+  const isZero = (r: { amount?: number }) => typeof r.amount === 'number' && r.amount === 0;
+  const zero = (o.rows ?? []).filter(isZero);
+  const split = splitRewards(o, (o.rows ?? []).filter((r) => !isZero(r)).map((r) => ({
     date: isIsoDate(r.date) ? r.date : undefined, description: s(r.description),
     cents: typeof r.amount === 'number' && Number.isFinite(r.amount) ? Math.round(Math.abs(r.amount) * 100) * (r.flow === 'in' ? 1 : -1) : undefined,
     section: s(r.section),
@@ -521,9 +581,175 @@ export function statementFromRead(o: ReadStatement): StatementDraft {
     openingCents: c(o.opening_balance), closingCents: c(o.closing_balance),
     rows: split.rows, ...(split.rewards ? { rewards: split.rewards } : {}),
     totals: o.totals ? Object.fromEntries(Object.entries(o.totals).filter(([, v]) => typeof v === 'number').map(([k, v]) => [k, Math.round(v * 100)])) : undefined,
-    terms: o.terms, pages: typeof o.pages === 'number' ? o.pages : undefined, truncated: !!o.truncated,
-    raw: { reader: o, ...(o.other_text ? { otherText: o.other_text } : {}) },
+    terms: o.terms, pages: typeof o.pages === 'number' ? o.pages : undefined, truncated: !!o.truncated, readBy: s(o.read_by),
+    raw: { reader: o, ...(o.other_text ? { otherText: o.other_text } : {}), ...(zero.length ? { zeroAmountLines: zero.map((r) => ({ date: r.date, description: r.description, section: r.section })) } : {}) },
+    ...(zero.length ? { corrections: [`${zero.length} line${zero.length > 1 ? 's' : ''} printed as $0.00 (${[...new Set(zero.map((r) => r.description ?? 'no description'))].slice(0, 4).join('; ')}) ${zero.length > 1 ? 'are' : 'is'} kept with the statement and not added as transactions.`] } : {}),
   };
+}
+
+// ======================================================================
+// Reading a statement twice
+// ======================================================================
+
+/** printed balance minus the balance the rows give, in cents. null when the draft cannot be checked yet. 0 = adds up. */
+export function statementGap(d: StatementDraft, rows: StatementRow[] = d.rows): number | null {
+  if (d.openingCents == null || d.closingCents == null || !d.accountType || !rows.length || !rows.every((r) => Number.isInteger(r.cents))) return null;
+  const sum = rows.reduce((t, r) => t + (r.cents as number), 0);
+  return d.closingCents - (d.accountType === 'credit' ? d.openingCents - sum : d.openingCents + sum);
+}
+
+const textKey = (t?: string) => (t ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** Rows that carry the same date and description in both readings but a different amount. Identical rows are paired first, so two lines with one description are not mixed up. */
+function rowsReadDifferently(a: StatementRow[], b: StatementRow[]): { index: number; otherCents: number }[] {
+  const left = new Set(a.map((_, i) => i)); const right = new Set(b.map((_, i) => i));
+  const pair = (withCents: boolean) => {
+    for (const i of [...left]) {
+      const j = [...right].find((k) => a[i].date === b[k].date && textKey(a[i].description) === textKey(b[k].description) && (!withCents || a[i].cents === b[k].cents));
+      if (j != null) { left.delete(i); right.delete(j); if (!withCents && Number.isInteger(b[j].cents) && a[i].cents !== b[j].cents) diffs.push({ index: i, otherCents: b[j].cents as number }); }
+    }
+  };
+  const diffs: { index: number; otherCents: number }[] = [];
+  pair(true); pair(false);
+  return diffs.sort((x, y) => x.index - y.index);
+}
+
+/**
+ * The same file read a second time, after the first reading failed the balance check. A misread digit is the usual cause and it rarely repeats,
+ * so the printed balance can pick the right reading: a second reading that adds up is kept, and so is a first reading with the one or two
+ * amounts replaced that make it add up. Anything else keeps the first reading and records which rows came out differently.
+ */
+export function settleReads(first: StatementDraft, second: StatementDraft): StatementDraft {
+  if (statementGap(second) === 0) return { ...second, corrections: ['The first reading of this file did not add up to the printed balance. A second reading did, so that one is kept.'] };
+  const gap = statementGap(first);
+  if (gap == null || gap === 0) return first;
+  const diffs = rowsReadDifferently(first.rows, second.rows);
+  if (!diffs.length) return first;
+  const swapped = (pick: number[]) => first.rows.map((r, i) => { const d = diffs.find((x) => x.index === i); return d && pick.includes(i) ? { ...r, cents: d.otherCents } : r; });
+  const fixes: number[][] = [];
+  const small = diffs.slice(0, 12);
+  for (let i = 0; i < small.length; i++) {
+    if (statementGap(first, swapped([small[i].index])) === 0) fixes.push([small[i].index]);
+    for (let j = i + 1; j < small.length; j++) if (statementGap(first, swapped([small[i].index, small[j].index])) === 0) fixes.push([small[i].index, small[j].index]);
+  }
+  const singles = fixes.filter((f) => f.length === 1);
+  const chosen = singles.length === 1 ? singles[0] : singles.length === 0 && fixes.length === 1 ? fixes[0] : null;
+  if (chosen) {
+    const rows = swapped(chosen);
+    const notes = chosen.map((i) => `Row ${i + 1} (${first.rows[i].description ?? ''}) was read as ${usd(Math.abs(first.rows[i].cents as number))} the first time and ${usd(Math.abs(rows[i].cents as number))} the second time. ${usd(Math.abs(rows[i].cents as number))} makes the statement add up to its printed balance, so that is what is kept. Check it against the PDF if you want to be sure.`);
+    return { ...first, rows, corrections: notes };
+  }
+  return { ...first, checkRows: diffs };
+}
+
+// ======================================================================
+// Reading a receipt twice
+// ======================================================================
+
+const AMOUNT_CHECKS = new Set(['sum', 'subtotal', 'count']);
+/** The checks that compare printed amounts with each other (items against the subtotal, the total and the printed item count). 0 = they all agree or cannot be checked. */
+export const receiptMisfits = (r: ReceiptRecord): number => analyseReceipt(r, noAnswers(), '2100-01-01').problems.filter((p) => AMOUNT_CHECKS.has(p.id)).length;
+
+/**
+ * A receipt read a second time after the first reading failed its own checks. The printed subtotal, total and item count choose between the two
+ * readings: one that agrees with them replaces one that does not. If neither agrees, the first stays and nothing is guessed.
+ */
+export function settleReceiptReads(first: ReceiptRecord, second: ReceiptRecord): ReceiptRecord {
+  const a = receiptMisfits(first); const b = receiptMisfits(second);
+  if (a === 0 || b >= a) return first;
+  const who = second.readBy ? ` (${second.readBy})` : '';
+  return { ...second, corrections: [b === 0 ? `The first reading of this receipt did not add up to its printed subtotal, total or item count. A second reading${who} did, so that one is kept. Check the prices against the image if you want to be sure.` : `The first reading of this receipt disagreed with its printed amounts in ${a} places. A second reading${who} disagrees in ${b}, so that one is kept, but it still does not add up.`] };
+}
+
+export interface ReceiptDiff {
+  /** what the new reading changes, in plain words. Empty when it says the same thing. */
+  lines: string[];
+  /** how many of the amount checks (items vs subtotal, total, item count) disagree with the printed figures, before and after */
+  before: number; after: number;
+}
+
+/** Compare the receipt on screen with a new reading of the same file. Items are paired by what they say, then by price, so a different spelling of one line is not reported as a change. */
+const chargesText = (r: ReceiptRecord) => ((r.charges ?? []).map((x) => `${x.label} ${usd(x.cents)}`).join(', ') || 'none');
+
+export function diffReceipts(a: ReceiptRecord, b: ReceiptRecord): ReceiptDiff {
+  const lines: string[] = [];
+  const m = (v?: number) => (v == null ? 'missing' : usd(v));
+  const head: [string, string, string][] = [['Store', a.merchant ?? 'missing', b.merchant ?? 'missing'], ['Date', a.date ?? 'missing', b.date ?? 'missing'], ['Total paid', m(a.totalCents), m(b.totalCents)], ['Subtotal', m(a.subtotalCents), m(b.subtotalCents)],
+    ['Sales tax', m(a.taxCents), m(b.taxCents)], ['Tip', m(a.tipCents), m(b.tipCents)], ['Extra charges', chargesText(a), chargesText(b)], ['Paid with points or credit', m(a.paidOtherCents), m(b.paidOtherCents)], ['Refund', m(a.refundCents), m(b.refundCents)], ['Items read', String(a.lines.length), String(b.lines.length)]];
+  for (const [label, x, y] of head) if (x !== y) lines.push(`${label}: ${x} → ${y}`);
+  const left = new Set(a.lines.map((_, i) => i)); const right = new Set(b.lines.map((_, i) => i));
+  const pair = (match: (x: ReceiptRecord['lines'][number], y: ReceiptRecord['lines'][number]) => boolean, onPair?: (i: number, j: number) => void) => {
+    for (const i of [...left]) { const j = [...right].find((k) => match(a.lines[i], b.lines[k])); if (j != null) { left.delete(i); right.delete(j); onPair?.(i, j); } }
+  };
+  // lines that say much the same thing (the same words, or one respelled by the reader) are the same item: only a different price is a change
+  const bigWords = (t: string) => t.toUpperCase().split(/[^A-Z0-9]+/).filter((w) => w.length >= 4);
+  const similar = (x: string, y: string) => textKey(x) === textKey(y) || bigWords(x).some((w) => bigWords(y).includes(w));
+  pair((x, y) => textKey(x.item) === textKey(y.item) && x.cents === y.cents);
+  pair((x, y) => similar(x.item, y.item) && x.cents === y.cents);
+  pair((x, y) => similar(x.item, y.item), (i, j) => lines.push(`${a.lines[i].item}: ${usd(a.lines[i].cents)} → ${usd(b.lines[j].cents)}`));
+  for (const i of [...left].slice(0, 10)) lines.push(`Not in the new reading: ${a.lines[i].item} ${usd(a.lines[i].cents)}`);
+  for (const j of [...right].slice(0, 10)) lines.push(`New reading adds: ${b.lines[j].item} ${usd(b.lines[j].cents)}`);
+  return { lines, before: receiptMisfits(a), after: receiptMisfits(b) };
+}
+
+/** The person chose the new reading of a receipt. Their earlier answer about a duplicate carries over; everything else is the new reading. */
+export function acceptReceiptReading(current: ReceiptRecord, next: ReceiptRecord): ReceiptRecord {
+  return { ...next, ...(current.dup ? { dup: current.dup } : {}), corrections: [...(next.corrections ?? []), `Read again at your request${next.readBy ? ` (${next.readBy})` : ''}. The new reading replaced the earlier one. Check it against the original.`] };
+}
+
+// ======================================================================
+// Telling the reader what looks wrong and reading again
+// ======================================================================
+
+/** The longest note a person can send with a re-read. */
+export const MAX_HINT = 600;
+
+const rowLine = (r: StatementRow) => `${r.date ?? 'no date'} | ${r.description ?? ''} | ${Number.isInteger(r.cents) ? `${usd(Math.abs(r.cents as number))} ${(r.cents as number) < 0 ? 'out' : 'in'}` : 'no amount'}`;
+
+/** The current reading as numbered text. It goes back to the reader with the person's note, so "row 7" in the note means the row they saw on screen. */
+export function readingAsText(d: StatementDraft): string {
+  const head = [`period ${d.periodFrom ?? '?'} to ${d.periodTo ?? '?'}`, `${d.accountType === 'credit' ? 'previous balance' : 'opening balance'} ${d.openingCents != null ? usd(d.openingCents) : '?'}`, `${d.accountType === 'credit' ? 'new balance' : 'closing balance'} ${d.closingCents != null ? usd(d.closingCents) : '?'}`];
+  return [head.join('; '), ...d.rows.map((r, i) => `${i + 1}. ${rowLine(r)}`)].join('\n');
+}
+
+export interface ReadingDiff {
+  /** what the new reading changes, in plain words. Empty when it says the same thing. */
+  lines: string[];
+  /** printed balance minus what the rows give, before and after. 0 = adds up, null = cannot be checked */
+  gapBefore: number | null; gapAfter: number | null;
+}
+
+/** Compare the reading on screen with a new one. Rows are paired by what they say, so a date that changed on every row is reported once, not twelve times. */
+export function diffReadings(a: StatementDraft, b: StatementDraft): ReadingDiff {
+  const lines: string[] = [];
+  const head: [string, unknown, unknown][] = [['Bank or issuer', a.institution, b.institution], ['Account last 4', a.last4, b.last4], ['Account type', a.accountType, b.accountType], ['Period start', a.periodFrom, b.periodFrom], ['Period end', a.periodTo, b.periodTo],
+    ['Opening / previous balance', a.openingCents != null ? usd(a.openingCents) : undefined, b.openingCents != null ? usd(b.openingCents) : undefined], ['Closing / new balance', a.closingCents != null ? usd(a.closingCents) : undefined, b.closingCents != null ? usd(b.closingCents) : undefined]];
+  for (const [label, x, y] of head) if (x !== y) lines.push(`${label}: ${x ?? 'missing'} → ${y ?? 'missing'}`);
+
+  const left = new Set(a.rows.map((_, i) => i)); const right = new Set(b.rows.map((_, i) => i));
+  const dateMoves: string[] = []; const amountMoves: string[] = [];
+  const pair = (match: (x: StatementRow, y: StatementRow) => boolean, onPair?: (i: number, j: number) => void) => {
+    for (const i of [...left]) {
+      const j = [...right].find((k) => match(a.rows[i], b.rows[k]));
+      if (j != null) { left.delete(i); right.delete(j); onPair?.(i, j); }
+    }
+  };
+  const same = (x: StatementRow, y: StatementRow) => textKey(x.description) === textKey(y.description);
+  pair((x, y) => x.date === y.date && same(x, y) && x.cents === y.cents);
+  pair((x, y) => same(x, y) && x.cents === y.cents, (i, j) => dateMoves.push(`row ${i + 1} (${a.rows[i].description ?? ''}) ${a.rows[i].date ?? 'no date'} → ${b.rows[j].date ?? 'no date'}`));
+  pair((x, y) => x.date === y.date && same(x, y), (i, j) => amountMoves.push(`Row ${i + 1} (${a.rows[i].description ?? ''}): ${Number.isInteger(a.rows[i].cents) ? usd(Math.abs(a.rows[i].cents as number)) : 'no amount'} → ${Number.isInteger(b.rows[j].cents) ? usd(Math.abs(b.rows[j].cents as number)) : 'no amount'}`));
+  if (dateMoves.length) lines.push(dateMoves.length <= 3 ? `Date changed on ${dateMoves.join('; ')}` : `Date changed on ${dateMoves.length} rows, for example ${dateMoves[0]}`);
+  lines.push(...amountMoves);
+  for (const i of [...left].slice(0, 8)) lines.push(`Row ${i + 1} (${rowLine(a.rows[i])}) is not in the new reading`);
+  for (const j of [...right].slice(0, 8)) lines.push(`New reading adds: ${rowLine(b.rows[j])}`);
+  if (left.size > 8 || right.size > 8) lines.push('More rows differ than are listed here.');
+  return { lines, gapBefore: statementGap(a), gapAfter: statementGap(b) };
+}
+
+/** The person chose the new reading: it replaces the old one, and the note they gave is kept on the statement and shown as a correction. */
+export function acceptReading(next: StatementDraft, hints: string[]): StatementDraft {
+  const note = `Read again at your request${hints.length ? ` (${hints.map((h) => `“${h}”`).join(', ')})` : ''}. The new reading is what the reader returned; check it against the PDF.`;
+  return { ...next, checkRows: undefined, corrections: [...(next.corrections ?? []), note], raw: { ...(next.raw ?? {}), ...(hints.length ? { readerNotes: hints } : {}) } };
 }
 
 // ======================================================================
@@ -541,6 +767,9 @@ export function receiptFieldText(r: ReceiptRecord, field: string): string {
     case 'subtotal': return m(r.subtotalCents);
     case 'tax': return m(r.taxCents);
     case 'tip': return m(r.tipCents);
+    case 'charges': return (r.charges ?? []).map((x) => `${x.label} ${(x.cents / 100).toFixed(2)}`).join('\n');
+    case 'paidOther': return m(r.paidOtherCents);
+    case 'refundTotal': return m(r.refundCents);
     case 'paymentMethod': return r.paymentMethod ?? '';
     case 'cardLast4': return r.cardLast4 ?? '';
     case 'storeAddress': return r.storeAddress ?? '';

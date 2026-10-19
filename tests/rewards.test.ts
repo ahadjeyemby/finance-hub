@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { analyseStatement, noAnswers, planStatement, rowsAddingUpTo, statementFromRead, trailingRowsAddingUpTo } from '../src/core/intake';
+import { analyseStatement, noAnswers, planStatement, rowsAddingUpTo, statementFromRead, statementGap, trailingRowsAddingUpTo } from '../src/core/intake';
 import type { ReadStatement } from '../src/core/intake';
 
 // A Chase Amazon Visa statement (fictional figures in the same layout): the card activity foots to the printed balance; a separate
@@ -113,4 +113,13 @@ test('a plain statement with one digit misread does not blame rows that only add
   assert.match(p.text, /Off by \$1\.00/);
   assert.ok(!/points or rewards/.test(p.text), p.text);
   assert.match(p.text, /one digit misread/);
+});
+
+test('lines printed as $0.00 are kept with the statement and not added as transactions', () => {
+  const d = statementFromRead({ institution: 'Bank of America', last4: '9780', account_type: 'credit', period_from: '2026-06-11', period_to: '2026-07-10', opening_balance: 35.1, closing_balance: 20,
+    rows: [{ date: '2026-07-03', description: 'PAYMENT', amount: 35.1, flow: 'in' }, { date: '2026-06-20', description: 'STORE', amount: 20, flow: 'out' }, { date: '2026-07-10', description: 'INTEREST CHARGED ON PURCHASES', amount: 0, flow: 'out', section: 'Interest Charged' }, { date: '2026-07-10', description: 'INTEREST CHARGED ON BALANCE TRANSFERS', amount: 0, flow: 'out', section: 'Interest Charged' }] });
+  assert.equal(d.rows.length, 2);
+  assert.match(d.corrections![0], /2 lines printed as \$0\.00 \(INTEREST CHARGED ON PURCHASES; INTEREST CHARGED ON BALANCE TRANSFERS\) are kept with the statement/);
+  assert.equal((d.raw as { zeroAmountLines: unknown[] }).zeroAmountLines.length, 2);
+  assert.equal(statementGap(d), 0);
 });

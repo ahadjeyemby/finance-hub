@@ -33,9 +33,11 @@ export interface ReceiptKey {
   id: string; label: string;
   merchant?: string | null; date?: string | null; time?: string | null; totalCents?: number | null;
   orderRef?: string | null; cardLast4?: string | null; storeRef?: string | null; txnId?: string | null;
+  /** how it was paid, as printed: what the app learns card digits from */
+  paymentMethod?: string | null;
 }
 export const keyOf = (r: ReceiptRecord, id: string, label: string, txnId?: string | null): ReceiptKey => ({
-  id, label, merchant: r.merchant, date: r.date, time: r.time, totalCents: r.totalCents, orderRef: r.orderRef, cardLast4: r.cardLast4, storeRef: r.storeRef, txnId: txnId ?? r.txnId ?? null,
+  id, label, merchant: r.merchant, date: r.date, time: r.time, totalCents: r.totalCents, orderRef: r.orderRef, cardLast4: r.cardLast4, storeRef: r.storeRef, txnId: txnId ?? r.txnId ?? null, paymentMethod: r.paymentMethod,
 });
 
 export interface Sameness {

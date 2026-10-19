@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 import type { ReceiptKey } from '@/core/dedupe';
 import type { ReceiptRecord } from '@/core/evidence';
 import { receiptToRow } from '@/core/evidence';
-import { receiptFromRead, statementFromRead } from '@/core/intake';
+import { MAX_HINT, readingAsText, receiptFromRead, receiptMisfits, settleReads, settleReceiptReads, statementFromRead, statementGap } from '@/core/intake';
 import type { ReadReceipt, ReadStatement, StatementDraft, StatementPlan } from '@/core/intake';
 import { uploadEvidence, uploadLedger } from '@/core/ledgerio';
 import { selectReadable, withRetry } from '@/core/bulk';
@@ -95,15 +95,42 @@ export async function findDuplicate(kind: 'receipt' | 'statement', sha256: strin
 export async function readReceiptFile(f: PickedFile): Promise<ReceiptRecord> {
   if (f.bytes.length > MAX_BYTES) throw new Error('This file is over 10 MB. Use a smaller photo or PDF.');
   const body = { file_base64: toBase64(f.bytes), media_type: f.type, filename: f.name };
-  const out = await withRetry(() => callFunction<ReadReceipt>('ingest-receipt', body));
-  return receiptFromRead(out, { fileName: f.name, sha256: f.sha256 });
+  const read = async (second = false) => receiptFromRead(await withRetry(() => callFunction<ReadReceipt>('ingest-receipt', second ? { ...body, second_opinion: true } : body)), { fileName: f.name, sha256: f.sha256 });
+  const first = await read();
+  // a price shifted against its item is the usual reason a receipt does not add up, and it rarely repeats: read again and let the printed subtotal, total and item count choose
+  if (receiptMisfits(first) === 0) return first;
+  try { return settleReceiptReads(first, await read(true)); } catch { return first; }
 }
 
 export async function readStatementFile(f: PickedFile): Promise<StatementDraft> {
   if (f.bytes.length > MAX_BYTES) throw new Error('This file is over 10 MB. Split it by month.');
   const body = { file_base64: toBase64(f.bytes), media_type: f.type, filename: f.name };
-  const out = await withRetry(() => callFunction<ReadStatement>('ingest-statement', body));
-  return statementFromRead(out);
+  const read = async (second = false) => statementFromRead(await withRetry(() => callFunction<ReadStatement>('ingest-statement', second ? { ...body, second_opinion: true } : body)));
+  const first = await read();
+  // a misread digit is the usual reason a statement does not add up, and it rarely repeats: on a failed balance check read the file once more and let the printed balance choose
+  const gap = statementGap(first);
+  if (gap == null || gap === 0 || first.truncated) return first;
+  try { return settleReads(first, await read(true)); } catch { return first; }
+}
+
+/** The readers the backend allows, for the picker on a card. Empty when the backend cannot say (offline, or functions not yet redeployed). */
+export async function listReaders(): Promise<string[]> {
+  try { return (await callFunction<{ models: string[] }>('ingest-receipt', { action: 'models' })).models ?? []; } catch { return []; }
+}
+
+/** One more reading of a receipt, on request. A chosen reader reads in plain JSON, the mode measured for every reader offered. Odd attempts use the plain-JSON request and even ones the tool-call request, because the two fail on different receipts. Never replaces anything by itself. */
+export async function rereadReceiptFile(f: PickedFile, attempt: number, model?: string): Promise<ReceiptRecord> {
+  if (f.bytes.length > MAX_BYTES) throw new Error('This file is over 10 MB. Use a smaller photo or PDF.');
+  const body = { file_base64: toBase64(f.bytes), media_type: f.type, filename: f.name, ...(model ? { model } : attempt % 2 === 1 ? { second_opinion: true } : {}) };
+  return receiptFromRead(await withRetry(() => callFunction<ReadReceipt>('ingest-receipt', body)), { fileName: f.name, sha256: f.sha256 });
+}
+
+/** One more reading of a statement the person has looked at, with their note about what is wrong. Never replaces anything by itself: the caller shows it next to the current reading. */
+export async function rereadStatementWithHint(f: PickedFile, current: StatementDraft, hint: string, model?: string): Promise<StatementDraft> {
+  if (f.bytes.length > MAX_BYTES) throw new Error('This file is over 10 MB. Split it by month.');
+  // without a note it is a plain second reading by the second-opinion model; with one, the reader is also told the note and the earlier reading
+  const body = { file_base64: toBase64(f.bytes), media_type: f.type, filename: f.name, ...(hint.trim() ? { hint: hint.slice(0, MAX_HINT), previous: readingAsText(current) } : model ? {} : { second_opinion: true }), ...(model ? { model } : {}) };
+  return statementFromRead(await withRetry(() => callFunction<ReadStatement>('ingest-statement', body)));
 }
 
 const safe = (s: string) => s.replace(/[^A-Za-z0-9._-]+/g, '_');
@@ -146,10 +173,10 @@ export async function saveStatementPlan(plan: StatementPlan, file: PickedFile | 
 /** What is already stored, in the small form the duplicate check needs. Empty when offline or on error: the check then only sees the current batch. */
 export async function loadStoredReceipts(): Promise<ReceiptKey[]> {
   if (!supabase) return [];
-  const q = await supabase.from('receipts').select('id, merchant, date, time, total_cents, order_ref, card_last4, store_ref, source_file, txn_id').limit(5000);
+  const q = await supabase.from('receipts').select('id, merchant, date, time, total_cents, order_ref, card_last4, store_ref, source_file, txn_id, payment_method').limit(5000);
   if (q.error) return [];
   return (q.data ?? []).map((r) => ({
     id: r.id as string, label: (r.source_file as string | null) ?? 'a stored receipt', merchant: r.merchant as string | null, date: r.date as string | null, time: r.time as string | null,
-    totalCents: r.total_cents as number | null, orderRef: r.order_ref as string | null, cardLast4: r.card_last4 as string | null, storeRef: r.store_ref as string | null, txnId: r.txn_id as string | null,
+    totalCents: r.total_cents as number | null, orderRef: r.order_ref as string | null, cardLast4: r.card_last4 as string | null, storeRef: r.store_ref as string | null, txnId: r.txn_id as string | null, paymentMethod: r.payment_method as string | null,
   }));
 }
