@@ -8,6 +8,7 @@
     "@expo/ui": "~58.0.20",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.118.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "expo": "^58.0.14",
     "expo-constants": "~58.0.12",
     "expo-device": "~58.0.5",
@@ -26,6 +27,8 @@
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.6",
     "expo-web-browser": "~58.0.6",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.4.299",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",
@@ -35,7 +38,8 @@
     "react-native-screens": "~4.30.0",
     "react-native-svg": "15.16.0",
     "react-native-web": "~0.21.4",
-    "react-native-worklets": "0.13.0"
+    "react-native-worklets": "0.13.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
@@ -60,12 +64,12 @@
     "ledger:sample": "tsx scripts/build-ledger.ts --sample",
     "ledger:upload": "bun scripts/upload-ledger.ts",
     "sample": "tsx scripts/make-sample.ts && tsx scripts/build-ledger.ts --sample",
-    "postinstall": "node scripts/init-seed.js",
-    "prestart": "node scripts/init-seed.js",
+    "postinstall": "node scripts/init-seed.js && node scripts/copy-redaction-assets.js",
+    "prestart": "node scripts/init-seed.js && node scripts/copy-redaction-assets.js",
     "pretest": "node scripts/init-seed.js",
     "pretypecheck": "node scripts/init-seed.js",
     "prelint": "node scripts/init-seed.js",
-    "prebuild:web": "node scripts/init-seed.js"
+    "prebuild:web": "node scripts/init-seed.js && node scripts/copy-redaction-assets.js"
   },
   "private": true,
   "engines": {

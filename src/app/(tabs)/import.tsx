@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, View, useWindowDimensions } from 'react-native';
 
@@ -6,6 +7,11 @@ import { FieldInput, Findings, ReceiptAgainBox, RereadBox, RowsEditor } from '@/
 import type { Proposal, ReceiptProposal } from '@/components/intake';
 import { ScreenHeader } from '@/components/header';
 import { FilePreview } from '@/components/preview';
+import { RedactReview } from '@/components/redact';
+import { findSensitive, parseHideWords, withNewSearch } from '@/core/redact';
+import type { RedactBox } from '@/core/redact';
+import { burnRedactions, discardScan, redactionSupported, scanForRedaction } from '@/data/redact';
+import type { Scan } from '@/data/redact';
 import { matchesFilter, progressLine, runPool, separateByKind, splitRepeats, tally } from '@/core/bulk';
 import type { BulkStatus, Filter } from '@/core/bulk';
 import { CATEGORIES } from '@/core/categories';
@@ -40,6 +46,12 @@ interface Item {
   link: string; cat: string | null; edit: boolean;
   /** the original file is shown beside the reading, to compare the two */
   peek?: boolean;
+  /** statements: scanned for sensitive details and waiting for the person to check the boxes (status 'redact') */
+  redact?: { scan: Scan; boxes: RedactBox[]; busy?: boolean; error?: string };
+  /** statements: how many boxes were burned in */
+  redactedBoxes?: number;
+  /** statements: how redaction ended. 'done' = the redacted copy is what is read and stored; 'skipped' = the person chose the original. */
+  redacted?: 'done' | 'skipped';
   /** statements: this number belongs to an existing account (a reissued card, a changed account number), not a new one */
   mergeInto?: string;
   /** receipts with link 'flag': why no charge is expected (paid in cash, from another account...) */
@@ -181,6 +193,21 @@ export default function Import() {
   const savedKeysRef = useRef<ReceiptKey[]>([]);
   const claimedRef = useRef<Set<string>>(new Set());
   const stopRef = useRef(false);
+  // redaction settings: on by default where it can run (the web version), kept on this device only
+  const [redactOn, setRedactOn] = useState(true);
+  const [hideText, setHideText] = useState('');
+  const redactOnRef = useRef(true);
+  const hideRef = useRef('');
+  useEffect(() => {
+    AsyncStorage.getItem('audit.redact.v1').then((raw) => {
+      if (!raw) return;
+      try { const v = JSON.parse(raw) as { on?: boolean; words?: string }; if (typeof v.on === 'boolean') { setRedactOn(v.on); redactOnRef.current = v.on; } if (typeof v.words === 'string') { setHideText(v.words); hideRef.current = v.words; } } catch { /* unreadable settings: keep the defaults */ }
+    }).catch(() => {});
+  }, []);
+  const saveRedactSettings = (on: boolean, words: string) => {
+    setRedactOn(on); setHideText(words); redactOnRef.current = on; hideRef.current = words;
+    AsyncStorage.setItem('audit.redact.v1', JSON.stringify({ on, words })).catch(() => {});
+  };
 
   useEffect(() => {
     let on = true;
@@ -205,8 +232,20 @@ export default function Import() {
         const dup = await findDuplicate(item.kind, item.file.sha256);
         if (dup.duplicateOf) return patch(item.key, (x) => ({ ...x, status: 'duplicate', message: `Already stored: ${dup.duplicateOf}. Nothing was changed.` }));
       }
+      // a statement is scanned for sensitive details on this device first; reading waits until the person has checked what will be blacked out
+      if (item.kind === 'statement' && item.file && redactionSupported && redactOnRef.current && !item.redacted) {
+        const hide = parseHideWords(hideRef.current);
+        patch(item.key, (x) => ({ ...x, message: 'Scanning for sensitive details. This happens on your device; nothing is sent anywhere.' }));
+        const scan = await scanForRedaction(item.file.bytes, item.file.type, hide, (m) => patch(item.key, (x) => (x.status === 'reading' ? { ...x, message: `${m}. This happens on your device; nothing is sent anywhere.` } : x)));
+        if (!live(item.key)) return discardScan(scan);
+        return patch(item.key, (x) => ({ ...x, status: 'redact', message: undefined, redact: { scan, boxes: scan.boxes } }));
+      }
       if (item.kind === 'receipt') { const r = applyCardHabit(await readReceiptFile(item.file!), [...ctxRef.current.receipts, ...savedKeysRef.current]); patch(item.key, (x) => ({ ...x, status: 'review', receipt: r })); }
-      else { const d = await readStatementFile(item.file!); patch(item.key, (x) => ({ ...x, status: 'review', statement: d })); }
+      else {
+        const d = await readStatementFile(item.file!);
+        // the saved statement says whether what was read is the redacted copy
+        patch(item.key, (x) => ({ ...x, status: 'review', statement: x.redacted ? { ...d, raw: { ...(d.raw ?? {}), redaction: x.redacted === 'done' ? { applied: true, boxes: x.redactedBoxes ?? 0 } : { applied: false, skipped: true } } } : d }));
+      }
     } catch (e) { patch(item.key, (x) => ({ ...x, status: 'failed', message: (e as Error).message })); }
   };
 
@@ -217,6 +256,38 @@ export default function Import() {
     stopRef.current = false; setReading(true);
     await runPool(waiting, READ_LANES, read, () => stopRef.current);
     setReading(false);
+  };
+
+  /** Change the boxes of a statement waiting for redaction review. */
+  const setRedactBoxes = (key: string, boxes: RedactBox[]) => patch(key, (x) => (x.redact ? { ...x, redact: { ...x.redact, boxes, error: undefined } } : x));
+  const searchAgain = (key: string, words: string[], text: string) => {
+    saveRedactSettings(redactOnRef.current, text);
+    patch(key, (x) => (x.redact ? { ...x, redact: { ...x.redact, boxes: withNewSearch(x.redact.boxes, findSensitive(x.redact.scan.words, { hide: words })) } } : x));
+  };
+  /** Burn the switched-on boxes into the pictures of the pages, replace the file with the redacted copy (the original is dropped from memory), and let it be read. */
+  const approveRedaction = async (key: string) => {
+    const cur = live(key);
+    if (!cur?.redact || !cur.file) return;
+    patch(key, (x) => (x.redact ? { ...x, redact: { ...x.redact, busy: true, error: undefined } } : x));
+    try {
+      const out = await burnRedactions(cur.redact.scan, cur.redact.boxes, cur.file.type === 'application/pdf');
+      const n = cur.redact.boxes.filter((b) => b.on).length;
+      discardScan(cur.redact.scan);
+      // the file keeps the fingerprint of the original, so the same statement is still recognised as already imported
+      patch(key, (x) => ({ ...x, status: 'queued', redact: undefined, redacted: 'done', redactedBoxes: n, file: x.file ? { ...x.file, bytes: out.bytes, type: out.type } : x.file }));
+      await processQueue();
+    } catch (e) { patch(key, (x) => (x.redact ? { ...x, redact: { ...x.redact, busy: false, error: (e as Error).message } } : x)); }
+  };
+  const skipRedaction = async (key: string) => {
+    const cur = live(key);
+    if (cur?.redact) discardScan(cur.redact.scan);
+    patch(key, (x) => ({ ...x, status: 'queued', redact: undefined, redacted: 'skipped' }));
+    await processQueue();
+  };
+  const discardRedaction = (key: string) => {
+    const cur = live(key);
+    if (cur?.redact) discardScan(cur.redact.scan);
+    update((xs) => xs.filter((x) => x.key !== key));
   };
 
   const add = async (source: 'files' | 'photos' | 'camera' | 'folder') => {
@@ -397,6 +468,15 @@ export default function Import() {
       <Card title="What are you adding?">
         <Segmented value={kind} onChange={setKind} options={[{ value: 'statement', label: 'Statements' }, { value: 'receipt', label: 'Receipts' }]} />
         <T size={13} tone="ink2">{kind === 'statement' ? 'Bank or card statements, one PDF per month, or photos of its pages.' : 'Store receipts or order confirmations, as photos or PDFs.'} {canPickFolder ? 'Choose a whole folder, or select as many files as you like.' : 'Select as many files or photos as you like.'}</T>
+        {kind === 'statement' && redactionSupported ? (
+          <View style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
+            <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Chip label="Redact statements first" on={redactOn} onPress={() => saveRedactSettings(!redactOn, hideText)} />
+              <T size={12} tone="ink3">{redactOn ? 'On' : 'Off: statements are read exactly as they are'}</T>
+            </View>
+            <T size={12} tone="ink3">{redactOn ? 'Each statement is scanned for account numbers, names, addresses and similar on your device, with no outside service. You check every box before anything is read or stored, and the reader only ever sees the redacted copy.' : 'Turn this on to black out sensitive details before a statement is read or stored.'}</T>
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
           {canPickFolder ? <Button label="Choose a folder" disabled={!connected} onPress={() => add('folder')} /> : null}
           <Button kind={canPickFolder ? 'outline' : 'solid'} label="Choose files" disabled={!connected} onPress={() => add('files')} />
@@ -440,6 +520,15 @@ export default function Import() {
       {shown.map((item) => {
         const ev = evals.get(item.key);
         const peeking = !!item.peek && !!item.file && item.file.bytes.length > 0 && (item.status === 'review' || item.status === 'saving');
+        if (item.status === 'redact' && item.redact) {
+          return (
+            <Card key={item.key} title={item.file?.name ?? 'Statement'} right={<T size={12} tone="ink3" bold>Check redaction</T>}>
+              <RedactReview scan={item.redact.scan} boxes={item.redact.boxes} hideText={hideText} busy={!!item.redact.busy} error={item.redact.error}
+                onBoxes={(b) => setRedactBoxes(item.key, b)} onSearch={(w, t) => searchAgain(item.key, w, t)}
+                onApprove={() => approveRedaction(item.key)} onSkip={() => skipRedaction(item.key)} onDiscard={() => discardRedaction(item.key)} />
+            </Card>
+          );
+        }
         if (compact && !item.open && (item.status === 'queued' || item.status === 'reading' || item.status === 'saving' || item.status === 'saved')) return <Line key={item.key} item={item} />;
         if (compact && !item.open && item.status === 'review' && ev) return <Summary key={item.key} item={item} ev={ev} accounts={accounts} onOpen={() => patch(item.key, (x) => ({ ...x, open: true }))} onSave={() => save(item.key)} onRemove={() => update((xs) => xs.filter((x) => x.key !== item.key))} />;
         const card = (
@@ -468,7 +557,7 @@ export default function Import() {
   );
 }
 
-const STATUS_TEXT: Record<BulkStatus, string> = { queued: 'Waiting', reading: 'Reading', review: '', saving: 'Saving', saved: 'Saved', failed: 'Not read', duplicate: 'Skipped' };
+const STATUS_TEXT: Record<BulkStatus, string> = { queued: 'Waiting', reading: 'Reading', redact: 'Check redaction', review: '', saving: 'Saving', saved: 'Saved', failed: 'Not read', duplicate: 'Skipped' };
 
 /** One line for a file that is waiting, being read, saving, or already saved. */
 function Line({ item }: { item: Item }) {
@@ -528,7 +617,7 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
   const title = item.file?.name ?? 'Receipt typed by hand';
   const tag = item.kind === 'statement' ? 'Statement' : 'Receipt';
   if (item.status === 'queued') return <Card title={title} right={<T size={12} tone="ink3">Waiting</T>}><T size={13} tone="ink2">In line to be read.</T><View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Discard" onPress={onRemove} /></View></Card>;
-  if (item.status === 'reading') return <Card title={title} right={<T size={12} tone="ink3">Reading</T>}><T size={13} tone="ink2">Reading the {tag.toLowerCase()} and checking it. This can take a minute for a long statement.</T></Card>;
+  if (item.status === 'reading') return <Card title={title} right={<T size={12} tone="ink3">Reading</T>}><T size={13} tone="ink2">{item.message ?? `Reading the ${tag.toLowerCase()} and checking it. This can take a minute for a long statement.`}</T></Card>;
   if (item.status === 'duplicate') return <Card title={title}><T size={13} tone="ink2">{item.message}</T><View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Dismiss" onPress={onRemove} /></View></Card>;
   if (item.status === 'failed') return (
     <Card title={title}>
