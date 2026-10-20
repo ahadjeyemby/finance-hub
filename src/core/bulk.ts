@@ -67,7 +67,8 @@ export async function withRetry<T>(fn: () => Promise<T>, tries = 3, wait: (ms: n
   throw last;
 }
 
-export type BulkStatus = 'queued' | 'reading' | 'review' | 'saving' | 'saved' | 'failed' | 'duplicate';
+/** 'redact' = a statement scanned for sensitive details, waiting for the person to check what will be blacked out */
+export type BulkStatus = 'queued' | 'reading' | 'redact' | 'review' | 'saving' | 'saved' | 'failed' | 'duplicate';
 export interface Tally { total: number; waiting: number; reading: number; ready: number; attention: number; saving: number; saved: number; failed: number; duplicate: number; done: number }
 
 /** Counts for the progress line. `ready` is only meaningful for items in review. */
@@ -77,6 +78,7 @@ export function tally(items: { status: BulkStatus; ready: boolean }[]): Tally {
     if (i.status === 'queued') t.waiting++;
     else if (i.status === 'reading') t.reading++;
     else if (i.status === 'review') { if (i.ready) t.ready++; else t.attention++; }
+    else if (i.status === 'redact') t.attention++;
     else if (i.status === 'saving') t.saving++;
     else if (i.status === 'saved') t.saved++;
     else if (i.status === 'failed') t.failed++;
@@ -92,7 +94,7 @@ export type Filter = 'all' | 'attention' | 'ready' | 'saved' | 'problems';
 export function matchesFilter(f: Filter, s: BulkStatus, ready: boolean): boolean {
   switch (f) {
     case 'all': return true;
-    case 'attention': return s === 'review' && !ready;
+    case 'attention': return (s === 'review' && !ready) || s === 'redact';
     case 'ready': return s === 'review' && ready;
     case 'saved': return s === 'saved';
     case 'problems': return s === 'failed' || s === 'duplicate';

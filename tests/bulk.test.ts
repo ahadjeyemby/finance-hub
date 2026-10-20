@@ -104,3 +104,12 @@ test('a mixed parent folder is sorted by what the paths say, and unclear paths a
   assert.deepEqual(r.other.map((f) => f.name), ['Statements/b.pdf']);
   assert.equal(separateByKind([{ name: 'Statements/b.pdf' }], 'statement').other.length, 0);
 });
+
+test('a statement waiting for the person to check its redaction counts as needing attention, never as ready or done reading', () => {
+  const t = tally([{ status: 'redact', ready: false }, { status: 'queued', ready: false }, { status: 'review', ready: true }]);
+  assert.equal(t.attention, 1);
+  assert.equal(t.ready, 1);
+  assert.equal(matchesFilter('attention', 'redact', false), true);
+  assert.equal(matchesFilter('ready', 'redact', true), false);
+  assert.equal(matchesFilter('all', 'redact', false), true);
+});
