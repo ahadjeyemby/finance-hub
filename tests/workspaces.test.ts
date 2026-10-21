@@ -232,3 +232,16 @@ test('existing users are unaffected: someone with no workspace sees exactly what
   assert.deepEqual(await counts(w, a), Object.fromEntries(COUNT_TABLES.map((t) => [t, 1])));
   assert.equal((await d.as(a, `update public.txns set category = 'x' where user_id = $1 returning id`, [b])).length, 0);
 });
+
+test('the admin sees members by email and by a label they set; only they can set it', async () => {
+  const w = await world();
+  const row = async (who: string, member: string) => (await w.d.as<{ email: string; label: string | null }>(who, 'select email, label from public.members where member = $1', [member]))[0];
+  assert.equal((await row(w.adm, w.wife)).email, 'wife@x.test', 'the address comes from the invite');
+  assert.equal((await row(w.adm, w.wife)).label, null);
+  assert.equal((await w.d.as(w.adm, `update public.members set label = 'Sam' where member = $1 returning member`, [w.wife])).length, 1);
+  assert.equal((await row(w.wife, w.wife)).label, 'Sam', 'the member sees how they are named');
+  assert.equal((await w.d.as(w.wife, `update public.members set label = 'Boss' where member = $1 returning member`, [w.wife])).length, 0, 'a member cannot rename themselves');
+  assert.equal((await w.d.as(w.adm, `update public.members set label = 'x' where member = $1 returning member`, [w.w2])).length, 0, 'not another workspace');
+  assert.match(String(await w.d.asFails(w.adm, `update public.members set label = $1 where member = $2`, ['x'.repeat(61), w.wife])), /members_label_len|check/);
+  assert.match(String(await w.d.asFails(w.adm, `update public.members set email = 'someone@else.test' where member = $1`, [w.wife])), /permission denied/, 'the address is not editable');
+});

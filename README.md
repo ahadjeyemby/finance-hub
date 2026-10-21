@@ -195,7 +195,20 @@ One person (the **admin**) can invite others (**members**). Everyone writes thei
 
 Apply it with `supabase db push`. It moves no data: someone with no members sees exactly what they saw before. `bun run test` runs the migrations on a real Postgres (PGlite, in memory) and logs in as several people to check what each can and cannot read and write, including negative cases such as a stranger, a paused member and a member trying to write the admin's rows.
 
-Not built yet: the invite email (a function that sends the token), the app's switcher (Me / a member / Everyone), loading and merging members' rows and overlays in the app, the readers checking `can_read_ai`, and an audit log.
+**Inviting people.** On the People screen the admin enters an email address, a role and whether the person may use the AI readers. The `invite-member` function (admin only) creates the invite as the caller, then asks Supabase to email a link that carries the code. The invited person signs in from the link (a new account gets no password, so they set one on the same screen), and pressing Join accepts the invite. The code alone gets nobody in: accepting also needs a sign-in with the address it was made for, it works once, and it expires in 7 days. An admin can cancel an invite, pause or remove a member, rename them, and switch the AI readers on or off for them. A member sees a plain notice that the admin can see everything they add, and can leave at any time.
+
+Set up once:
+```bash
+supabase db push                                   # migrations 0006 and 0007
+supabase secrets set APP_URL=https://your-web-address     # optional: without it no email is sent and the admin passes the code on by hand
+supabase functions deploy invite-member
+supabase functions deploy ask ingest-receipt ingest-statement ingest-payslip   # they now check workspace access
+```
+Add `https://your-web-address/**` under Auth, URL Configuration, Redirect URLs, or the link in the email will not carry the code. Keep public sign-ups off. The service role key is used in exactly one place, inside `invite-member`, to send the email; Supabase provides it to the function and it never reaches the app.
+
+**Who may use the readers.** `ALLOWED_EMAIL` is now optional, may list several addresses separated by commas, and only decides who may be an admin or work alone on this deployment (leave it set to your own address). Members are decided by their membership: it must be active, and the readers need `can_read_ai`. A member can never invite or manage.
+
+Not built yet: the app's switcher (Me / a member / Everyone), loading and merging members' rows and overlays in the app, and an audit log. Joining from an invite link works in the web version; on a phone build, paste the code under People.
 
 The model is fixed, never chosen per request. It defaults to `anthropic/claude-haiku-5.5` (supports tools and image input). To change it:
 

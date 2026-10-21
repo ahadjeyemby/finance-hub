@@ -89,6 +89,7 @@ export default function Overview() {
           <Button small kind="outline" label="All transactions" onPress={() => router.push('/ledger')} />
           <Button small kind="outline" label="Accounts and data" onPress={() => router.push('/accounts')} />
           <Button small kind="outline" label="Receipt links" onPress={() => router.push('/links')} />
+          <Button small kind="outline" label="People" onPress={() => router.push('/people')} />
           <Button small kind="outline" label="Income" onPress={() => router.push('/income')} />
           <Button small kind="outline" label="Recurring" onPress={() => router.push('/recurring')} />
           <Button small kind="outline" label="Views" onPress={() => router.push('/views')} />
