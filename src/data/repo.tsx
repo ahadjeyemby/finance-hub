@@ -9,6 +9,8 @@ import { addMonths, monthEnd, monthOf, monthStart, monthsBetween, todayISO } fro
 import { applyOverlay, runQuery } from '@/core/queries';
 import type { Ctx, Filter } from '@/core/queries';
 import { buildQuestions } from '@/core/questions';
+import { emptyIncome } from '@/core/income';
+import type { IncomeState } from '@/core/income';
 import { emptyRecurring } from '@/core/recurring';
 import type { RecurringState } from '@/core/recurring';
 import type { CashDraft } from '@/core/questions';
@@ -99,6 +101,9 @@ export interface Repo {
   tagState: TagState;
   /** change the tag definitions or the tags on a charge or an item */
   saveTagState: (next: TagState) => void;
+  /** income sources, pay records and deposit assignments */
+  income: IncomeState;
+  saveIncome: (next: IncomeState) => void;
   /** what the person decided about recurring charges, and the ones added by hand */
   recurring: RecurringState;
   saveRecurring: (next: RecurringState) => void;
@@ -311,6 +316,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     patchTxn: (id, patch) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [id]: { ...o.patches[id], ...patch } } }); },
     links: linkData, reloadLinks,
     tagState, saveTagState: (next) => commit({ ...overlayRef.current, tags: next }),
+    income: overlay.income ?? emptyIncome(), saveIncome: (next) => commit({ ...overlayRef.current, income: next }),
     recurring: overlay.recurring ?? emptyRecurring(), saveRecurring: (next) => commit({ ...overlayRef.current, recurring: next }),
     categoryConfig: overlay.categories, saveCategoryConfig: (next) => commit({ ...overlayRef.current, categories: next }),
     attachReceipt: (txnId, lines, uri) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [txnId]: { ...o.patches[txnId], lines, receiptId: uri } } }); },

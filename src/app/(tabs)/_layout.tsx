@@ -41,6 +41,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="accounts" options={tab('Accounts', 'accounts')} />
       {/* on a phone the bottom bar is full: Receipt links stay reachable from the Overview and Import */}
       <Tabs.Screen name="links" options={wide ? tab('Receipt links', 'links') : hidden} />
+      <Tabs.Screen name="income" options={wide ? tab('Income', 'income') : hidden} />
       <Tabs.Screen name="recurring" options={wide ? tab('Recurring', 'recurring') : hidden} />
       <Tabs.Screen name="views" options={wide ? tab('Views', 'views') : hidden} />
       <Tabs.Screen name="categories" options={wide ? tab('Categories and tags', 'tags') : hidden} />
