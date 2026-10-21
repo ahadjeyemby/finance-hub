@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { addManual, addMonthsTo, decide, detectCadence, emptyRecurring, removeManual, summarizeRecurring } from '../src/core/recurring';
+import { addManual, addMonthsTo, decide, detectCadence, emptyRecurring, incomeVsFixed, removeManual, summarizeRecurring } from '../src/core/recurring';
 import type { Txn } from '../src/core/types';
 
 let n = 0;
@@ -170,4 +170,26 @@ test('recurring decisions survive sync: merged key by key, parsed safely, and co
   assert.deepEqual(parseOverlay({ recurring: { edits: 5, manual: 'x' } }).recurring, { edits: {}, manual: [] });
   assert.equal(parseOverlay({}).recurring, undefined);
   assert.deepEqual(parseOverlay(JSON.parse(JSON.stringify(a))).recurring, a.recurring);
+});
+
+test('income is averaged over the last three complete months and set against the fixed amount', () => {
+  const acct = { id: 'a', name: 'Checking', institution: 'X', type: 'checking' as const, last4: '1', coverage: { from: '2026-01-01', to: '2026-06-30' } };
+  const inc = (date: string, dollars: number, subtype = 'salary'): Txn => ({ ...t('Employer', date, 0), cents: Math.round(dollars * 100), kind: 'income', subtype });
+  const txns = [inc('2026-03-15', 3000), inc('2026-04-15', 3000), inc('2026-05-15', 3600), inc('2026-06-15', 3000), inc('2026-01-15', 9000), inc('2026-06-20', 600, 'unconfirmed')];
+  const r = incomeVsFixed({ txns, accounts: [acct] }, 200000, '2026-06-30')!;
+  assert.deepEqual(r.months, ['2026-04', '2026-05', '2026-06']);
+  assert.equal(r.incomeCents, 320000);           // (3000 + 3600 + 3000) / 3
+  assert.equal(r.unconfirmedCents, 20000);
+  assert.equal(r.leftCents, 120000);
+  assert.ok(Math.abs(r.share! - 200000 / 320000) < 1e-9);
+  assert.equal(r.incomeIncomplete, false);
+  // fixed costs above income give a negative remainder
+  assert.equal(incomeVsFixed({ txns, accounts: [acct] }, 400000, '2026-06-30')!.leftCents, -80000);
+  // a statement that stops mid-month leaves that month out
+  const part = incomeVsFixed({ txns, accounts: [{ ...acct, coverage: { from: '2026-01-01', to: '2026-06-10' }, incomeComplete: false }] }, 0, '2026-06-30')!;
+  assert.deepEqual(part.months, ['2026-03', '2026-04', '2026-05']);
+  assert.ok(part.incomeIncomplete);
+  // no income, or no complete month, means no comparison
+  assert.equal(incomeVsFixed({ txns: [], accounts: [acct] }, 5000, '2026-06-30')!.share, null);
+  assert.equal(incomeVsFixed({ txns, accounts: [{ ...acct, coverage: { from: '2026-06-05', to: '2026-06-20' } }] }, 5000, '2026-06-30'), null);
 });

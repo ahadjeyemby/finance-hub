@@ -5,6 +5,9 @@
 // every rhythm into a monthly equivalent (a yearly $120 is $10 a month). The person confirms, ignores or cancels what it found and can add what it
 // cannot see (rent paid in cash before there is a history). Nothing here guesses silently: each item says how many charges it rests on.
 import { categoryLabel } from './categories';
+import { monthOf } from './dates';
+import { completeMonths } from './forecast';
+import type { Ctx } from './queries';
 import type { Txn } from './types';
 
 export type Cadence = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'semiannual' | 'annual';
@@ -219,6 +222,38 @@ export function summarizeRecurring(txns: Txn[], state: RecurringState | undefine
     unconfirmedMonthlyCents: on.filter((i) => i.source === 'detected').reduce((s, i) => s + i.monthlyCents, 0),
     next30Cents: upcoming.reduce((s, u) => s + u.cents, 0),
     upcoming,
+  };
+}
+
+export interface IncomeVsFixed {
+  /** the complete months the average rests on (at most the last three) */
+  months: string[];
+  /** average monthly income over those months, not counting income still marked unconfirmed */
+  incomeCents: number;
+  /** average monthly income the person has not yet confirmed, left out of the figure above */
+  unconfirmedCents: number;
+  /** what is left of the average income after the fixed amount; negative when fixed costs exceed it */
+  leftCents: number;
+  /** fixed amount as a share of income, null when there is no income to compare with */
+  share: number | null;
+  /** a checking account's statements may not show all income, so the figure can be low */
+  incomeIncomplete: boolean;
+}
+
+/**
+ * How the fixed monthly amount compares with what comes in. Income is averaged over the last three complete months so a part-covered month never
+ * pulls it down; with no complete month there is nothing to compare and the result is null.
+ */
+export function incomeVsFixed(ctx: Ctx, fixedMonthlyCents: number, asOf: string): IncomeVsFixed | null {
+  const months = completeMonths(ctx, '2000-01-01', monthOf(asOf)).slice(-3);
+  if (!months.length) return null;
+  const inMonths = ctx.txns.filter((t) => t.kind === 'income' && !t.business && months.includes(monthOf(t.date)));
+  const sum = (ts: Txn[]) => Math.round(ts.reduce((s, t) => s + t.cents, 0) / months.length);
+  const incomeCents = sum(inMonths.filter((t) => t.subtype !== 'unconfirmed'));
+  return {
+    months, incomeCents, unconfirmedCents: sum(inMonths.filter((t) => t.subtype === 'unconfirmed')),
+    leftCents: incomeCents - fixedMonthlyCents, share: incomeCents > 0 ? fixedMonthlyCents / incomeCents : null,
+    incomeIncomplete: ctx.accounts.some((a) => a.type === 'checking' && a.incomeComplete === false),
   };
 }
 

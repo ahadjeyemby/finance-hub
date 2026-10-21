@@ -3,9 +3,9 @@ import { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/header';
-import { dayLabel, todayISO } from '@/core/dates';
+import { dayLabel, monthLabel, todayISO } from '@/core/dates';
 import { dollars } from '@/core/queries';
-import { CADENCE_LABEL, addManual, decide, removeManual, summarizeRecurring } from '@/core/recurring';
+import { CADENCE_LABEL, addManual, decide, incomeVsFixed, removeManual, summarizeRecurring } from '@/core/recurring';
 import type { Cadence, RecurringItem } from '@/core/recurring';
 import { useRepo } from '@/data/repo';
 import { C, F, R, S } from '@/theme/tokens';
@@ -19,10 +19,11 @@ const input = { minHeight: 44, borderRadius: R.md, backgroundColor: C.ground, pa
  * confirmed or set aside by the person, and topped up by hand for what no statement shows (rent paid in cash).
  */
 export default function Recurring() {
-  const { txns, dataTo, recurring, saveRecurring } = useRepo();
+  const { txns, ctx, dataTo, recurring, saveRecurring } = useRepo();
   const today = todayISO();
   // business-marked charges are excluded from personal totals everywhere else, so they are here too
   const sum = useMemo(() => summarizeRecurring(txns.filter((t) => !t.business), recurring, dataTo, today), [txns, recurring, dataTo, today]);
+  const cover = useMemo(() => incomeVsFixed(ctx, sum.fixedMonthlyCents, dataTo), [ctx, sum.fixedMonthlyCents, dataTo]);
   const [asideOpen, setAsideOpen] = useState(false);
   const [name, setName] = useState(''); const [amount, setAmount] = useState(''); const [cadence, setCadence] = useState<Cadence>('monthly'); const [anchor, setAnchor] = useState(today);
 
@@ -43,6 +44,17 @@ export default function Recurring() {
         <T size={13} tone="ink2">Yearly and quarterly charges are spread across the months, so a $120 yearly fee counts as $10. Items switched off, cancelled or no longer charging are left out.</T>
         <T size={12} tone="ink3">{dollars(sum.fixedMonthlyCents * 12)} a year across {on.filter((i) => i.health !== 'stopped').length} item{on.filter((i) => i.health !== 'stopped').length === 1 ? '' : 's'}. {sum.unconfirmedMonthlyCents > 0 ? `${dollars(sum.unconfirmedMonthlyCents)} of it is found from your statements and not yet confirmed by you.` : 'Everything in it is confirmed or added by you.'}</T>
         <T size={12} tone="ink3">Based on statements up to {dataTo > '0000' ? dayLabel(dataTo) : 'none yet'}. A variable bill such as electricity is planned at its middle amount, so the real month can be higher or lower.</T>
+      </Card>
+
+      <Card title="Against your income">
+        {cover ? (
+          <>
+            <T size={14}>{cover.incomeCents > 0 ? `Income averages ${dollars(cover.incomeCents)} a month over ${cover.months.length === 1 ? 'the last complete month' : `the last ${cover.months.length} complete months`}. Fixed costs take ${cover.share != null ? `${(cover.share * 100).toFixed(0)}%` : ''} of it.` : 'No confirmed income found in the complete months, so there is nothing to compare with.'}</T>
+            {cover.incomeCents > 0 ? <T size={22} bold tone={cover.leftCents < 0 ? 'bad' : 'ink'}>{cover.leftCents < 0 ? `${dollars(-cover.leftCents)} short each month` : `${dollars(cover.leftCents)} left each month`}</T> : null}
+            {cover.incomeCents > 0 ? <View style={{ height: 8, backgroundColor: C.line, borderRadius: 4, overflow: 'hidden' }}><View style={{ width: `${Math.min(100, Math.max(2, (cover.share ?? 0) * 100))}%`, height: '100%', backgroundColor: cover.leftCents < 0 ? C.bad : C.bar, borderRadius: 4 }} /></View> : null}
+            <T size={12} tone="ink3">Months used: {cover.months.map((m) => monthLabel(m, true)).join(', ')}. What is left is before everyday spending such as groceries and fuel.{cover.unconfirmedCents > 0 ? ` ${dollars(cover.unconfirmedCents)} a month of income is still unconfirmed and not counted.` : ''}{cover.incomeIncomplete ? ' A checking account is marked as not showing all income, so the average may be low.' : ''}</T>
+          </>
+        ) : <T size={13} tone="ink2">No month is fully covered by every account&apos;s statements yet, so income cannot be averaged.</T>}
       </Card>
 
       {alerts.length ? (
