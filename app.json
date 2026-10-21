@@ -1,15 +1,12 @@
 {
   "expo": {
-    "name": "Audit",
-    "slug": "finance-audit",
+    "name": "Finora",
+    "slug": "finora",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "financeaudit",
+    "scheme": "finora",
     "userInterfaceStyle": "light",
-    "ios": {
-      "icon": "./assets/expo.icon"
-    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#2B2D31",
@@ -31,7 +28,7 @@
         {
           "backgroundColor": "#E8E6E1",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 112
         }
       ]
     ],

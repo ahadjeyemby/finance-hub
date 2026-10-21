@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#2B2D31"/>
+  <!-- magnifier ring + handle -->
+  <circle cx="450" cy="450" r="245" fill="none" stroke="#E8E6E1" stroke-width="64"/>
+  <line x1="632" y1="632" x2="800" y2="800" stroke="#E8E6E1" stroke-width="72" stroke-linecap="round"/>
+  <!-- rising trend line -->
+  <polyline points="330,540 410,460 470,510 570,385" fill="none" stroke="#3FB6A8" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="570" cy="385" r="34" fill="#3FB6A8"/>
+</svg>

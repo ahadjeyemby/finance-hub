@@ -99,7 +99,7 @@ export async function callOpenRouter(req: ModelRequest, cfg: CallConfig): Promis
   const f = cfg.fetchImpl ?? fetch;
   const r = await f('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json', 'X-OpenRouter-Title': cfg.title ?? 'Audit' },
+    headers: { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json', 'X-OpenRouter-Title': cfg.title ?? 'Finora' },
     body: JSON.stringify(buildBody(req, cfg.model, { dataCollection: cfg.dataCollection, pdfEngine: cfg.pdfEngine })),
   });
   const text = await r.text();
