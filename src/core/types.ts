@@ -123,6 +123,8 @@ export interface Overlay {
   categories?: import('./categories').CategoryConfig;
   /** tag definitions and the person's changes to the tags of a charge or one item on it (see tags.ts) */
   tags?: import('./tags').TagState;
+  /** what the person confirmed, ignored or cancelled among the recurring charges, and the ones added by hand (see recurring.ts) */
+  recurring?: import('./recurring').RecurringState;
 }
 
 export interface SavedReport {
