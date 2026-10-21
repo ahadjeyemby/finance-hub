@@ -16,7 +16,7 @@ export default function Add() {
         <Button label="Import receipts" onPress={() => router.push({ pathname: '/import', params: { kind: 'receipt' } })} />
       </Card>
       <Card title="Cash">
-        <T size={13} tone="ink2">A short chat for something paid in cash. It keeps asking until the entry is usable, and offers to split a mixed purchase into items.</T>
+        <T size={13} tone="ink2">A short form in four sections (Amount, Details, Items, Review) that you can open in any order, with Back and Next. Open the transaction later to change anything about it.</T>
         <Button kind="outline" label="Add a cash purchase" onPress={() => router.push('/cash')} />
       </Card>
     </Screen>

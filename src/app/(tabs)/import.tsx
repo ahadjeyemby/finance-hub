@@ -27,7 +27,7 @@ import { AUTO_AFTER, applyCardHabit, learnAliases, learnCard, linkTrust, methodK
 import type { ReceiptKey, Sameness } from '@/core/dedupe';
 import { itemLines, likelyRefundCredits, receiptToLines, receiptUnits } from '@/core/evidence';
 import type { ReceiptRecord } from '@/core/evidence';
-import { acceptReading, acceptReceiptReading, analyseReceipt, analyseStatement, diffReadings, diffReceipts, linkReceipt, noAnswers, planStatement, receiptFieldText, resolveAccount, setReceiptField, setStatementField, statementFieldText } from '@/core/intake';
+import { RECEIPT_FIELDS, acceptReading, acceptReceiptReading, analyseReceipt, analyseStatement, diffReadings, diffReceipts, linkReceipt, noAnswers, planStatement, receiptFieldText, resolveAccount, setReceiptField, setStatementField, statementFieldText } from '@/core/intake';
 import type { Analysis, Answers, DocKind, Gap, StatementDraft } from '@/core/intake';
 import { dollars } from '@/core/queries';
 import { suggestCategory } from '@/core/questions';
@@ -86,7 +86,6 @@ const COMPACT_FROM = 4;
 /** Re-reads with a note, per file. */
 const MAX_REREADS = 6;
 
-const RECEIPT_FIELDS: [string, string][] = [['merchant', 'Store'], ['date', 'Date'], ['time', 'Time'], ['total', 'Total paid'], ['subtotal', 'Subtotal'], ['tax', 'Sales tax'], ['tip', 'Tip'], ['paidOther', 'Paid with points, gift card or credit (not the card)'], ['refundTotal', 'Refund total, if any'], ['paymentMethod', 'Paid with'], ['cardLast4', 'Card last 4'], ['storeAddress', 'Store address'], ['storeRef', 'Store number'], ['orderRef', 'Order number']];
 const STATEMENT_FIELDS: [string, string][] = [['institution', 'Bank or issuer'], ['last4', 'Account last 4'], ['periodFrom', 'Period start'], ['periodTo', 'Period end'], ['opening', 'Opening balance (card: previous balance owed)'], ['closing', 'Closing balance (card: new balance owed)']];
 
 async function loadStored(owner?: string): Promise<Stored[]> {

@@ -67,6 +67,8 @@ export interface Txn {
   receiptFlag?: string;
   /** manual entries: when the person entered it, ISO UTC with time */
   createdAt?: string;
+  /** when the person last edited this entry (cash entries): the later edit wins when two devices meet in a sync */
+  editedAt?: string;
   /** manual entries: when it first reached the database. Stays empty until a push succeeds. */
   uploadedAt?: string;
   /** item lines when the transaction was split from a receipt or typed in */

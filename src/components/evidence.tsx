@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
@@ -34,7 +35,7 @@ export function originOf(t: Txn, ev: Evidence | null): string {
   return 'Bank or card statement';
 }
 
-function Body({ t, ev, loading }: { t: Txn; ev: Evidence | null; loading: boolean }) {
+function Body({ t, ev, loading, onEdit }: { t: Txn; ev: Evidence | null; loading: boolean; onEdit: (receiptId: string) => void }) {
   const isImage = (p: string | null) => !!p && /\.(jpe?g|png|webp)$/i.test(p);
   return (
     <View style={{ gap: S.md }}>
@@ -96,6 +97,7 @@ function Body({ t, ev, loading }: { t: Txn; ev: Evidence | null; loading: boolea
           <Field label="Read from" value={r.origin === 'typed' ? 'Typed in by hand' : r.origin === 'offline_extract' ? 'A document file' : 'An uploaded photo'} />
           {r.lines.length ? <View style={{ marginTop: 6 }}>{r.lines.map((l, i) => <Field key={i} label={i === 0 ? 'Items' : ''} value={`${l.item}${l.qty && l.qty !== 1 ? ` x${l.qty}` : ''}${l.weight ? ` ${l.weight} ${l.weightUnit ?? 'lb'}` : ''}${l.code ? ` (${l.code})` : ''}  ${cents(l.cents)}`} />)}</View> : null}
           {r.url && isImage(r.storagePath) ? <Image source={{ uri: r.url }} style={{ width: '100%', height: 260, borderRadius: R.sm, marginTop: 6 }} contentFit="contain" accessibilityLabel="Receipt image" /> : null}
+          <Button small kind="outline" label="Edit this receipt" onPress={() => onEdit(r.id)} style={{ marginTop: 6, alignSelf: 'flex-start' }} />
           {r.url ? <Button small kind="outline" label="Open the original" onPress={() => open(r.url)} style={{ marginTop: 6, alignSelf: 'flex-start' }} /> : null}
         </Section>
       ))}
@@ -128,7 +130,7 @@ export function EvidenceCard({ txn }: { txn: Txn }) {
               <H size={18}>{txn.merchant}, {dollars(txn.cents, { sign: true })}</H>
               <Button small kind="ghost" label="Close" onPress={() => setShown(false)} />
             </View>
-            <ScrollView contentContainerStyle={{ paddingBottom: S.lg }}><Body t={txn} ev={ev} loading={loading} /></ScrollView>
+            <ScrollView contentContainerStyle={{ paddingBottom: S.lg }}><Body t={txn} ev={ev} loading={loading} onEdit={(rid) => { setShown(false); router.push({ pathname: '/receipt', params: { id: rid } }); }} /></ScrollView>
           </View>
         </View>
       </Modal>

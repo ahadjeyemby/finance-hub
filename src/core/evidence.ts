@@ -254,3 +254,16 @@ export function receiptToLines(r: ReceiptRecord, chargeCents: number): { item: s
   if (sum < chargeCents) out.push({ item: 'Other (not itemised)', cents: chargeCents - sum });
   return out;
 }
+
+/**
+ * What to write when a stored receipt is edited: the receipt's own columns, and the parts of its raw data the editor owns (extra charges, points
+ * paid, refund, item count) merged into what is already there. The stored file, its fingerprint, its link and everything else read from the
+ * document are left as they are.
+ */
+export function receiptUpdate(rec: ReceiptRecord, currentRaw: Record<string, unknown> = {}): Record<string, unknown> {
+  const full = receiptToRow(rec, null, null);
+  const { txn_id: _t, storage_path: _p, source_file: _f, sha256: _s, origin: _o, captured_at: _c, raw: fresh, ...cols } = full;
+  const raw: Record<string, unknown> = { ...currentRaw };
+  for (const k of ['charges', 'paidOther', 'refund', 'itemCount']) { delete raw[k]; if (k in fresh) raw[k] = (fresh as Record<string, unknown>)[k]; }
+  return { ...cols, raw };
+}

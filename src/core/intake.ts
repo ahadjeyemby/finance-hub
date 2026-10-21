@@ -839,3 +839,6 @@ export function addRow(d: StatementDraft, date: string, description: string, amo
   if (cents == null) return { draft: d, error: 'Enter an amount like -12.50 (money out is negative).' };
   return { draft: { ...d, rows: [...d.rows, { date: iso, description: description.trim(), cents }].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? '')) } };
 }
+
+/** The fields of a receipt a person can read and correct, with the labels they see: the import review and the stored-receipt editor share this list. */
+export const RECEIPT_FIELDS: [string, string][] = [['merchant', 'Store'], ['date', 'Date'], ['time', 'Time'], ['total', 'Total paid'], ['subtotal', 'Subtotal'], ['tax', 'Sales tax'], ['tip', 'Tip'], ['paidOther', 'Paid with points, gift card or credit (not the card)'], ['refundTotal', 'Refund total, if any'], ['paymentMethod', 'Paid with'], ['cardLast4', 'Card last 4'], ['storeAddress', 'Store address'], ['storeRef', 'Store number'], ['orderRef', 'Order number']];

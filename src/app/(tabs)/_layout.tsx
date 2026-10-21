@@ -47,6 +47,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="views" options={wide ? tab('Views', 'views') : hidden} />
       <Tabs.Screen name="categories" options={wide ? tab('Categories and tags', 'tags') : hidden} />
       <Tabs.Screen name="ledger" options={hidden} />
+      <Tabs.Screen name="receipt" options={hidden} />
       <Tabs.Screen name="txn/[id]" options={hidden} />
       <Tabs.Screen name="forecast" options={hidden} />
       <Tabs.Screen name="prices" options={hidden} />
