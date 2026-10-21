@@ -3,10 +3,21 @@ import { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/header';
+import { RedactReview } from '@/components/redact';
 import { dayLabel, monthLabel } from '@/core/dates';
 import { INCOME_TYPES, INCOME_TYPE_LABEL, assignDeposit, matchAll, newIncomeId, parseWords, recordIssues, removeRecord, removeSource, saveRecord, saveSource, summarizeIncome } from '@/core/income';
 import type { IncomeType, PayRecord } from '@/core/income';
+import { draftFromRead, provenance } from '@/core/payslip';
+import type { PayslipDraft } from '@/core/payslip';
 import { dollars } from '@/core/queries';
+import { findSensitive, parseHideWords, withNewSearch } from '@/core/redact';
+import type { RedactBox } from '@/core/redact';
+import { pickFiles } from '@/data/intake';
+import type { PickedFile } from '@/data/intake';
+import { readPayslipFile } from '@/data/payslip';
+import { burnRedactions, discardScan, redactionSupported, scanForRedaction } from '@/data/redact';
+import type { Scan } from '@/data/redact';
+import { useRedactSettings } from '@/data/redactSettings';
 import { useRepo } from '@/data/repo';
 import { C, F, R, S } from '@/theme/tokens';
 import { Banner, Button, Card, Chip, Screen, T } from '@/theme/ui';
@@ -62,15 +73,23 @@ export default function Income() {
   const [srcId, setSrcId] = useState(''); const [date, setDate] = useState(''); const [gross, setGross] = useState(''); const [net, setNet] = useState('');
   const [taxes, setTaxes] = useState<Line[]>([{ label: '', amount: '' }]); const [deds, setDeds] = useState<Line[]>([]); const [deps, setDeps] = useState<Line[]>([]);
   const [saved, setSaved] = useState('');
+  const [periodFrom, setPeriodFrom] = useState(''); const [periodTo, setPeriodTo] = useState('');
+  // reading a pay slip: picked, redacted on this device (web), read, then put in the form below for the person to check
+  const redact = useRedactSettings();
+  const [slip, setSlip] = useState<{ file: PickedFile; stage: 'scanning' | 'redact' | 'reading' | 'failed'; message?: string; scan?: Scan; boxes: RedactBox[]; busy?: boolean; error?: string } | null>(null);
+  const [readInfo, setReadInfo] = useState<{ notes: string[]; readBy?: string; fileName: string } | null>(null);
 
   const draft: PayRecord = {
-    id: 'draft', sourceId: srcId || income.sources[0]?.id || '', date, grossCents: cents(gross) || 0, netCents: cents(net) || 0,
+    id: 'draft', sourceId: srcId || (income.sources.length === 1 ? income.sources[0].id : ''), date, grossCents: cents(gross) || 0, netCents: cents(net) || 0,
     taxes: taxes.filter((l) => l.label.trim() || l.amount.trim()).map((l) => ({ label: l.label.trim(), cents: cents(l.amount) || 0 })),
     deductions: deds.filter((l) => l.label.trim() || l.amount.trim()).map((l) => ({ label: l.label.trim(), cents: cents(l.amount) || 0, group: l.group ?? 'other' })),
     deposits: deps.filter((l) => l.amount.trim()).map((l) => ({ ...(l.last4 ? { last4: l.last4 } : {}), cents: cents(l.amount) || 0 })),
+    ...(periodFrom ? { periodFrom } : {}), ...(periodTo ? { periodTo } : {}),
+    ...(readInfo ? { note: provenance(readInfo.readBy, readInfo.fileName) } : {}),
   };
   const issues = open ? recordIssues(draft) : [];
   const ready = !!draft.sourceId && !issues.length;
+  const needsSource = open && !draft.sourceId;
   const sourceName = (id: string) => income.sources.find((s) => s.id === id)?.name ?? 'Removed source';
   const txnById = useMemo(() => new Map(txns.map((t) => [t.id, t])), [txns]);
 
@@ -79,8 +98,47 @@ export default function Income() {
     const r = saveRecord(income, rec);
     if (r.issues.length) return setNotice(r.issues.join(' '));
     saveIncome(r.state); setNotice(''); setSaved(`Saved the ${dayLabel(rec.date)} pay record.`);
-    setOpen(false); setDate(''); setGross(''); setNet(''); setTaxes([{ label: '', amount: '' }]); setDeds([]); setDeps([]);
+    setOpen(false); clearForm();
   };
+
+  const fill = (d: PayslipDraft, fileName: string) => {
+    setSrcId(d.sourceId ?? ''); setDate(d.date); setGross(d.gross); setNet(d.net); setPeriodFrom(d.periodFrom); setPeriodTo(d.periodTo);
+    setTaxes(d.taxes.length ? d.taxes : [{ label: '', amount: '' }]); setDeds(d.deductions); setDeps(d.deposits);
+    setReadInfo({ notes: d.notes, readBy: d.readBy, fileName }); setOpen(true); setSaved(''); setNotice('');
+  };
+  const readIt = async (file: PickedFile) => {
+    setSlip({ file, stage: 'reading', boxes: [], message: 'Reading the pay slip' });
+    try {
+      fill(draftFromRead(await readPayslipFile(file), income.sources), file.name);
+      setSlip(null);
+    } catch (e) { setSlip({ file, stage: 'failed', boxes: [], error: (e as Error).message }); }
+  };
+  const pickSlip = async (source: 'files' | 'photos') => {
+    setNotice('');
+    let files: PickedFile[] = [];
+    try { files = await pickFiles(source); } catch (e) { return setNotice((e as Error).message); }
+    const file = files[0];
+    if (!file) return;
+    if (!redactionSupported || !redact.onRef.current) return readIt(file);
+    setSlip({ file, stage: 'scanning', boxes: [], message: 'Preparing' });
+    try {
+      const scan = await scanForRedaction(file.bytes, file.type, parseHideWords(redact.wordsRef.current), (m) => setSlip((x) => (x && x.stage === 'scanning' ? { ...x, message: `${m}. This happens on your device; nothing is sent anywhere.` } : x)));
+      setSlip({ file, stage: 'redact', scan, boxes: scan.boxes });
+    } catch (e) { setSlip({ file, stage: 'failed', boxes: [], error: `Could not scan the file for sensitive details (${(e as Error).message}). Read it without redacting, or discard it.` }); }
+  };
+  const dropSlip = () => { if (slip?.scan) discardScan(slip.scan); setSlip(null); };
+  const approveSlip = async () => {
+    if (!slip?.scan) return;
+    const { file, scan, boxes } = slip;
+    setSlip({ ...slip, busy: true, error: undefined });
+    try {
+      const out = await burnRedactions(scan, boxes, file.type === 'application/pdf');
+      discardScan(scan);
+      await readIt({ ...file, bytes: out.bytes, type: out.type });
+    } catch (e) { setSlip((x) => (x ? { ...x, busy: false, error: (e as Error).message } : x)); }
+  };
+  const skipRedaction = async () => { if (!slip) return; const file = slip.file; if (slip.scan) discardScan(slip.scan); await readIt(file); };
+  const clearForm = () => { setDate(''); setGross(''); setNet(''); setTaxes([{ label: '', amount: '' }]); setDeds([]); setDeps([]); setPeriodFrom(''); setPeriodTo(''); setReadInfo(null); };
 
   return (
     <Screen max={820}>
@@ -172,23 +230,67 @@ export default function Income() {
         </View>
       </Card>
 
-      <Card title="Pay records" right={<Button small kind={open ? 'ghost' : 'outline'} label={open ? 'Cancel' : 'Add a pay record'} disabled={!income.sources.length} onPress={() => { setOpen(!open); setSaved(''); }} />}>
+      <Card title="Pay records" right={<Button small kind={open ? 'ghost' : 'outline'} label={open ? 'Cancel' : 'Type one by hand'} disabled={!income.sources.length} onPress={() => { setOpen(!open); setSaved(''); if (open) clearForm(); }} />}>
         {!income.sources.length ? <T size={13} tone="ink2">Add an income source first.</T> : null}
         <T size={12} tone="ink3">One per paycheck or payout, copied from the pay slip. It is saved only when gross minus taxes and deductions equals net pay, and each deposit it names is looked for on your statements.</T>
         {saved ? <T size={13} tone="good">{saved}</T> : null}
 
+        {!slip ? (
+          <View style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
+            <T size={13} bold>Read a pay slip</T>
+            <T size={12} tone="ink3">Choose a pay slip PDF, a photo or a screenshot of your payroll page. It is read into the form below so you can check every figure against the slip before saving. The file itself is not kept, only the figures you save.</T>
+            {redactionSupported ? (
+              <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Chip label="Redact pay slips first" on={redact.on} onPress={() => redact.save(!redact.on, redact.words)} />
+                <T size={12} tone="ink3">{redact.on ? 'On: names, addresses and account numbers are blacked out on your device first, and you check the boxes before anything is read.' : 'Off: the slip is read exactly as it is'}</T>
+              </View>
+            ) : null}
+            <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+              <Button small label="Choose a file" disabled={!income.sources.length} onPress={() => pickSlip('files')} />
+              <Button small kind="outline" label="Choose a photo" disabled={!income.sources.length} onPress={() => pickSlip('photos')} />
+            </View>
+          </View>
+        ) : slip.stage === 'redact' && slip.scan ? (
+          <View style={{ gap: S.sm }}>
+            <T size={13} bold>{slip.file.name}</T>
+            <RedactReview scan={slip.scan} boxes={slip.boxes} hideText={redact.words} busy={!!slip.busy} error={slip.error} noun="pay slip" kept={false}
+              onBoxes={(b) => setSlip((x) => (x ? { ...x, boxes: b, error: undefined } : x))}
+              onSearch={(w, t) => { redact.save(redact.on, t); setSlip((x) => (x?.scan ? { ...x, boxes: withNewSearch(x.boxes, findSensitive(x.scan.words, { hide: w })) } : x)); }}
+              onApprove={approveSlip} onSkip={skipRedaction} onDiscard={dropSlip} />
+          </View>
+        ) : slip.stage === 'failed' ? (
+          <View style={{ gap: S.sm, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
+            <T size={13} tone="bad">{slip.error}</T>
+            <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+              <Button small kind="outline" label="Read it without redacting" onPress={skipRedaction} />
+              <Button small kind="ghost" label="Discard" onPress={dropSlip} />
+            </View>
+          </View>
+        ) : <T size={13} tone="ink2">{slip.message ?? 'Working'}</T>}
+
         {open ? (
           <View style={{ gap: S.sm, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
+            {readInfo ? (
+              <View style={{ gap: 2 }}>
+                <T size={13} bold>Read from {readInfo.fileName}{readInfo.readBy ? ` by ${readInfo.readBy}` : ''}. Check every figure against your slip before saving.</T>
+                {readInfo.notes.map((n) => <T key={n} size={13} tone="ink2">{n}</T>)}
+              </View>
+            ) : null}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{income.sources.map((s) => <Chip key={s.id} label={s.name} on={draft.sourceId === s.id} onPress={() => setSrcId(s.id)} />)}</View>
             <View style={{ flexDirection: 'row', gap: 4 }}>
               <Field value={date} onChange={setDate} placeholder="Pay date YYYY-MM-DD" label="Pay date" />
               <Field value={gross} onChange={setGross} placeholder="Gross pay" label="Gross pay" />
               <Field value={net} onChange={setNet} placeholder="Net pay (take home)" label="Net pay" />
             </View>
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              <Field value={periodFrom} onChange={setPeriodFrom} placeholder="Period from YYYY-MM-DD (optional)" label="Pay period start" />
+              <Field value={periodTo} onChange={setPeriodTo} placeholder="Period to YYYY-MM-DD (optional)" label="Pay period end" />
+            </View>
             <Lines title="Taxes taken out" kind="tax" lines={taxes} onChange={setTaxes} />
             <Lines title="Other deductions (insurance, retirement, other)" kind="deduction" lines={deds} onChange={setDeds} />
             <Lines title="Where it was deposited (optional, lets the app find it on your statements)" kind="deposit" lines={deps} onChange={setDeps} />
             {issues.length && (gross || net) ? issues.map((i) => <T key={i} size={13} tone="bad">{i}</T>) : null}
+            {needsSource ? <T size={13} tone="bad">Choose which income source this pay record belongs to.</T> : null}
             {!issues.length && draft.sourceId ? <T size={13} tone="good">Adds up: {dollars(draft.grossCents, { decimals: true })} minus {dollars(draft.grossCents - draft.netCents, { decimals: true })} taken out is {dollars(draft.netCents, { decimals: true })}.</T> : null}
             <View style={{ flexDirection: 'row' }}><Button label="Save pay record" disabled={!ready} onPress={submitRecord} /></View>
           </View>

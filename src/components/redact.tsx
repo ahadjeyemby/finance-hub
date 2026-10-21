@@ -14,8 +14,12 @@ type Pt = { x: number; y: number };
  * found; a box is clicked to switch it off or on, a new one is drawn by dragging across the page, and a list of words to always hide can be
  * searched for again. Nothing is changed in the file until "Use these redactions" is pressed. Web only: it draws with ordinary page elements.
  */
-export function RedactReview({ scan, boxes, hideText, busy, error, onBoxes, onSearch, onApprove, onSkip, onDiscard }: {
+export function RedactReview({ scan, boxes, hideText, busy, error, noun = 'statement', kept = true, onBoxes, onSearch, onApprove, onSkip, onDiscard }: {
   scan: Scan; boxes: RedactBox[]; hideText: string; busy: boolean; error?: string;
+  /** what is being redacted, for the wording (statement, pay slip) */
+  noun?: string;
+  /** whether the file itself is kept in storage once read (a statement is; a pay slip is not, only the figures from it) */
+  kept?: boolean;
   onBoxes: (next: RedactBox[]) => void; onSearch: (words: string[], text: string) => void; onApprove: () => void; onSkip: () => void; onDiscard: () => void;
 }) {
   const [text, setText] = useState(hideText);
@@ -31,7 +35,7 @@ export function RedactReview({ scan, boxes, hideText, busy, error, onBoxes, onSe
 
   return (
     <View style={{ gap: S.sm }}>
-      <T size={13} tone="ink2">Check what will be blacked out before this statement is read or stored. Red boxes are covered in the copy that is used; the original is not kept. Click a box to switch it off or on. Drag across a page to cover something it missed. Account and card numbers keep their last four digits so the statement can still be matched to its account.</T>
+      <T size={13} tone="ink2">Check what will be blacked out before this {noun} is read{kept ? ' or stored' : ''}. Red boxes are covered in the copy that is used; the original is not kept. Click a box to switch it off or on. Drag across a page to cover something it missed. Account and card numbers keep their last four digits so it can still be matched to its account.</T>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
         {countByReason(boxes).map((c) => <Chip key={c.reason} label={`${REDACT_LABEL[c.reason]}: ${c.on} of ${c.total}`} on={c.on > 0} onPress={() => onBoxes(setReason(boxes, c.reason, c.on < c.total))} />)}
         {!boxes.length ? <T size={13} tone="ink2">Nothing looked sensitive. Draw a box over anything you want covered.</T> : null}
@@ -78,7 +82,7 @@ export function RedactReview({ scan, boxes, hideText, busy, error, onBoxes, onSe
       {confirmSkip ? (
         <View style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
           <T size={13} tone="bad" bold>Read it without redacting?</T>
-          <T size={13} tone="ink2">The whole original, with every number and address on it, is sent to the reader and kept in your private storage.</T>
+          <T size={13} tone="ink2">The whole original, with every number and address on it, is sent to the reader{kept ? ' and kept in your private storage' : ''}.</T>
           <View style={{ flexDirection: 'row', gap: S.sm }}>
             <Button small kind="outline" label="Yes, read the original" disabled={busy} onPress={onSkip} />
             <Button small kind="ghost" label="No, go back" onPress={() => setConfirmSkip(false)} />
