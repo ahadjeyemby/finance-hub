@@ -1,6 +1,6 @@
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
-export type IconName = 'overview' | 'explore' | 'add' | 'inbox' | 'reports' | 'accounts' | 'links' | 'views' | 'tags' | 'recurring' | 'back';
+export type IconName = 'overview' | 'explore' | 'add' | 'inbox' | 'reports' | 'accounts' | 'links' | 'views' | 'tags' | 'recurring' | 'income' | 'back';
 
 export function Icon({ name, color, size = 22 }: { name: IconName; color: string; size?: number }) {
   const p = { stroke: color, strokeWidth: 2, fill: 'none', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -16,6 +16,7 @@ export function Icon({ name, color, size = 22 }: { name: IconName; color: string
       {name === 'views' ? <><Circle cx={12} cy={12} r={8} {...p} /><Path d="M12 4v8l5.5 5.5" {...p} /></> : null}
       {name === 'tags' ? <><Path d="M3.5 12.5V4.5h8l8 8-8 8-8-8z" {...p} /><Circle cx={8} cy={9} r={1.2} {...p} /></> : null}
       {name === 'recurring' ? <><Path d="M19 8a7.5 7.5 0 0 0-13-1.5L4.5 8.5M4.5 4v4.5H9M5 16a7.5 7.5 0 0 0 13 1.5l1.5-2M19.5 20v-4.5H15" {...p} /></> : null}
+      {name === 'income' ? <><Path d="M12 20V5M7 10l5-5 5 5" {...p} /><Path d="M5 20h14" {...p} /></> : null}
       {name === 'back' ? <Path d="M15 5l-7 7 7 7" {...p} /> : null}
     </Svg>
   );

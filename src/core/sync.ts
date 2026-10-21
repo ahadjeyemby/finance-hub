@@ -69,7 +69,16 @@ export function mergeOverlays(local: Overlay, remote: Overlay): Overlay {
     ...mergeCategories(local, remote),
     ...mergeTags(local, remote),
     ...mergeRecurring(local, remote),
+    ...mergeIncome(local, remote),
   };
+}
+
+/** Income: sources and pay records by id (the remote winning), deposit assignments key by key. */
+function mergeIncome(local: Overlay, remote: Overlay): Pick<Overlay, 'income'> {
+  const a = local.income; const b = remote.income;
+  if (!a && !b) return {};
+  const byId = <T extends { id: string }>(x?: T[], y?: T[]) => [...new Map([...(x ?? []), ...(y ?? [])].map((i) => [i.id, i])).values()];
+  return { income: { sources: byId(a?.sources, b?.sources), records: byId(a?.records, b?.records), assign: { ...(a?.assign ?? {}), ...(b?.assign ?? {}) } } };
 }
 
 /** Recurring: decisions key by key, the remote winning; items added by hand by id. */
@@ -103,18 +112,20 @@ export function parseOverlay(body: unknown): Overlay {
   const obj = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, never>) : {});
   const arr = (v: unknown) => (Array.isArray(v) ? v : []);
   const cats = obj(b.categories) as Record<string, never>; const tags = obj(b.tags) as Record<string, never>;
-  const rec = obj(b.recurring) as Record<string, never>;
+  const rec = obj(b.recurring) as Record<string, never>; const inc = obj(b.income) as Record<string, never>;
   return {
     manual: arr(b.manual) as Txn[], patches: obj(b.patches), merchantRules: obj(b.merchantRules), answered: obj(b.answered) as Record<string, string>, savedReports: arr(b.savedReports) as Overlay['savedReports'],
     ...(b.categories ? { categories: { custom: arr(cats.custom), edits: obj(cats.edits), merged: obj(cats.merged) } as unknown as Overlay['categories'] } : {}),
     ...(b.tags ? { tags: { defs: arr(tags.defs), edits: obj(tags.edits) } as unknown as Overlay['tags'] } : {}),
+    ...(b.income ? { income: { sources: arr(inc.sources), records: arr(inc.records), assign: obj(inc.assign) } as unknown as Overlay['income'] } : {}),
     ...(b.recurring ? { recurring: { edits: obj(rec.edits), manual: arr(rec.manual) } as unknown as Overlay['recurring'] } : {}),
   };
 }
 
 export const overlayIsEmpty = (o: Overlay) => !o.manual.length && !Object.keys(o.patches).length && !Object.keys(o.merchantRules).length && !Object.keys(o.answered).length && !o.savedReports.length
   && !o.categories?.custom.length && !Object.keys(o.categories?.edits ?? {}).length && !Object.keys(o.categories?.merged ?? {}).length && !o.tags?.defs.length && !Object.keys(o.tags?.edits ?? {}).length
-  && !Object.keys(o.recurring?.edits ?? {}).length && !o.recurring?.manual.length;
+  && !Object.keys(o.recurring?.edits ?? {}).length && !o.recurring?.manual.length
+  && !o.income?.sources.length && !o.income?.records.length && !Object.keys(o.income?.assign ?? {}).length;
 
 /** Mark manual entries that have not reached the database yet. Called with the moment a push is attempted. */
 export function stampUploads(o: Overlay, nowISO: string): Overlay {

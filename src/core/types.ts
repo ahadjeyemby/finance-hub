@@ -125,6 +125,8 @@ export interface Overlay {
   tags?: import('./tags').TagState;
   /** what the person confirmed, ignored or cancelled among the recurring charges, and the ones added by hand (see recurring.ts) */
   recurring?: import('./recurring').RecurringState;
+  /** where income comes from, the pay records and the deposits the person assigned (see income.ts) */
+  income?: import('./income').IncomeState;
 }
 
 export interface SavedReport {
