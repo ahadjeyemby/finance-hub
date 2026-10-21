@@ -8,11 +8,14 @@ import type { Proposal, ReceiptProposal } from '@/components/intake';
 import { ScreenHeader } from '@/components/header';
 import { FilePreview } from '@/components/preview';
 import { RedactReview } from '@/components/redact';
+import { ScanReview } from '@/components/scanner';
 import { findSensitive, parseHideWords, withNewSearch } from '@/core/redact';
 import { autoTagsFor } from '@/core/tags';
 import type { RedactBox } from '@/core/redact';
 import { burnRedactions, discardScan, redactionSupported, scanForRedaction } from '@/data/redact';
 import type { Scan } from '@/data/redact';
+import { discardShot, finishScan, loadShot, scanSupported } from '@/data/scan';
+import type { Shot } from '@/data/scan';
 import { matchesFilter, progressLine, runPool, separateByKind, splitRepeats, tally } from '@/core/bulk';
 import type { BulkStatus, Filter } from '@/core/bulk';
 import { allCategories } from '@/core/categories';
@@ -32,7 +35,7 @@ import { saveLinks, setFlag } from '@/data/links';
 import { sweepLinks } from '@/data/linking';
 import { NO_LINK_LABEL, RECEIPT_NO_LINK, storedKeys } from '@/core/links';
 import type { Link, NoLinkReason } from '@/core/links';
-import { canPickFolder, findDuplicate, loadStoredReceipts, pickFiles, pickFolder, readReceiptFile, listReaders, readStatementFile, rereadReceiptFile, rereadStatementWithHint, saveReceiptRecord, saveStatementPlan } from '@/data/intake';
+import { canPickFolder, findDuplicate, loadStoredReceipts, makePicked, pickFiles, pickFolder, readReceiptFile, listReaders, readStatementFile, rereadReceiptFile, rereadStatementWithHint, saveReceiptRecord, saveStatementPlan } from '@/data/intake';
 import type { PickedFile } from '@/data/intake';
 import { useRepo } from '@/data/repo';
 import { supabase } from '@/data/supabase';
@@ -179,6 +182,23 @@ export default function Import() {
   const receipts = useMemo(() => (links ? storedKeys(links) : fallbackReceipts), [links, fallbackReceipts]);
   const [notice, setNotice] = useState('');
   const [info, setInfo] = useState('');
+  // photos taken with the camera wait here, one at a time, to be cropped and cleaned up like a document scan before they join the list
+  const [shots, setShots] = useState<{ key: string; file: PickedFile; shot?: Shot; busy?: boolean; error?: string }[]>([]);
+  const [scanOn, setScanOn] = useState(true);
+  const scanOnRef = useRef(true);
+  useEffect(() => {
+    AsyncStorage.getItem('audit.scan.v1').then((raw) => { if (raw === 'off') { setScanOn(false); scanOnRef.current = false; } }).catch(() => {});
+  }, []);
+  const setScanSetting = (on: boolean) => { setScanOn(on); scanOnRef.current = on; AsyncStorage.setItem('audit.scan.v1', on ? 'on' : 'off').catch(() => {}); };
+  const first = shots[0];
+  useEffect(() => {
+    if (!first || first.shot || first.error) return;
+    let alive = true;
+    loadShot(first.file.bytes, first.file.type)
+      .then((shot) => { if (alive) setShots((xs) => xs.map((x) => (x.key === first.key ? { ...x, shot } : x))); else discardShot(shot); })
+      .catch((e) => { if (alive) setShots((xs) => xs.map((x) => (x.key === first.key ? { ...x, error: `Could not open this photo for scanning (${(e as Error).message}). Use it as taken, or discard it.` } : x))); });
+    return () => { alive = false; };
+  }, [first]);
   const [filter, setFilter] = useState<Filter>('all');
   const [limit, setLimit] = useState(PAGE);
   const [reading, setReading] = useState(false);
@@ -299,7 +319,14 @@ export default function Import() {
       else files = await pickFiles(source);
     } catch (e) { return setNotice((e as Error).message); }
     if (!files.length && !skipped.length) return;
-
+    if (source === 'camera' && scanSupported && scanOnRef.current && files.length) {
+      setShots((xs) => [...xs, ...files.map((file, i) => ({ key: `shot-${Date.now()}-${i}`, file }))]);
+      return;
+    }
+    await admit(files, skipped);
+  };
+  /** Add picked files to the list: sorted by kind, repeats left out, the rest queued to be read. */
+  const admit = async (files: PickedFile[], skipped: string[]) => {
     const sep = separateByKind(files, kind);
     const known = new Set(itemsRef.current.flatMap((i) => (i.file ? [i.file.sha256] : [])));
     const { fresh, repeats } = splitRepeats(sep.fit, known);
@@ -316,6 +343,24 @@ export default function Import() {
       ...fresh.map((f) => newItem(kind, f)),
     ]);
     await processQueue();
+  };
+  const dropShot = (key: string) => setShots((xs) => { const x = xs.find((s) => s.key === key); if (x?.shot) discardShot(x.shot); return xs.filter((s) => s.key !== key); });
+  const acceptScan = async (key: string, quad: Parameters<typeof finishScan>[1], mode: Parameters<typeof finishScan>[2], turns: number) => {
+    const cur = shots.find((x) => x.key === key);
+    if (!cur?.shot) return;
+    setShots((xs) => xs.map((x) => (x.key === key ? { ...x, busy: true, error: undefined } : x)));
+    try {
+      const out = await finishScan(cur.shot, quad, mode, turns);
+      const file = await makePicked(`${cur.file.name.replace(/\.[^.]+$/, '')}-scan.jpg`, out.bytes, out.type);
+      dropShot(key);
+      await admit([file], []);
+    } catch (e) { setShots((xs) => xs.map((x) => (x.key === key ? { ...x, busy: false, error: (e as Error).message } : x))); }
+  };
+  const acceptOriginal = async (key: string) => {
+    const cur = shots.find((x) => x.key === key);
+    if (!cur) return;
+    dropShot(key);
+    await admit([cur.file], []);
   };
   const typeByHand = () => update((xs) => [...xs, newItem('receipt', null, { status: 'review', receipt: { lines: [] }, open: true })]);
   const stop = () => { stopRef.current = true; };
@@ -478,6 +523,12 @@ export default function Import() {
             <T size={12} tone="ink3">{redactOn ? 'Each statement is scanned for account numbers, names, addresses and similar on your device, with no outside service. You check every box before anything is read or stored, and the reader only ever sees the redacted copy.' : 'Turn this on to black out sensitive details before a statement is read or stored.'}</T>
           </View>
         ) : null}
+        {scanSupported ? (
+          <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Chip label="Scan photos taken here" on={scanOn} onPress={() => setScanSetting(!scanOn)} />
+            <T size={12} tone="ink3">{scanOn ? 'A photo from Take a photo is cropped to the paper, straightened and cleaned up in black and white, on your device. You check the crop first.' : 'Off: photos are used exactly as taken'}</T>
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
           {canPickFolder ? <Button label="Choose a folder" disabled={!connected} onPress={() => add('folder')} /> : null}
           <Button kind={canPickFolder ? 'outline' : 'solid'} label="Choose files" disabled={!connected} onPress={() => add('files')} />
@@ -516,6 +567,23 @@ export default function Import() {
             <Chip key={f} label={label} count={n} on={filter === f} onPress={() => { setFilter(f); setLimit(PAGE); }} />
           ))}
         </View>
+      ) : null}
+
+      {first ? (
+        <Card key={first.key} title={first.file.name} right={<T size={12} tone="ink3" bold>{shots.length > 1 ? `Scan 1 of ${shots.length}` : 'Check the scan'}</T>}>
+          {first.shot ? (
+            <ScanReview key={first.key} shot={first.shot} busy={!!first.busy} error={first.error}
+              onUse={(q, m, t) => acceptScan(first.key, q, m, t)} onOriginal={() => acceptOriginal(first.key)} onDiscard={() => dropShot(first.key)} />
+          ) : first.error ? (
+            <View style={{ gap: S.sm }}>
+              <T size={13} tone="bad">{first.error}</T>
+              <View style={{ flexDirection: 'row', gap: S.sm }}>
+                <Button small kind="outline" label="Use the photo as taken" onPress={() => acceptOriginal(first.key)} />
+                <Button small kind="ghost" label="Discard this photo" onPress={() => dropShot(first.key)} />
+              </View>
+            </View>
+          ) : <T size={13} tone="ink2">Looking for the paper in the photo. This happens on your device.</T>}
+        </Card>
       ) : null}
 
       {shown.map((item) => {

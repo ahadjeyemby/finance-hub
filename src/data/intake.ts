@@ -11,6 +11,7 @@ import type { ReadReceipt, ReadStatement, StatementDraft, StatementPlan } from '
 import { uploadEvidence, uploadLedger } from '@/core/ledgerio';
 import { selectReadable, withRetry } from '@/core/bulk';
 import { digestHex, sniffMime, toBase64 } from '@/core/sha256';
+import { scanSupported } from './scan';
 import { callFunction, supabase } from './supabase';
 
 export interface PickedFile { name: string; type: string; bytes: Uint8Array; sha256: string }
@@ -23,6 +24,9 @@ async function toPicked(name: string, bytes: Uint8Array, declared?: string | nul
   const type = sniffMime(bytes) ?? declared ?? NAME_TYPE[name.split('.').pop()?.toLowerCase() ?? ''] ?? 'application/octet-stream';
   return { name, type, bytes, sha256: await digestHex(bytes) };
 }
+
+/** A picked file from bytes made on the device (a scan), fingerprinted like any other. */
+export const makePicked = (name: string, bytes: Uint8Array, type: string): Promise<PickedFile> => toPicked(name, bytes, type);
 
 /** Browsers can hand over a whole folder. Phones cannot: there the person selects many files or photos instead. */
 export const canPickFolder = Platform.OS === 'web';
@@ -65,7 +69,7 @@ export async function pickFiles(source: 'files' | 'photos' | 'camera'): Promise<
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) throw new Error('Camera access is off. Allow it in Settings, or choose a photo instead.');
   }
-  const opts = { quality: 0.85, mediaTypes: ['images'] as ImagePicker.MediaType[] };
+  const opts = { quality: source === 'camera' && scanSupported ? 1 : 0.85, mediaTypes: ['images'] as ImagePicker.MediaType[] };
   const r = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync({ ...opts, allowsMultipleSelection: true, selectionLimit: 0, orderedSelection: true });
   if (r.canceled) return [];
   const out: PickedFile[] = [];
