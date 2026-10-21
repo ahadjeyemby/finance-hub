@@ -13,6 +13,7 @@ import { findSensitive, parseHideWords, withNewSearch } from '@/core/redact';
 import { autoTagsFor } from '@/core/tags';
 import type { RedactBox } from '@/core/redact';
 import { burnRedactions, discardScan, redactionSupported, scanForRedaction } from '@/data/redact';
+import { useRedactSettings } from '@/data/redactSettings';
 import type { Scan } from '@/data/redact';
 import { discardShot, finishScan, loadShot, scanSupported } from '@/data/scan';
 import type { Shot } from '@/data/scan';
@@ -215,20 +216,7 @@ export default function Import() {
   const claimedRef = useRef<Set<string>>(new Set());
   const stopRef = useRef(false);
   // redaction settings: on by default where it can run (the web version), kept on this device only
-  const [redactOn, setRedactOn] = useState(true);
-  const [hideText, setHideText] = useState('');
-  const redactOnRef = useRef(true);
-  const hideRef = useRef('');
-  useEffect(() => {
-    AsyncStorage.getItem('audit.redact.v1').then((raw) => {
-      if (!raw) return;
-      try { const v = JSON.parse(raw) as { on?: boolean; words?: string }; if (typeof v.on === 'boolean') { setRedactOn(v.on); redactOnRef.current = v.on; } if (typeof v.words === 'string') { setHideText(v.words); hideRef.current = v.words; } } catch { /* unreadable settings: keep the defaults */ }
-    }).catch(() => {});
-  }, []);
-  const saveRedactSettings = (on: boolean, words: string) => {
-    setRedactOn(on); setHideText(words); redactOnRef.current = on; hideRef.current = words;
-    AsyncStorage.setItem('audit.redact.v1', JSON.stringify({ on, words })).catch(() => {});
-  };
+  const { on: redactOn, words: hideText, onRef: redactOnRef, wordsRef: hideRef, save: saveRedactSettings } = useRedactSettings();
 
   useEffect(() => {
     let on = true;
