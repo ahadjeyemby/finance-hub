@@ -1,14 +1,15 @@
-import Svg, { Circle, Line, Polyline, Rect } from 'react-native-svg';
+import { Image } from 'expo-image';
 
-/** The Finora mark on its dark tile: a magnifier over a rising line. The same drawing as assets/brand/finora-icon.svg, which the app icon is made from. */
+// The Finora artwork, from assets/brand. The symbol is the roof, bars and rising arrow; the lockup adds the name and the line "Your finances. In control."
+const SYMBOL = require('../../assets/brand/png/01_symbol_color_256px.png');
+const LOCKUP = require('../../assets/brand/png/09_logo_horizontal_color_1200px.png');
+
+/** The Finora symbol on a transparent background. */
 export function Logo({ size = 44 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 1024 1024" accessibilityLabel="Finora" aria-label="Finora">
-      <Rect width={1024} height={1024} rx={230} fill="#2B2D31" />
-      <Circle cx={450} cy={450} r={245} fill="none" stroke="#E8E6E1" strokeWidth={64} />
-      <Line x1={632} y1={632} x2={800} y2={800} stroke="#E8E6E1" strokeWidth={72} strokeLinecap="round" />
-      <Polyline points="330,540 410,460 470,510 570,385" fill="none" stroke="#3FB6A8" strokeWidth={44} strokeLinecap="round" strokeLinejoin="round" />
-      <Circle cx={570} cy={385} r={34} fill="#3FB6A8" />
-    </Svg>
-  );
+  return <Image source={SYMBOL} style={{ width: size, height: size }} contentFit="contain" accessibilityLabel="Finora" />;
+}
+
+/** The full logo: symbol, name and tagline side by side (about 3 to 1). */
+export function Lockup({ width = 260 }: { width?: number }) {
+  return <Image source={LOCKUP} style={{ width, height: Math.round(width * (391 / 1200)) }} contentFit="contain" accessibilityLabel="Finora. Your finances. In control." />;
 }

@@ -26,8 +26,8 @@ export function reportToHtml(spec: ReportSpec, ctx: Ctx, dataTo: string): string
   }
   const notes = (spec.notes ?? []).map((n) => `<p class="note">${esc(n)}</p>`).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-body{font-family:Helvetica,Arial,sans-serif;color:#1B1A18;padding:28px;max-width:760px;margin:auto}h1{font-size:24px;margin:0}h2{font-size:15px;margin:22px 0 6px}.s,small{color:#5E5C56;font-size:12px}
-.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.kpi{border:1px solid #D9D6CF;border-radius:8px;padding:8px 12px;min-width:120px}.kpi b{display:block;font-size:20px}
-table{width:100%;border-collapse:collapse;font-size:12px}td{padding:5px 4px;border-bottom:1px solid #E8E6E1}td.n{text-align:right;font-weight:700;white-space:nowrap}td.bar{width:38%}td.bar i{display:block;height:8px;background:#3A3D44;border-radius:0 4px 4px 0}
+body{font-family:Helvetica,Arial,sans-serif;color:#172031;padding:28px;max-width:760px;margin:auto}h1{font-size:24px;margin:0}h2{font-size:15px;margin:22px 0 6px}.s,small{color:#5E5C56;font-size:12px}
+.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.kpi{border:1px solid #DDE1EA;border-radius:8px;padding:8px 12px;min-width:120px}.kpi b{display:block;font-size:20px}
+table{width:100%;border-collapse:collapse;font-size:12px}td{padding:5px 4px;border-bottom:1px solid #E8EBF4}td.n{text-align:right;font-weight:700;white-space:nowrap}td.bar{width:38%}td.bar i{display:block;height:8px;background:#3A3D44;border-radius:0 4px 4px 0}
 .note{background:#FFF1CC;color:#5C3F00;padding:8px 10px;border-radius:6px;font-size:12px}</style></head><body><h1>${esc(spec.title)}</h1><p class="s">${esc(spec.period.label)}${spec.subtitle ? ' &middot; ' + esc(spec.subtitle) : ''}</p>${notes}${parts.join('')}<p class="s" style="margin-top:28px">Built from statements through ${dayLabel(dataTo)}.</p></body></html>`;
 }
