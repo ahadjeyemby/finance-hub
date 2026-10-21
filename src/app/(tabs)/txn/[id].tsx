@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { EvidenceCard } from '@/components/evidence';
+import { EditEntry } from '@/components/txnedit';
 import { TagsEditor } from '@/components/tags';
 import { ScreenHeader } from '@/components/header';
 import { allCategories, categoryLabel } from '@/core/categories';
@@ -37,6 +38,7 @@ export default function TxnDetail() {
         <T size={12} tone="ink3">{t.description}</T>
       </Card>
       <EvidenceCard txn={t} />
+      <EditEntry key={`${t.id}:${t.merchant}`} txn={t} />
       {isSpend ? (
         <>
           <Card title="Business or personal">

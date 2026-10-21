@@ -120,6 +120,12 @@ export interface Repo {
   saveReport: (prompt: string, spec: ReportSpec) => string;
   deleteReport: (id: string) => void;
   patchTxn: (id: string, patch: Overlay['patches'][string]) => void;
+  /** take back changes made to a charge, so it shows what the statement says again */
+  clearPatch: (id: string, keys: (keyof Overlay['patches'][string])[]) => void;
+  /** replace a cash entry with its edited version (same id) */
+  updateCash: (t: Txn) => void;
+  /** remove a cash entry the person entered */
+  removeCash: (id: string) => void;
   attachReceipt: (txnId: string, lines: { item: string; cents: number }[], uri: string) => void;
   /** the tag definitions and the person's changes to tags (always has the tag list, the default one until they change it) */
   tagState: TagState;
@@ -368,6 +374,23 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     saveReport: (prompt, spec) => { const id = `r${Date.now()}`; commit({ ...overlay, savedReports: [{ id, createdAt: new Date().toISOString(), prompt, spec }, ...overlay.savedReports] }); return id; },
     deleteReport: (id) => commit({ ...overlay, savedReports: overlay.savedReports.filter((r) => r.id !== id) }),
     patchTxn: (id, patch) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [id]: { ...o.patches[id], ...patch } } }); },
+    clearPatch: (id, keys) => {
+      const o = overlayRef.current; const cur = { ...(o.patches[id] ?? {}) };
+      for (const k of keys) delete cur[k];
+      const patches = { ...o.patches };
+      if (Object.keys(cur).length) patches[id] = cur; else delete patches[id];
+      commit({ ...o, patches });
+    },
+    // an edited entry is the person's own words again: earlier quick changes to the same entry are dropped so they cannot override the form, except its receipt
+    updateCash: (t) => {
+      const o = overlayRef.current; const rid = o.patches[t.id]?.receiptId;
+      const patches = { ...o.patches }; delete patches[t.id]; if (rid) patches[t.id] = { receiptId: rid };
+      commit({ ...o, manual: o.manual.map((x) => (x.id === t.id ? t : x)), patches });
+    },
+    removeCash: (id) => {
+      const o = overlayRef.current; const patches = { ...o.patches }; delete patches[id];
+      commit({ ...o, manual: o.manual.filter((x) => x.id !== id), patches });
+    },
     links: baseLinks, reloadLinks,
     team: teamApi,
     // what is saved is only the admin's own part: members' tags, categories and income sources stay theirs (see ownTagState and friends in core/team.ts)

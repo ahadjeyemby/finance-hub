@@ -55,7 +55,8 @@ export const chunk = <T,>(xs: T[], size: number): T[][] => { const out: T[][] = 
  */
 export function mergeOverlays(local: Overlay, remote: Overlay): Overlay {
   const manual = new Map(local.manual.map((t) => [t.id, t]));
-  for (const t of remote.manual) manual.set(t.id, t);
+  // the same entry on both sides: the one edited later wins (the remote when neither was edited)
+  for (const t of remote.manual) { const l = manual.get(t.id); manual.set(t.id, l && (l.editedAt ?? '') > (t.editedAt ?? '') ? l : t); }
   const reports = new Map(local.savedReports.map((r) => [r.id, r]));
   for (const r of remote.savedReports) reports.set(r.id, r);
   const patches: Overlay['patches'] = { ...local.patches };

@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 
 import type { ReceiptKey } from '@/core/dedupe';
 import type { ReceiptRecord } from '@/core/evidence';
-import { receiptToRow } from '@/core/evidence';
+import { receiptToRow, receiptUpdate } from '@/core/evidence';
 import { MAX_HINT, readingAsText, receiptAsText, receiptFromRead, receiptMisfits, settleReads, settleReceiptReads, statementFromRead, statementGap } from '@/core/intake';
 import type { ReadReceipt, ReadStatement, StatementDraft, StatementPlan } from '@/core/intake';
 import { uploadEvidence, uploadLedger } from '@/core/ledgerio';
@@ -159,6 +159,18 @@ export async function saveReceiptRecord(rec: ReceiptRecord, file: PickedFile | n
     : await supabase.from('receipts').insert(row).select('id').single();
   if (q.error) throw new Error(`Could not save the receipt: ${q.error.message}`);
   return q.data.id as string;
+}
+
+/** Save the edits made to a receipt that is already stored. Only its own details change: the file, its link and the rest of what was read stay. */
+export async function updateReceiptRecord(id: string, rec: ReceiptRecord, owner?: string): Promise<void> {
+  if (!supabase) throw new Error('No database is connected, so nothing can be saved.');
+  const uid = owner ?? meId();
+  const cur = await supabase.from('receipts').select('raw').eq('user_id', uid).eq('id', id).maybeSingle();
+  if (cur.error) throw new Error(`Could not read the receipt: ${cur.error.message}`);
+  if (!cur.data) throw new Error('That receipt is no longer stored.');
+  const r = await supabase.from('receipts').update(receiptUpdate(rec, (cur.data.raw ?? {}) as Record<string, unknown>)).eq('user_id', uid).eq('id', id).select('id');
+  if (r.error) throw new Error(`Could not save the receipt: ${r.error.message}`);
+  if (!r.data?.length) throw new Error('The receipt was not changed. You may not be allowed to edit it.');
 }
 
 /** Save an approved statement: account, rows, the statement record, each source line and the original PDF. */
