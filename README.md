@@ -1,4 +1,4 @@
-# Audit
+# Finora
 
 A personal finance audit app for phone and web (Expo, React Native). It reads your statements, receipts and cash entries, then shows what you earned, where the money went, what comes next month, and asks questions whenever something is unclear.
 
