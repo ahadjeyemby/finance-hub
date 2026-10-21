@@ -20,6 +20,7 @@ import type { LedgerKind } from '@/core/sync';
 import { emptyOverlay } from '@/core/types';
 import type { Account, CategoryId, Overlay, Question, Txn } from '@/core/types';
 import { C, SERIES } from '@/theme/tokens';
+import { setCurrentUser } from './scope';
 import { fetchLedger, fetchOverlay, pushOverlay } from './sync';
 import { fetchLinkData, NO_LINKS } from './links';
 import type { LinkData } from './links';
@@ -141,6 +142,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userId = session?.user.id ?? null;
   userIdRef.current = userId;
+  setCurrentUser(userId);
 
   // local state first, so the app opens instantly and works offline
   useEffect(() => {

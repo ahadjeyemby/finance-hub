@@ -53,14 +53,17 @@ export async function uploadLedger(db: SupabaseClient, ledger: LedgerFile, size 
   return { accounts: ledger.accounts.length, txns: rows.length };
 }
 
-/** Delete this user's statement rows (row level security limits it to them). Transactions first, then accounts. */
-export async function wipeLedger(db: SupabaseClient): Promise<void> {
-  const t = await db.from('txns').delete().not('id', 'is', null);   // txn_raw rows go with them (on delete cascade)
+/**
+ * Delete one person's statement rows, and only theirs: `userId` is always named, because an admin's database role can also reach their members' rows.
+ * Transactions first, then accounts.
+ */
+export async function wipeLedger(db: SupabaseClient, userId: string): Promise<void> {
+  const t = await db.from('txns').delete().eq('user_id', userId).not('id', 'is', null);   // txn_raw rows go with them (on delete cascade)
   if (t.error) throw t.error;
   // statements point at accounts without a cascade, so they must go first or the accounts delete is refused
-  const s = await db.from('statements').delete().not('id', 'is', null);
+  const s = await db.from('statements').delete().eq('user_id', userId).not('id', 'is', null);
   if (s.error) throw s.error;
-  const a = await db.from('accounts').delete().not('id', 'is', null);
+  const a = await db.from('accounts').delete().eq('user_id', userId).not('id', 'is', null);
   if (a.error) throw a.error;
 }
 
@@ -135,12 +138,12 @@ export async function uploadEvidence(db: SupabaseClient, ledger: LedgerFile, bun
 
   // Link receipts to their transactions inside the app's overlay (additive: existing answers are kept).
   if (Object.keys(patches).length) {
-    const cur = await db.from('overlays').select('body').maybeSingle();
+    const cur = await db.from('overlays').select('body').eq('user_id', o.userId).maybeSingle();
     if (cur.error) throw cur.error;
     const body = (cur.data?.body ?? {}) as { patches?: Record<string, object> };
     const merged = { ...(cur.data?.body ?? {}), patches: { ...(body.patches ?? {}) } } as { patches: Record<string, object> };
     for (const [id, p] of Object.entries(patches)) merged.patches[id] = { ...(merged.patches[id] ?? {}), ...p };
-    const w = await db.from('overlays').upsert({ body: merged, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    const w = await db.from('overlays').upsert({ user_id: o.userId, body: merged, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
     if (w.error) throw w.error;
   }
   return res;

@@ -12,6 +12,7 @@ import { uploadEvidence, uploadLedger } from '@/core/ledgerio';
 import { selectReadable, withRetry } from '@/core/bulk';
 import { digestHex, sniffMime, toBase64 } from '@/core/sha256';
 import { scanSupported } from './scan';
+import { meId } from './scope';
 import { callFunction, supabase } from './supabase';
 
 export interface PickedFile { name: string; type: string; bytes: Uint8Array; sha256: string }
@@ -89,8 +90,8 @@ export type Found = { duplicateOf: string | null };
 export async function findDuplicate(kind: 'receipt' | 'statement', sha256: string): Promise<Found> {
   if (!supabase) return { duplicateOf: null };
   const q = kind === 'receipt'
-    ? await supabase.from('receipts').select('id, merchant, date').eq('sha256', sha256).limit(1)
-    : await supabase.from('statements').select('id, label').eq('sha256', sha256).limit(1);
+    ? await supabase.from('receipts').select('id, merchant, date').eq('user_id', meId()).eq('sha256', sha256).limit(1)
+    : await supabase.from('statements').select('id, label').eq('user_id', meId()).eq('sha256', sha256).limit(1);
   if (q.error || !q.data?.length) return { duplicateOf: null };
   const row = q.data[0] as Record<string, string | null>;
   return { duplicateOf: kind === 'receipt' ? [row.merchant, row.date].filter(Boolean).join(' on ') || 'a stored receipt' : row.label ?? row.id };
@@ -171,7 +172,7 @@ export async function saveStatementPlan(plan: StatementPlan, file: PickedFile | 
     readFile: async () => (file ? { bytes: file.bytes, contentType: file.type } : null),
   });
   for (const u of plan.pairUpdates) {
-    const r = await supabase.from('txns').update({ pair_id: u.pairId }).eq('id', u.id);
+    const r = await supabase.from('txns').update({ pair_id: u.pairId }).eq('user_id', uid).eq('id', u.id);
     if (r.error) throw new Error(`Saved, but could not link a card payment: ${r.error.message}`);
   }
 }
@@ -179,7 +180,7 @@ export async function saveStatementPlan(plan: StatementPlan, file: PickedFile | 
 /** What is already stored, in the small form the duplicate check needs. Empty when offline or on error: the check then only sees the current batch. */
 export async function loadStoredReceipts(): Promise<ReceiptKey[]> {
   if (!supabase) return [];
-  const q = await supabase.from('receipts').select('id, merchant, date, time, total_cents, order_ref, card_last4, store_ref, source_file, txn_id, payment_method').limit(5000);
+  const q = await supabase.from('receipts').select('id, merchant, date, time, total_cents, order_ref, card_last4, store_ref, source_file, txn_id, payment_method').eq('user_id', meId()).limit(5000);
   if (q.error) return [];
   return (q.data ?? []).map((r) => ({
     id: r.id as string, label: (r.source_file as string | null) ?? 'a stored receipt', merchant: r.merchant as string | null, date: r.date as string | null, time: r.time as string | null,

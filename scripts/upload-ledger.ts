@@ -71,7 +71,7 @@ async function main() {
   }
   console.log(`Signed in as ${auth.user.email}`);
 
-  const probe = await db.from('accounts').select('id', { count: 'exact', head: true });
+  const probe = await db.from('accounts').select('id', { count: 'exact', head: true }).eq('user_id', auth.user.id);
   if (probe.error) {
     fail(looksMissingTable(probe.error)
       ? 'The database tables do not exist yet. Apply the migration first:\n  supabase link --project-ref <your-project-ref>\n  supabase db push\nor paste supabase/migrations/0001_init.sql into the dashboard SQL Editor and run it.'
@@ -80,7 +80,7 @@ async function main() {
   console.log(`Database currently holds ${probe.count ?? 0} accounts.`);
 
   if (flag('--dry-run')) { console.log('Dry run: nothing sent.'); return; }
-  if (flag('--wipe')) { await wipeLedger(db); console.log('Existing statement rows deleted.'); }
+  if (flag('--wipe')) { await wipeLedger(db, auth.user.id); console.log('Existing statement rows deleted.'); }
 
   const sent = await uploadLedger(db, ledger);
   console.log(`Uploaded ${sent.accounts} accounts and ${sent.txns} transactions.`);
@@ -110,7 +110,7 @@ async function main() {
   // Read it back and compare, so "done" means the numbers match.
   let count = 0; let sum = 0;
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db.from('txns').select('cents').order('id').range(from, from + 999);
+    const { data, error } = await db.from('txns').select('cents').eq('user_id', auth.user.id).order('id').range(from, from + 999);
     if (error) throw error;
     count += data.length; sum += data.reduce((s, r) => s + (r.cents as number), 0);
     if (data.length < 1000) break;

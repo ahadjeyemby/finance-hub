@@ -3,12 +3,13 @@ import type { Account, AccountNumber } from '@/core/types';
 import { rowToAccount } from '@/core/sync';
 import type { AccountRow } from '@/core/sync';
 import { signed } from './evidence';
+import { meId } from './scope';
 import { supabase } from './supabase';
 
 /** Store the extra numbers of one account (the main number stays on the account itself). Needs migration 0004. */
 export async function saveAccountNumbers(accountId: string, numbers: AccountNumber[]): Promise<void> {
   if (!supabase) throw new Error('No database is connected.');
-  const { error } = await supabase.from('accounts').update({ extra_numbers: numbers }).eq('id', accountId);
+  const { error } = await supabase.from('accounts').update({ extra_numbers: numbers }).eq('user_id', meId()).eq('id', accountId);
   if (error) throw new Error(/extra_numbers|schema cache/i.test(error.message) ? 'The database needs migration 0004 first (supabase db push).' : `Could not save the number: ${error.message}`);
 }
 
@@ -27,7 +28,7 @@ export interface StatementRef {
 export async function fetchStatements(accountId: string | null): Promise<StatementRef[]> {
   if (!supabase) return [];
   const base = supabase.from('statements').select('id, label, period_from, period_to, opening_balance_cents, closing_balance_cents, reconciled, reconciliation, source_file, pages, storage_path');
-  const { data, error } = await (accountId === null ? base.is('account_id', null) : base.eq('account_id', accountId)).order('period_from', { ascending: false });
+  const { data, error } = await (accountId === null ? base.eq('user_id', meId()).is('account_id', null) : base.eq('user_id', meId()).eq('account_id', accountId)).order('period_from', { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []).map((r) => ({
     id: r.id as string, label: r.label as string | null, periodFrom: r.period_from as string | null, periodTo: r.period_to as string | null,
@@ -63,7 +64,7 @@ export async function unmergeAccount(source: Account, target: Account): Promise<
 /** Accounts that were merged away, with the account each went into. Empty when nothing was merged or migration 0005 is not run. */
 export async function fetchMergedAccounts(): Promise<(Account & { mergedInto: string })[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase.from('accounts').select('*').not('merged_into', 'is', null);
+  const { data, error } = await supabase.from('accounts').select('*').eq('user_id', meId()).not('merged_into', 'is', null);
   if (error) return [];
   return (data ?? []).map((r) => ({ ...rowToAccount(r as AccountRow), mergedInto: r.merged_into as string }));
 }

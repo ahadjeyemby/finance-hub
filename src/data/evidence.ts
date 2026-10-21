@@ -1,6 +1,7 @@
 import { rowToReceipt, rowToStatement } from '@/core/evidence';
 import type { ReceiptView, StatementView } from '@/core/evidence';
 import type { Txn } from '@/core/types';
+import { meId } from './scope';
 import { supabase } from './supabase';
 
 export interface RawLine { statementId: string | null; lineNo: number | null; postedDate: string | null; sourceFile: string | null; row: Record<string, unknown> }
@@ -22,35 +23,36 @@ export async function signed(bucket: 'statements' | 'receipts', path: string | n
 }
 
 /** Everything stored about where a transaction came from. Read on demand, so the ledger sync stays small. */
-export async function fetchEvidence(t: Txn): Promise<Evidence> {
+export async function fetchEvidence(t: Txn, owner?: string): Promise<Evidence> {
   const empty: Evidence = { online: false, raw: null, statement: null, receipts: [] };
   if (!supabase) return empty;
   try {
+    const uid = owner ?? meId();
     let raw: RawLine | null = null;
     let statement: Evidence['statement'] = null;
     if (!t.manual) {
-      const r = await supabase.from('txn_raw').select('statement_id,line_no,posted_date,source_file,row').eq('txn_id', t.id).maybeSingle();
+      const r = await supabase.from('txn_raw').select('statement_id,line_no,posted_date,source_file,row').eq('user_id', uid).eq('txn_id', t.id).maybeSingle();
       if (r.error) throw r.error;
       if (r.data) {
         raw = { statementId: r.data.statement_id, lineNo: r.data.line_no, postedDate: r.data.posted_date, sourceFile: r.data.source_file, row: r.data.row as Record<string, unknown> };
         if (raw.statementId) {
-          const s = await supabase.from('statements').select('*').eq('id', raw.statementId).maybeSingle();
+          const s = await supabase.from('statements').select('*').eq('user_id', uid).eq('id', raw.statementId).maybeSingle();
           if (s.error) throw s.error;
           if (s.data) { const v = rowToStatement(s.data); statement = { ...v, url: await signed('statements', v.storagePath) }; }
         }
       }
     }
     // the links are the record of which receipts belong to this charge; the older receipts.txn_id and the charge's own receiptId are still read so nothing saved before links is hidden
-    const lk = await supabase.from('receipt_links').select('receipt_id, role, method, reason, confirmed').eq('txn_id', t.id);
+    const lk = await supabase.from('receipt_links').select('receipt_id, role, method, reason, confirmed').eq('user_id', uid).eq('txn_id', t.id);
     const linkRows = lk.error ? [] : (lk.data ?? []);
-    const viaLinks = linkRows.length ? await supabase.from('receipts').select('*').in('id', linkRows.map((l) => l.receipt_id as string)) : { data: [], error: null };
+    const viaLinks = linkRows.length ? await supabase.from('receipts').select('*').eq('user_id', uid).in('id', linkRows.map((l) => l.receipt_id as string)) : { data: [], error: null };
     if (viaLinks.error) throw viaLinks.error;
-    const byTxn = await supabase.from('receipts').select('*').eq('txn_id', t.id);
+    const byTxn = await supabase.from('receipts').select('*').eq('user_id', uid).eq('txn_id', t.id);
     if (byTxn.error) throw byTxn.error;
     const rows = [...(viaLinks.data ?? [])];
     for (const x of byTxn.data ?? []) if (!rows.some((y) => y.id === x.id)) rows.push(x);
     if (t.receiptId && UUID.test(t.receiptId) && !rows.some((x) => x.id === t.receiptId)) {
-      const byId = await supabase.from('receipts').select('*').eq('id', t.receiptId).maybeSingle();
+      const byId = await supabase.from('receipts').select('*').eq('user_id', uid).eq('id', t.receiptId).maybeSingle();
       if (byId.error) throw byId.error;
       if (byId.data) rows.push(byId.data);
     }

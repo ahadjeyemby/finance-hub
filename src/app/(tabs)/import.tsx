@@ -14,6 +14,7 @@ import { autoTagsFor } from '@/core/tags';
 import type { RedactBox } from '@/core/redact';
 import { burnRedactions, discardScan, redactionSupported, scanForRedaction } from '@/data/redact';
 import { useRedactSettings } from '@/data/redactSettings';
+import { meId } from '@/data/scope';
 import type { Scan } from '@/data/redact';
 import { discardShot, finishScan, loadShot, scanSupported } from '@/data/scan';
 import type { Shot } from '@/data/scan';
@@ -90,7 +91,7 @@ const STATEMENT_FIELDS: [string, string][] = [['institution', 'Bank or issuer'],
 
 async function loadStored(): Promise<Stored[]> {
   if (!supabase) return [];
-  const q = await supabase.from('statements').select('id, account_id, period_from, period_to');
+  const q = await supabase.from('statements').select('id, account_id, period_from, period_to').eq('user_id', meId());
   return q.error ? [] : (q.data ?? []).map((r) => ({ id: r.id as string, accountId: r.account_id as string | null, periodFrom: r.period_from as string | null, periodTo: r.period_to as string | null }));
 }
 
