@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
 import { projectRefOf } from '@/core/sync';
 
@@ -11,7 +12,7 @@ export const projectRef = projectRefOf(url);
 
 /** null when no project is configured: the app then runs fully local. */
 export const supabase = url && key
-  ? createClient(url, key, { auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false } })
+  ? createClient(url, key, { auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: Platform.OS === 'web' } })
   : null;
 
 /** Call an edge function as the signed-in user. */

@@ -46,6 +46,8 @@ export interface AuthApi {
   /** false when no Supabase project is configured: the app runs fully local */
   configured: boolean;
   email: string | null;
+  /** the signed-in person's id, or null */
+  userId: string | null;
   /** resolves to an error message, or null on success */
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
@@ -254,6 +256,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   const auth = useMemo<AuthApi>(() => ({
     configured,
     email: session?.user.email ?? null,
+    userId: session?.user.id ?? null,
     signIn: async (email, password) => {
       if (!supabase) return 'No backend is configured.';
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });

@@ -22,8 +22,9 @@ function Gate() {
   if (!ready || (!fonts && !fontError)) return <View style={{ flex: 1, backgroundColor: C.ground }} />;
   // with a backend configured, nothing is shown until someone signs in
   if (auth.configured && !auth.email) return <SignIn />;
-  // no ledger in the database: say so, never show anything else. The import screen is the one way out of an empty database.
-  if (!hasData && pathname !== '/import') return <NoData />;
+  // no ledger in the database: say so, never show anything else. The import screen is the one way out of an empty database, and the People
+  // screen is where an invited person joins a workspace (they have no data of their own yet).
+  if (!hasData && pathname !== '/import' && pathname !== '/people') return <NoData />;
   return <View style={{ flex: 1, backgroundColor: C.ground }}><SavedCopyNote /><Slot /></View>;
 }
 
