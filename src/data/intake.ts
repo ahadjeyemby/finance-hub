@@ -87,11 +87,11 @@ async function assetBytes(a: { uri: string; file?: Blob }): Promise<Uint8Array> 
 export type Found = { duplicateOf: string | null };
 
 /** Has this exact file been stored before? Same bytes = same fingerprint, whatever the file is called. */
-export async function findDuplicate(kind: 'receipt' | 'statement', sha256: string): Promise<Found> {
+export async function findDuplicate(kind: 'receipt' | 'statement', sha256: string, owner: string = meId()): Promise<Found> {
   if (!supabase) return { duplicateOf: null };
   const q = kind === 'receipt'
-    ? await supabase.from('receipts').select('id, merchant, date').eq('user_id', meId()).eq('sha256', sha256).limit(1)
-    : await supabase.from('statements').select('id, label').eq('user_id', meId()).eq('sha256', sha256).limit(1);
+    ? await supabase.from('receipts').select('id, merchant, date').eq('user_id', owner).eq('sha256', sha256).limit(1)
+    : await supabase.from('statements').select('id, label').eq('user_id', owner).eq('sha256', sha256).limit(1);
   if (q.error || !q.data?.length) return { duplicateOf: null };
   const row = q.data[0] as Record<string, string | null>;
   return { duplicateOf: kind === 'receipt' ? [row.merchant, row.date].filter(Boolean).join(' on ') || 'a stored receipt' : row.label ?? row.id };
@@ -144,16 +144,16 @@ const safe = (s: string) => s.replace(/[^A-Za-z0-9._-]+/g, '_');
 const userId = async () => { const { data } = await supabase!.auth.getSession(); const id = data.session?.user.id; if (!id) throw new Error('Signed out. Sign in again, then save.'); return id; };
 
 /** Store the original file and every field of the receipt. Returns the receipt id. Throws with a readable message on failure. */
-export async function saveReceiptRecord(rec: ReceiptRecord, file: PickedFile | null, txnId: string | null): Promise<string> {
+export async function saveReceiptRecord(rec: ReceiptRecord, file: PickedFile | null, txnId: string | null, owner?: string): Promise<string> {
   if (!supabase) throw new Error('No database is connected, so nothing can be saved.');
-  const uid = await userId();
+  const uid = owner ?? await userId();
   let path: string | null = null;
   if (file) {
     path = `${uid}/${file.sha256.slice(0, 12)}-${safe(file.name)}`;
     const up = await supabase.storage.from('receipts').upload(path, file.bytes, { contentType: file.type, upsert: true });
     if (up.error) throw new Error(`Could not store the original file: ${up.error.message}`);
   }
-  const row = receiptToRow({ ...rec, sha256: file?.sha256 ?? rec.sha256, sourceFile: file?.name ?? rec.sourceFile, origin: file ? 'app_upload' : 'typed' }, path, txnId);
+  const row = { ...receiptToRow({ ...rec, sha256: file?.sha256 ?? rec.sha256, sourceFile: file?.name ?? rec.sourceFile, origin: file ? 'app_upload' : 'typed' }, path, txnId), ...(owner ? { user_id: owner } : {}) };
   const q = file
     ? await supabase.from('receipts').upsert(row, { onConflict: 'user_id,sha256' }).select('id').single()
     : await supabase.from('receipts').insert(row).select('id').single();
@@ -162,11 +162,11 @@ export async function saveReceiptRecord(rec: ReceiptRecord, file: PickedFile | n
 }
 
 /** Save an approved statement: account, rows, the statement record, each source line and the original PDF. */
-export async function saveStatementPlan(plan: StatementPlan, file: PickedFile | null): Promise<void> {
+export async function saveStatementPlan(plan: StatementPlan, file: PickedFile | null, owner?: string): Promise<void> {
   if (!supabase) throw new Error('No database is connected, so nothing can be saved.');
-  const uid = await userId();
+  const uid = owner ?? await userId();
   const ledger = { accounts: [plan.account], txns: plan.txns };
-  await uploadLedger(supabase, ledger);
+  await uploadLedger(supabase, ledger, undefined, owner);
   await uploadEvidence(supabase, ledger, { statements: [{ ...plan.statement, sha256: file?.sha256 ?? plan.statement.sha256 }], raw: plan.raw }, {
     userId: uid,
     readFile: async () => (file ? { bytes: file.bytes, contentType: file.type } : null),
@@ -178,9 +178,9 @@ export async function saveStatementPlan(plan: StatementPlan, file: PickedFile | 
 }
 
 /** What is already stored, in the small form the duplicate check needs. Empty when offline or on error: the check then only sees the current batch. */
-export async function loadStoredReceipts(): Promise<ReceiptKey[]> {
+export async function loadStoredReceipts(owner: string = meId()): Promise<ReceiptKey[]> {
   if (!supabase) return [];
-  const q = await supabase.from('receipts').select('id, merchant, date, time, total_cents, order_ref, card_last4, store_ref, source_file, txn_id, payment_method').eq('user_id', meId()).limit(5000);
+  const q = await supabase.from('receipts').select('id, merchant, date, time, total_cents, order_ref, card_last4, store_ref, source_file, txn_id, payment_method').eq('user_id', owner).limit(5000);
   if (q.error) return [];
   return (q.data ?? []).map((r) => ({
     id: r.id as string, label: (r.source_file as string | null) ?? 'a stored receipt', merchant: r.merchant as string | null, date: r.date as string | null, time: r.time as string | null,

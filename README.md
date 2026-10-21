@@ -208,7 +208,20 @@ Add `https://your-web-address/**` under Auth, URL Configuration, Redirect URLs, 
 
 **Who may use the readers.** `ALLOWED_EMAIL` is now optional, may list several addresses separated by commas, and only decides who may be an admin or work alone on this deployment (leave it set to your own address). Members are decided by their membership: it must be active, and the readers need `can_read_ai`. A member can never invite or manage.
 
-Not built yet: the app's switcher (Me / a member / Everyone), loading and merging members' rows and overlays in the app, and an audit log. Joining from an invite link works in the web version; on a phone build, paste the code under People.
+**Seeing and adding for a team.** An admin with members gets a bar at the top of every screen: Me, each member, or Everyone. Everything else (Overview, Explore, Income, Recurring, Views, forecasts) shows only whose data is on screen. Each member's own decisions (their categories, rules, cash entries and tags) are applied to their charges first, as they see them; the admin's own category and tag changes are applied over that, so the admin can summarise overall without asking anyone, and nothing the admin does changes a member's own screens. The admin's changes live in the admin's own overlay, under the member's prefixed charge id, so two people never write the same row. The view starts on Me.
+
+On the Import screen the admin adds statements and receipts to whoever is on show: view a member, and the statement is saved to that member's data (the member sees it). In the Everyone view, documents go to the admin's own data. An item remembers whose data it was read for and can only be saved there. A cash purchase is always kept in the admin's own books.
+
+Every database query in the app now names its owner. This matters once an admin has members, because the admin's database role can reach their rows: a query that named no owner could mix people's data or change a member's row that shares an id.
+
+Known limits of the team view:
+- A joint account that both people import shows twice in the Everyone view. Import it under one person.
+- A member's own custom categories are listed for the admin, but renames and merges the member made are not applied to the admin's view.
+- The admin cannot remove a member's receipt links or flags, only their own.
+- Cash entries the admin adds are the admin's own, not the member's.
+- The contributor role has the same data boundary as a member but not yet a narrower app. There is no audit log yet.
+- Joining from an invite link works in the web version. On a phone build, paste the code under People.
+- None of this has been exercised in a signed-in app yet, only in unit tests and database tests.
 
 The model is fixed, never chosen per request. It defaults to `anthropic/claude-haiku-5.5` (supports tools and image input). To change it:
 

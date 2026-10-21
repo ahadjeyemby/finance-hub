@@ -22,9 +22,15 @@ import type { Account, CategoryId, Overlay, Question, Txn } from '@/core/types';
 import { C, SERIES } from '@/theme/tokens';
 import { setCurrentUser } from './scope';
 import { fetchLedger, fetchOverlay, pushOverlay } from './sync';
+import { fetchTeamData } from './team';
+import { listMembers, myAccess } from './workspace';
 import { fetchLinkData, NO_LINKS } from './links';
 import type { LinkData } from './links';
 import { applyLinks } from '@/core/links';
+import { canManage } from '@/core/workspace';
+import type { Access, Member } from '@/core/workspace';
+import { combineTeam, inView, mergeCategoryConfigs, mergeIncomes, mergeTagStates, ownCategoryConfig, ownIncomeState, ownTagState } from '@/core/team';
+import type { PersonData, Viewing } from '@/core/team';
 import { setCategoryConfig } from '@/core/categories';
 import type { CategoryConfig } from '@/core/categories';
 import { DEFAULT_TAGS, applyTags } from '@/core/tags';
@@ -63,6 +69,21 @@ export interface SourceInfo {
   /** statement accounts and rows as Supabase returned them, before any local edit is applied */
   accounts: number;
   rows: number;
+}
+/** An admin's view of their workspace. With no members this is empty and the app behaves as it always did. */
+export interface TeamApi {
+  access: Access | null;
+  /** active members, as the database lists them */
+  members: Member[];
+  /** the signed-in person's id */
+  me: string | null;
+  /** 'me', 'all', or a member's id. Always valid: a member who is gone falls back to 'me'. */
+  viewing: Viewing;
+  setViewing: (v: Viewing) => void;
+  /** true when the admin has at least one member, so the switcher is worth showing */
+  active: boolean;
+  /** one person's own accounts, charges and receipt links exactly as stored (no id prefixes), for adding to their data: 'me' or a member's id */
+  dataOf: (who: string) => { accounts: Account[]; txns: Txn[]; links: LinkData | null } | null;
 }
 export interface SyncApi { state: SyncState; lastAt: string | null; error: string | null; now: () => Promise<void> }
 
@@ -104,6 +125,8 @@ export interface Repo {
   tagState: TagState;
   /** change the tag definitions or the tags on a charge or an item */
   saveTagState: (next: TagState) => void;
+  /** who is on this person's team, and whose data is on screen */
+  team: TeamApi;
   /** income sources, pay records and deposit assignments */
   income: IncomeState;
   saveIncome: (next: IncomeState) => void;
@@ -129,6 +152,8 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   const [overlay, setOverlay] = useState<Overlay>(emptyOverlay());
   const [ledger, setLedger] = useState<Seed>(EMPTY);
   const [linkData, setLinkData] = useState<LinkData | null>(null);
+  const [team, setTeam] = useState<{ access: Access | null; members: Member[]; data: PersonData[] }>({ access: null, members: [], data: [] });
+  const [viewingState, setViewingState] = useState<Viewing>('me');
   const [ledgerFrom, setLedgerFrom] = useState<{ kind: LedgerKind; at: string | null }>({ kind: 'none', at: null });
   const [loaded, setLoaded] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
@@ -213,6 +238,12 @@ export function RepoProvider({ children }: { children: ReactNode }) {
       else AsyncStorage.removeItem(LEDGER_KEY).catch(() => {});
 
       setLinkData(await fetchLinkData());
+      // a person who manages a workspace also loads their members' data (what comes back is decided by the database, not by this code)
+      try {
+        const access = await myAccess();
+        const members = canManage(access) ? (await listMembers()).filter((m) => m.active) : [];
+        setTeam({ access, members, data: members.length ? await fetchTeamData(members.map((m) => m.member)) : [] });
+      } catch { setTeam({ access: null, members: [], data: [] }); }
       const remote = await fetchOverlay();
       const local = overlayRef.current;
       let next = remote ? (dirtyRef.current ? mergeOverlays(local, remote) : remote) : local;
@@ -239,7 +270,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
           if (pushTimer.current) clearTimeout(pushTimer.current);
           await AsyncStorage.multiRemove([KEY, LEDGER_KEY, DIRTY_KEY, SYNCED_KEY]).catch(() => {});
           dirtyRef.current = false; overlayRef.current = emptyOverlay();
-          if (live) { setOverlay(emptyOverlay()); setLedger(EMPTY); setLinkData(null); setLedgerFrom({ kind: 'none', at: null }); }
+          if (live) { setOverlay(emptyOverlay()); setLedger(EMPTY); setLinkData(null); setTeam({ access: null, members: [], data: [] }); setViewingState('me'); setLedgerFrom({ kind: 'none', at: null }); }
         }
         await AsyncStorage.setItem(OWNER_KEY, tag).catch(() => {});
         const copy = parseLedgerCache(await AsyncStorage.getItem(LEDGER_KEY), projectRef, userId);
@@ -270,21 +301,34 @@ export function RepoProvider({ children }: { children: ReactNode }) {
       await AsyncStorage.multiRemove([KEY, LEDGER_KEY, DIRTY_KEY, SYNCED_KEY, OWNER_KEY]).catch(() => {});
       dirtyRef.current = false; overlayRef.current = emptyOverlay();
       setOverlay(emptyOverlay()); setLedger(EMPTY); setLedgerFrom({ kind: 'none', at: null }); setSyncInfo({ state: 'local', lastAt: null, error: null });
+      setTeam({ access: null, members: [], data: [] }); setViewingState('me');
     },
   }), [configured, session]);
   const sync = useMemo<SyncApi>(() => ({ ...syncInfo, state: configured ? syncInfo.state : 'local', now: syncNow }), [syncInfo, configured, syncNow]);
   const ready = loaded && authReady;
   const source = useMemo<SourceInfo>(() => ({ kind: ledgerFrom.kind, project: projectRef, at: ledgerFrom.at, accounts: ledger.accounts.length, rows: ledger.txns.length }), [ledgerFrom, ledger]);
 
-  const receiptsById = useMemo(() => new Map((linkData ?? NO_LINKS).receipts.map((r) => [r.id, r])), [linkData]);
+  const ownTagState_ = useMemo<TagState>(() => ({ defs: overlay.tags?.defs?.length ? overlay.tags.defs : DEFAULT_TAGS, edits: overlay.tags?.edits ?? {} }), [overlay.tags]);
+  // with members, "my data plus theirs" is put side by side (see core/team.ts); with none, this is exactly the single-person data it always was
+  const combined = useMemo(() => (team.data.length && userId
+    ? combineTeam({ id: userId, accounts: ledger.accounts, txns: ledger.txns, overlay, links: linkData, tags: ownTagState_, income: overlay.income ?? emptyIncome() }, team.data)
+    : null), [team.data, userId, ledger, overlay, linkData, ownTagState_]);
+  const baseAccounts = combined?.accounts ?? ledger.accounts;
+  const baseLinks = combined?.links ?? linkData;
+  const tagState = combined?.tags ?? ownTagState_;
+  const categories = combined?.categories ?? overlay.categories;
+  const incomeAll = combined?.income ?? overlay.income ?? emptyIncome();
+  const receiptsById = useMemo(() => new Map((baseLinks ?? NO_LINKS).receipts.map((r) => [r.id, r])), [baseLinks]);
   const reloadLinks = useCallback(async () => { setLinkData(await fetchLinkData()); }, []);
-  const tagState = useMemo<TagState>(() => ({ defs: overlay.tags?.defs?.length ? overlay.tags.defs : DEFAULT_TAGS, edits: overlay.tags?.edits ?? {} }), [overlay.tags]);
+  const viewing: Viewing = !team.data.length ? 'me' : viewingState === 'all' || viewingState === 'me' || team.members.some((m) => m.member === viewingState) ? viewingState : 'me';
   // the category list is registered before anything is derived from it, so every screen below sees the person's own categories
-  const txns = useMemo(() => {
-    setCategoryConfig(overlay.categories);
-    return applyTags(applyLinks(applyOverlay(ledger.txns, overlay), linkData?.links ?? [], receiptsById, linkData?.flags ?? []), tagState);
-  }, [ledger, overlay, linkData, receiptsById, tagState]);
-  const accounts = ledger.accounts;
+  const everyone = useMemo(() => {
+    setCategoryConfig(categories);
+    return applyTags(applyLinks(applyOverlay(combined?.txns ?? ledger.txns, overlay), baseLinks?.links ?? [], receiptsById, baseLinks?.flags ?? []), tagState);
+  }, [combined, ledger, overlay, baseLinks, receiptsById, tagState, categories]);
+  // the switcher: everything the screens use is already limited to whose data is on show
+  const txns = useMemo(() => (combined && userId && viewing !== 'all' ? everyone.filter((t) => inView(t.owner, viewing, userId)) : everyone), [everyone, combined, userId, viewing]);
+  const accounts = useMemo(() => (combined && userId && viewing !== 'all' ? baseAccounts.filter((a) => inView(a.owner, viewing, userId)) : baseAccounts), [baseAccounts, combined, userId, viewing]);
   const ctx = useMemo<Ctx>(() => ({ txns, accounts }), [txns, accounts]);
   const questions = useMemo(() => buildQuestions(txns, overlay), [txns, overlay]);
 
@@ -308,6 +352,11 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     return new Map(top.map((k, i) => [k, SERIES[i]]));
   }, [ctx]);
 
+  const teamApi = useMemo<TeamApi>(() => ({
+    access: team.access, members: team.members, me: userId, viewing, setViewing: setViewingState, active: team.data.length > 0,
+    dataOf: (who) => (who === 'me' || who === userId ? { accounts: ledger.accounts, txns: ledger.txns, links: linkData } : team.data.find((m) => m.id === who) ?? null),
+  }), [team, userId, viewing, ledger, linkData]);
+
   const value = useMemo<Repo>(() => ({
     ready, hasData, auth, sync, source, accounts, txns, ctx, scope, setScope, overlay, questions, dataTo, dataFrom, completeTo, months, period, setPeriod, range,
     scoped: (f) => ({ ...(f ?? {}), scope }),
@@ -319,15 +368,17 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     saveReport: (prompt, spec) => { const id = `r${Date.now()}`; commit({ ...overlay, savedReports: [{ id, createdAt: new Date().toISOString(), prompt, spec }, ...overlay.savedReports] }); return id; },
     deleteReport: (id) => commit({ ...overlay, savedReports: overlay.savedReports.filter((r) => r.id !== id) }),
     patchTxn: (id, patch) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [id]: { ...o.patches[id], ...patch } } }); },
-    links: linkData, reloadLinks,
-    tagState, saveTagState: (next) => commit({ ...overlayRef.current, tags: next }),
-    income: overlay.income ?? emptyIncome(), saveIncome: (next) => commit({ ...overlayRef.current, income: next }),
+    links: baseLinks, reloadLinks,
+    team: teamApi,
+    // what is saved is only the admin's own part: members' tags, categories and income sources stay theirs (see ownTagState and friends in core/team.ts)
+    tagState, saveTagState: (next) => commit({ ...overlayRef.current, tags: team.data.length ? ownTagState(next, mergeTagStates({ defs: [], edits: {} }, team.data.map((m) => ({ id: m.id, tags: m.overlay.tags }))), overlayRef.current.tags) : next }),
+    income: incomeAll, saveIncome: (next) => commit({ ...overlayRef.current, income: team.data.length ? ownIncomeState(next, mergeIncomes(emptyIncome(), team.data.map((m) => ({ id: m.id, income: m.overlay.income }))), overlayRef.current.income) : next }),
     recurring: overlay.recurring ?? emptyRecurring(), saveRecurring: (next) => commit({ ...overlayRef.current, recurring: next }),
-    categoryConfig: overlay.categories, saveCategoryConfig: (next) => commit({ ...overlayRef.current, categories: next }),
+    categoryConfig: categories, saveCategoryConfig: (next) => commit({ ...overlayRef.current, categories: team.data.length ? ownCategoryConfig(next, mergeCategoryConfigs(undefined, team.data.map((m) => m.overlay.categories)), overlayRef.current.categories) : next }),
     attachReceipt: (txnId, lines, uri) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [txnId]: { ...o.patches[txnId], lines, receiptId: uri } } }); },
     colorOf: (category) => colors.get(category) ?? C.other,
     reset: () => commit(emptyOverlay()),
-  }), [ready, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, colors, commit, linkData, reloadLinks, tagState]);
+  }), [ready, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, colors, commit, baseLinks, reloadLinks, tagState, incomeAll, categories, team, teamApi]);
 
   return <Ctx_.Provider value={value}>{children}</Ctx_.Provider>;
 }

@@ -27,13 +27,13 @@ const rowToLink = (r: Record<string, any>): Link => ({ id: r.id, receiptId: r.re
 const linkToRow = (l: Link) => ({ receipt_id: l.receiptId, txn_id: l.txnId, amount_cents: l.amountCents ?? null, role: l.role, method: l.method, reason: l.reason ?? null, confirmed: l.confirmed });
 
 /** Everything linking needs, or null when the tables are not there yet (migration 0003 not run) or there is no connection. */
-export async function fetchLinkData(): Promise<LinkData | null> {
+export async function fetchLinkData(owner: string = meId()): Promise<LinkData | null> {
   if (!supabase) return null;
   try {
     const [links, flags, receipts] = await Promise.all([
-      pages<Record<string, any>>('receipt_links', '*', 'created_at'),
-      pages<Record<string, any>>('link_flags', '*', 'created_at'),
-      pages<Record<string, any>>('receipts', RECEIPT_COLS, 'created_at'),
+      pages<Record<string, any>>('receipt_links', '*', 'created_at', owner),
+      pages<Record<string, any>>('link_flags', '*', 'created_at', owner),
+      pages<Record<string, any>>('receipts', RECEIPT_COLS, 'created_at', owner),
     ]);
     return {
       links: links.map(rowToLink),
@@ -44,9 +44,9 @@ export async function fetchLinkData(): Promise<LinkData | null> {
 }
 
 /** Store links. A receipt and a charge are linked once: saving the same pair again updates it. */
-export async function saveLinks(links: Link[]): Promise<void> {
+export async function saveLinks(links: Link[], owner?: string): Promise<void> {
   if (!links.length) return;
-  const { error } = await db().from('receipt_links').upsert(links.map(linkToRow), { onConflict: 'receipt_id,txn_id' });
+  const { error } = await db().from('receipt_links').upsert(links.map(linkToRow).map((r) => (owner ? { ...r, user_id: owner } : r)), { onConflict: 'receipt_id,txn_id' });
   if (error) throw new Error(`Could not save the link: ${error.message}`);
 }
 
@@ -56,8 +56,8 @@ export async function removeLink(receiptId: string, txnId: string): Promise<void
 }
 
 /** Say there is no link to expect (paid in cash, no receipt for rent...). Replaces an earlier flag on the same receipt or charge. */
-export async function setFlag(kind: 'receipt' | 'txn', refId: string, reason: NoLinkReason, note?: string): Promise<void> {
-  const { error } = await db().from('link_flags').upsert({ kind, ref_id: refId, reason, note: note ?? null }, { onConflict: 'user_id,kind,ref_id' });
+export async function setFlag(kind: 'receipt' | 'txn', refId: string, reason: NoLinkReason, note?: string, owner?: string): Promise<void> {
+  const { error } = await db().from('link_flags').upsert({ ...(owner ? { user_id: owner } : {}), kind, ref_id: refId, reason, note: note ?? null }, { onConflict: 'user_id,kind,ref_id' });
   if (error) throw new Error(`Could not save that: ${error.message}`);
 }
 

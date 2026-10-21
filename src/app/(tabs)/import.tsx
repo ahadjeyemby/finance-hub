@@ -89,9 +89,9 @@ const MAX_REREADS = 6;
 const RECEIPT_FIELDS: [string, string][] = [['merchant', 'Store'], ['date', 'Date'], ['time', 'Time'], ['total', 'Total paid'], ['subtotal', 'Subtotal'], ['tax', 'Sales tax'], ['tip', 'Tip'], ['paidOther', 'Paid with points, gift card or credit (not the card)'], ['refundTotal', 'Refund total, if any'], ['paymentMethod', 'Paid with'], ['cardLast4', 'Card last 4'], ['storeAddress', 'Store address'], ['storeRef', 'Store number'], ['orderRef', 'Order number']];
 const STATEMENT_FIELDS: [string, string][] = [['institution', 'Bank or issuer'], ['last4', 'Account last 4'], ['periodFrom', 'Period start'], ['periodTo', 'Period end'], ['opening', 'Opening balance (card: previous balance owed)'], ['closing', 'Closing balance (card: new balance owed)']];
 
-async function loadStored(): Promise<Stored[]> {
+async function loadStored(owner?: string): Promise<Stored[]> {
   if (!supabase) return [];
-  const q = await supabase.from('statements').select('id, account_id, period_from, period_to').eq('user_id', meId());
+  const q = await supabase.from('statements').select('id, account_id, period_from, period_to').eq('user_id', owner ?? meId());
   return q.error ? [] : (q.data ?? []).map((r) => ({ id: r.id as string, accountId: r.account_id as string | null, periodFrom: r.period_from as string | null, periodTo: r.period_to as string | null }));
 }
 
@@ -173,7 +173,20 @@ function evaluateAll(items: Item[], ctx: Ctx): Map<string, Ev> {
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export default function Import() {
-  const { accounts, txns, hasData, sync, addCash, links, reloadLinks } = useRepo();
+  const repo = useRepo();
+  const { hasData, sync, addCash, reloadLinks, team } = repo;
+  // whose data a document is added to: the signed-in person's, or (for an admin viewing one member) that member's. Everyone is treated as me.
+  const target = team.active && team.viewing !== 'all' && team.viewing !== 'me' ? team.viewing : null;
+  const targetRef = useRef<string | null>(null);
+  targetRef.current = target;
+  const memberData = target ? team.dataOf(target) : null;
+  const ownLinks = team.active ? team.dataOf('me')?.links ?? null : repo.links;
+  const accounts = useMemo(() => (memberData ? memberData.accounts : team.active ? repo.accounts.filter((a) => (a.owner ?? team.me) === team.me) : repo.accounts), [memberData, team.active, team.me, repo.accounts]);
+  const txns = useMemo(() => (memberData ? memberData.txns : team.active ? repo.txns.filter((t) => (t.owner ?? team.me) === team.me) : repo.txns), [memberData, team.active, team.me, repo.txns]);
+  const links = memberData ? memberData.links : ownLinks;
+  const targetName = target ? (team.members.find((m) => m.member === target)?.label || team.members.find((m) => m.member === target)?.email || 'this member') : 'you';
+  // each item remembers whose data it was read for, so it can only be saved there
+  const ownerOf = useRef(new Map<string, string | null>());
   const params = useLocalSearchParams<{ kind?: string }>();
   const [kind, setKind] = useState<DocKind>(params.kind === 'receipt' ? 'receipt' : 'statement');
   const [items, setItems] = useState<Item[]>([]);
@@ -221,13 +234,17 @@ export default function Import() {
 
   useEffect(() => {
     let on = true;
-    loadStored().then((s) => { if (on) setStored(s); });
-    loadStoredReceipts().then((r) => { if (on) setFallbackReceipts(r); });
+    loadStored(target ?? undefined).then((s) => { if (on) setStored(s); });
+    loadStoredReceipts(target ?? undefined).then((r) => { if (on) setFallbackReceipts(r); });
     listReaders().then((m) => { if (on) setReaders(m); });
     return () => { on = false; };
-  }, []);
+  }, [target]);
 
-  const update = (f: (xs: Item[]) => Item[]) => { itemsRef.current = f(itemsRef.current); setItems(itemsRef.current); };
+  const update = (f: (xs: Item[]) => Item[]) => {
+    itemsRef.current = f(itemsRef.current);
+    for (const i of itemsRef.current) if (!ownerOf.current.has(i.key)) ownerOf.current.set(i.key, targetRef.current);
+    setItems(itemsRef.current);
+  };
   const patch = (key: string, f: (i: Item) => Item) => update((xs) => xs.map((x) => (x.key === key ? f(x) : x)));
   const live = (key: string) => itemsRef.current.find((x) => x.key === key);
 
@@ -239,7 +256,7 @@ export default function Import() {
     patch(item.key, (x) => ({ ...x, status: 'reading' }));
     try {
       if (item.file) {
-        const dup = await findDuplicate(item.kind, item.file.sha256);
+        const dup = await findDuplicate(item.kind, item.file.sha256, ownerOf.current.get(item.key) ?? undefined);
         if (dup.duplicateOf) return patch(item.key, (x) => ({ ...x, status: 'duplicate', message: `Already stored: ${dup.duplicateOf}. Nothing was changed.` }));
       }
       // a statement is scanned for sensitive details on this device first; reading waits until the person has checked what will be blacked out
@@ -407,6 +424,12 @@ export default function Import() {
   const save = async (key: string) => {
     const item = live(key);
     if (!item || item.status !== 'review') return;
+    const forOwner = ownerOf.current.get(key) ?? null;
+    if (forOwner !== targetRef.current) {
+      const name = forOwner ? (team.members.find((m) => m.member === forOwner)?.label || team.members.find((m) => m.member === forOwner)?.email || 'that member') : 'you';
+      return patch(key, (x) => ({ ...x, message: `This was read for ${name}. Switch the view back to ${forOwner ? name : 'Me'} to save it there.` }));
+    }
+    const owner = forOwner ?? undefined;
     const cx: Ctx = { ...ctxRef.current, receipts: [...ctxRef.current.receipts, ...savedKeysRef.current], claimed: claimedRef.current };
     const ev = evaluateAll(itemsRef.current, cx).get(key);
     if (!ev || !ev.canSave) return;
@@ -419,7 +442,7 @@ export default function Import() {
         const link = ev.linkTxn;
         const original = ev.extra && ev.same && !ev.same.of.id.startsWith('q:') ? ev.same.of : null;
         // the link is its own record (receipt_links), so the receipt row is saved without one
-        const rid = await saveReceiptRecord(original ? { ...rec, duplicateOf: original.id } : rec, item.file, null);
+        const rid = await saveReceiptRecord(original ? { ...rec, duplicateOf: original.id } : rec, item.file, null, owner);
         savedId = rid; savedTxnId = link?.id ?? original?.txnId ?? null;
         const mk = (txnId: string, role: Link['role']): Link => {
           const chosen = item.link !== 'auto';
@@ -439,25 +462,26 @@ export default function Import() {
             message = `Saved and linked to ${link.merchant}, ${link.date}, ${dollars(-link.cents)}.`;
           }
         } else if (ev.cash) {
+          if (owner) throw new Error('A cash purchase is kept in your own books. Switch the view to Me to add one.');
           const t = addCash({ amount: (rec.totalCents ?? 0) / 100, merchant: rec.merchant ?? 'Receipt', what: 'Receipt', category: ev.cashCat!, date: rec.date!, business: false, oneOff: false, splitAsked: true, receiptId: rid, lines: receiptToLines(rec, rec.totalCents ?? 0).map((l) => ({ item: l.item, amount: l.cents / 100 })) });
           savedTxnId = t.id;
           toSave.push({ receiptId: rid, txnId: t.id, role: 'primary', method: 'manual', reason: 'entered as a cash purchase', confirmed: true });
           message = 'Saved and added as a cash purchase.';
         } else if (item.link === 'flag') {
-          await setFlag('receipt', rid, item.noLink ?? 'cash');
+          await setFlag('receipt', rid, item.noLink ?? 'cash', undefined, owner);
           message = `Saved. Marked as: ${NO_LINK_LABEL[item.noLink ?? 'cash'].toLowerCase()}, so no charge is expected.`;
         } else message = 'Saved as evidence. It is not linked to a charge yet. Open Links to match it when its statement is imported.';
-        if (toSave.length) await saveLinks(toSave);
+        if (toSave.length) await saveLinks(toSave, owner);
         await reloadLinks();
       } else {
         const plan = planStatement(item.statement!, { accounts: statementAccounts(item, cx.accounts), statements: cx.stored, existing: cx.txns }, { name: item.file?.name ?? 'statement', sha256: item.file?.sha256 });
-        await saveStatementPlan(plan, item.file);
+        await saveStatementPlan(plan, item.file, owner);
         await sync.now();
-        setStored(await loadStored());
+        setStored(await loadStored(owner));
         await settle(cx.txns);
         // receipts saved earlier may now have their charge: link the clear ones, leave the likely ones for the person to confirm
         let swept: Awaited<ReturnType<typeof sweepLinks>> = null;
-        try { swept = await sweepLinks(ctxRef.current.txns, ctxRef.current.accounts); if (swept) await reloadLinks(); } catch { /* the statement is saved; links can be found later from the Links screen */ }
+        try { swept = await sweepLinks(ctxRef.current.txns, ctxRef.current.accounts, owner); if (swept) await reloadLinks(); } catch { /* the statement is saved; links can be found later from the Links screen */ }
         message = plan.txns.length === 0 && plan.skipped.length
           ? `Nothing new: all ${plan.skipped.length} rows were already in your ledger. The statement itself was recorded.`
           : `Saved ${plan.txns.length} transactions to ${plan.account.name}${plan.isNewAccount ? ' (new account)' : ''}${plan.pairUpdates.length ? `, linked ${plan.pairUpdates.length} card payment${plan.pairUpdates.length > 1 ? 's' : ''}` : ''}.${plan.skipped.length ? ` ${plan.skipped.length} ${plan.skipped.length === 1 ? 'row was' : 'rows were'} already in your ledger and not added again.` : ''}`;
@@ -499,6 +523,7 @@ export default function Import() {
   return (
     <Screen max={anyPeek && sideBySide ? 1400 : 760}>
       <ScreenHeader back title="Import" sub="Every receipt and statement is read and checked first. Nothing is saved until every detail is accounted for." right={<View style={{ flexDirection: 'row', gap: S.sm }}><Button small kind="outline" label="Accounts" onPress={() => router.push('/accounts')} /><Button small kind="outline" label="Receipt links" onPress={() => router.push('/links')} /></View>} />
+      {team.active ? <Banner title={`Adding for ${targetName}`} tone="info">Statements and receipts you add here are saved to {target ? `${targetName}'s` : 'your'} data{target ? ', and they will see them. A cash purchase is kept in your own books' : ''}. Change whose data is on show with the bar at the top.</Banner> : null}
       {!connected ? <Banner title="No database is connected.">Set the Supabase URL and anon key in .env first. Nothing can be saved without it.</Banner> : null}
       <Card title="What are you adding?">
         <Segmented value={kind} onChange={setKind} options={[{ value: 'statement', label: 'Statements' }, { value: 'receipt', label: 'Receipts' }]} />
