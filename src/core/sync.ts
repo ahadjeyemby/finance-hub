@@ -68,7 +68,16 @@ export function mergeOverlays(local: Overlay, remote: Overlay): Overlay {
     savedReports: [...reports.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     ...mergeCategories(local, remote),
     ...mergeTags(local, remote),
+    ...mergeRecurring(local, remote),
   };
+}
+
+/** Recurring: decisions key by key, the remote winning; items added by hand by id. */
+function mergeRecurring(local: Overlay, remote: Overlay): Pick<Overlay, 'recurring'> {
+  const a = local.recurring; const b = remote.recurring;
+  if (!a && !b) return {};
+  const manual = new Map([...(a?.manual ?? []), ...(b?.manual ?? [])].map((m) => [m.id, m]));
+  return { recurring: { edits: { ...(a?.edits ?? {}), ...(b?.edits ?? {}) }, manual: [...manual.values()] } };
 }
 
 /** Categories the person changed on either device: custom ones by id, edits and merges key by key, the remote winning. */
@@ -94,15 +103,18 @@ export function parseOverlay(body: unknown): Overlay {
   const obj = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, never>) : {});
   const arr = (v: unknown) => (Array.isArray(v) ? v : []);
   const cats = obj(b.categories) as Record<string, never>; const tags = obj(b.tags) as Record<string, never>;
+  const rec = obj(b.recurring) as Record<string, never>;
   return {
     manual: arr(b.manual) as Txn[], patches: obj(b.patches), merchantRules: obj(b.merchantRules), answered: obj(b.answered) as Record<string, string>, savedReports: arr(b.savedReports) as Overlay['savedReports'],
     ...(b.categories ? { categories: { custom: arr(cats.custom), edits: obj(cats.edits), merged: obj(cats.merged) } as unknown as Overlay['categories'] } : {}),
     ...(b.tags ? { tags: { defs: arr(tags.defs), edits: obj(tags.edits) } as unknown as Overlay['tags'] } : {}),
+    ...(b.recurring ? { recurring: { edits: obj(rec.edits), manual: arr(rec.manual) } as unknown as Overlay['recurring'] } : {}),
   };
 }
 
 export const overlayIsEmpty = (o: Overlay) => !o.manual.length && !Object.keys(o.patches).length && !Object.keys(o.merchantRules).length && !Object.keys(o.answered).length && !o.savedReports.length
-  && !o.categories?.custom.length && !Object.keys(o.categories?.edits ?? {}).length && !Object.keys(o.categories?.merged ?? {}).length && !o.tags?.defs.length && !Object.keys(o.tags?.edits ?? {}).length;
+  && !o.categories?.custom.length && !Object.keys(o.categories?.edits ?? {}).length && !Object.keys(o.categories?.merged ?? {}).length && !o.tags?.defs.length && !Object.keys(o.tags?.edits ?? {}).length
+  && !Object.keys(o.recurring?.edits ?? {}).length && !o.recurring?.manual.length;
 
 /** Mark manual entries that have not reached the database yet. Called with the moment a push is attempted. */
 export function stampUploads(o: Overlay, nowISO: string): Overlay {
