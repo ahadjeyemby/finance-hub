@@ -42,6 +42,7 @@
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11",
     "@types/node": "^26.6.5",
     "@types/react": "~19.3.0",
     "ajv": "^8.20.0",

@@ -176,10 +176,26 @@ brew install supabase           # other platforms: https://supabase.com/docs/gui
 supabase login
 supabase link --project-ref <your-project-ref>
 supabase secrets set OPENROUTER_API_KEY=<your key> ALLOWED_EMAIL=<your email>
+
 supabase functions deploy ask
 supabase functions deploy ingest-receipt
 supabase functions deploy ingest-statement
 ```
+
+### Workspaces and roles (database layer, migration 0006)
+
+One person (the **admin**) can invite others (**members**). Everyone writes their own data and sees only their own. The admin can also see, add, change and delete everything their members hold, so one overall view is possible without asking anyone to re-categorise. All of it is enforced by row level security in the database, not by the app.
+
+- A row always belongs to the person it was made for (`user_id`) and never changes hands, not even by the admin. The admin may add rows for a member (a statement, a cash charge) and change what is there.
+- A member's overlay (their own decisions, categories, tags) is readable by the admin and writable only by the member. The admin's own changes to a member's charges are meant to live in the admin's own overlay, so two people never write the same row.
+- A membership comes only from an invite sent to the member's own email, accepted once, before it expires (`create_invite`, `accept_invite`). An admin cannot add someone else's data by inserting a membership, and cannot change whose membership it is.
+- Pausing a membership (`active = false`), ending it, or a member leaving cuts the admin off on the next query. The member keeps their data.
+- Roles: `member` (the full app on their own data) and `contributor` (adds entries, sees only their own; the same data boundary with a narrower app). `can_read_ai` says whether a member may use the paid readers on the admin's credit. `my_access()` tells the app and the readers what the caller is.
+- One workspace per person; an admin cannot also be a member.
+
+Apply it with `supabase db push`. It moves no data: someone with no members sees exactly what they saw before. `bun run test` runs the migrations on a real Postgres (PGlite, in memory) and logs in as several people to check what each can and cannot read and write, including negative cases such as a stranger, a paused member and a member trying to write the admin's rows.
+
+Not built yet: the invite email (a function that sends the token), the app's switcher (Me / a member / Everyone), loading and merging members' rows and overlays in the app, the readers checking `can_read_ai`, and an audit log.
 
 The model is fixed, never chosen per request. It defaults to `anthropic/claude-haiku-5.5` (supports tools and image input). To change it:
 
