@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 import type { TextInputInstance } from 'react-native';
 
-import { Logo } from '@/components/brand';
+import { Lockup } from '@/components/brand';
 import { useRepo } from '@/data/repo';
 import { C, F, R, S } from '@/theme/tokens';
 import { Button, H, T } from '@/theme/ui';
@@ -30,8 +30,7 @@ export function SignIn() {
     <View style={{ flex: 1, backgroundColor: C.ground, alignItems: 'center', justifyContent: 'center', padding: S.lg }}>
       <View style={{ width: '100%', maxWidth: 400, gap: S.lg }}>
         <View style={{ gap: 4 }}>
-          <Logo size={52} />
-          <Text style={{ fontFamily: F.display, fontSize: 34, letterSpacing: -1, color: C.ink }}>Finora</Text>
+          <Lockup width={280} />
           <T tone="ink2">Sign in to open your ledger.</T>
         </View>
         <View style={{ backgroundColor: C.paper, borderRadius: R.md, padding: S.lg, gap: S.md }}>
