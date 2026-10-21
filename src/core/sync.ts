@@ -66,7 +66,26 @@ export function mergeOverlays(local: Overlay, remote: Overlay): Overlay {
     merchantRules: { ...local.merchantRules, ...remote.merchantRules },
     answered: { ...local.answered, ...remote.answered },
     savedReports: [...reports.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    ...mergeCategories(local, remote),
+    ...mergeTags(local, remote),
   };
+}
+
+/** Categories the person changed on either device: custom ones by id, edits and merges key by key, the remote winning. */
+function mergeCategories(local: Overlay, remote: Overlay): Pick<Overlay, 'categories'> {
+  const a = local.categories; const b = remote.categories;
+  if (!a && !b) return {};
+  const custom = new Map([...(a?.custom ?? []), ...(b?.custom ?? [])].map((c) => [c.id, c]));
+  return { categories: { custom: [...custom.values()], edits: { ...(a?.edits ?? {}), ...(b?.edits ?? {}) }, merged: { ...(a?.merged ?? {}), ...(b?.merged ?? {}) } } };
+}
+
+/** Tags: the definitions are one list (remote wins when both changed it), the per-charge and per-item changes merge key by key. */
+function mergeTags(local: Overlay, remote: Overlay): Pick<Overlay, 'tags'> {
+  const a = local.tags; const b = remote.tags;
+  if (!a && !b) return {};
+  const edits: NonNullable<Overlay['tags']>['edits'] = { ...(a?.edits ?? {}) };
+  for (const [k, v] of Object.entries(b?.edits ?? {})) edits[k] = { ...edits[k], ...v };
+  return { tags: { defs: b?.defs ?? a?.defs ?? [], edits } };
 }
 
 /** Accept only a well-formed overlay from the network; anything else becomes an empty section. */
@@ -74,10 +93,16 @@ export function parseOverlay(body: unknown): Overlay {
   const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
   const obj = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, never>) : {});
   const arr = (v: unknown) => (Array.isArray(v) ? v : []);
-  return { manual: arr(b.manual) as Txn[], patches: obj(b.patches), merchantRules: obj(b.merchantRules), answered: obj(b.answered) as Record<string, string>, savedReports: arr(b.savedReports) as Overlay['savedReports'] };
+  const cats = obj(b.categories) as Record<string, never>; const tags = obj(b.tags) as Record<string, never>;
+  return {
+    manual: arr(b.manual) as Txn[], patches: obj(b.patches), merchantRules: obj(b.merchantRules), answered: obj(b.answered) as Record<string, string>, savedReports: arr(b.savedReports) as Overlay['savedReports'],
+    ...(b.categories ? { categories: { custom: arr(cats.custom), edits: obj(cats.edits), merged: obj(cats.merged) } as unknown as Overlay['categories'] } : {}),
+    ...(b.tags ? { tags: { defs: arr(tags.defs), edits: obj(tags.edits) } as unknown as Overlay['tags'] } : {}),
+  };
 }
 
-export const overlayIsEmpty = (o: Overlay) => !o.manual.length && !Object.keys(o.patches).length && !Object.keys(o.merchantRules).length && !Object.keys(o.answered).length && !o.savedReports.length;
+export const overlayIsEmpty = (o: Overlay) => !o.manual.length && !Object.keys(o.patches).length && !Object.keys(o.merchantRules).length && !Object.keys(o.answered).length && !o.savedReports.length
+  && !o.categories?.custom.length && !Object.keys(o.categories?.edits ?? {}).length && !Object.keys(o.categories?.merged ?? {}).length && !o.tags?.defs.length && !Object.keys(o.tags?.edits ?? {}).length;
 
 /** Mark manual entries that have not reached the database yet. Called with the moment a push is attempted. */
 export function stampUploads(o: Overlay, nowISO: string): Overlay {

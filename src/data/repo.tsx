@@ -20,6 +20,10 @@ import { fetchLedger, fetchOverlay, pushOverlay } from './sync';
 import { fetchLinkData, NO_LINKS } from './links';
 import type { LinkData } from './links';
 import { applyLinks } from '@/core/links';
+import { setCategoryConfig } from '@/core/categories';
+import type { CategoryConfig } from '@/core/categories';
+import { DEFAULT_TAGS, applyTags } from '@/core/tags';
+import type { TagState } from '@/core/tags';
 import { projectRef, supabase } from './supabase';
 
 const KEY = 'audit.overlay.v1';
@@ -89,6 +93,13 @@ export interface Repo {
   deleteReport: (id: string) => void;
   patchTxn: (id: string, patch: Overlay['patches'][string]) => void;
   attachReceipt: (txnId: string, lines: { item: string; cents: number }[], uri: string) => void;
+  /** the tag definitions and the person's changes to tags (always has the tag list, the default one until they change it) */
+  tagState: TagState;
+  /** change the tag definitions or the tags on a charge or an item */
+  saveTagState: (next: TagState) => void;
+  /** the person's category changes: added, renamed, hidden and merged categories */
+  categoryConfig: CategoryConfig | undefined;
+  saveCategoryConfig: (next: CategoryConfig) => void;
   /** receipt-to-charge links, flags and stored receipts (null until loaded, or when migration 0003 has not been run) */
   links: LinkData | null;
   /** fetch the links again, after one was saved or changed */
@@ -252,7 +263,12 @@ export function RepoProvider({ children }: { children: ReactNode }) {
 
   const receiptsById = useMemo(() => new Map((linkData ?? NO_LINKS).receipts.map((r) => [r.id, r])), [linkData]);
   const reloadLinks = useCallback(async () => { setLinkData(await fetchLinkData()); }, []);
-  const txns = useMemo(() => applyLinks(applyOverlay(ledger.txns, overlay), linkData?.links ?? [], receiptsById, linkData?.flags ?? []), [ledger, overlay, linkData, receiptsById]);
+  const tagState = useMemo<TagState>(() => ({ defs: overlay.tags?.defs?.length ? overlay.tags.defs : DEFAULT_TAGS, edits: overlay.tags?.edits ?? {} }), [overlay.tags]);
+  // the category list is registered before anything is derived from it, so every screen below sees the person's own categories
+  const txns = useMemo(() => {
+    setCategoryConfig(overlay.categories);
+    return applyTags(applyLinks(applyOverlay(ledger.txns, overlay), linkData?.links ?? [], receiptsById, linkData?.flags ?? []), tagState);
+  }, [ledger, overlay, linkData, receiptsById, tagState]);
   const accounts = ledger.accounts;
   const ctx = useMemo<Ctx>(() => ({ txns, accounts }), [txns, accounts]);
   const questions = useMemo(() => buildQuestions(txns, overlay), [txns, overlay]);
@@ -289,10 +305,12 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     deleteReport: (id) => commit({ ...overlay, savedReports: overlay.savedReports.filter((r) => r.id !== id) }),
     patchTxn: (id, patch) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [id]: { ...o.patches[id], ...patch } } }); },
     links: linkData, reloadLinks,
+    tagState, saveTagState: (next) => commit({ ...overlayRef.current, tags: next }),
+    categoryConfig: overlay.categories, saveCategoryConfig: (next) => commit({ ...overlayRef.current, categories: next }),
     attachReceipt: (txnId, lines, uri) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [txnId]: { ...o.patches[txnId], lines, receiptId: uri } } }); },
     colorOf: (category) => colors.get(category) ?? C.other,
     reset: () => commit(emptyOverlay()),
-  }), [ready, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, colors, commit, linkData, reloadLinks]);
+  }), [ready, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, colors, commit, linkData, reloadLinks, tagState]);
 
   return <Ctx_.Provider value={value}>{children}</Ctx_.Provider>;
 }

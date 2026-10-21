@@ -4,7 +4,7 @@ import { TextInput, View } from 'react-native';
 
 import { TxnRow } from '@/components/txnrow';
 import { ScreenHeader } from '@/components/header';
-import { categoryLabel } from '@/core/categories';
+import { allCategories, categoryLabel } from '@/core/categories';
 import { dollars, listTxns } from '@/core/queries';
 import type { Filter } from '@/core/queries';
 import type { CategoryId, Kind } from '@/core/types';
@@ -13,19 +13,20 @@ import { C, F, R, S } from '@/theme/tokens';
 import { Card, Screen, T } from '@/theme/ui';
 
 export default function Ledger() {
-  const p = useLocalSearchParams<{ from?: string; to?: string; category?: string; merchant?: string; kinds?: string }>();
-  const { ctx, scope } = useRepo();
+  const p = useLocalSearchParams<{ from?: string; to?: string; category?: string; merchant?: string; kinds?: string; tags?: string; group?: string }>();
+  const { ctx, scope, tagState } = useRepo();
   const [text, setText] = useState('');
   const filter = useMemo<Filter>(() => ({
     scope, text: text || undefined, from: p.from, to: p.to,
-    categories: p.category ? [p.category as CategoryId] : undefined,
+    categories: p.category ? [p.category as CategoryId] : p.group ? allCategories().filter((c) => c.group === p.group).map((c) => c.id) : undefined,
+    tags: p.tags ? p.tags.split(',') : undefined,
     merchants: p.merchant ? [p.merchant] : undefined,
     kinds: p.kinds ? (p.kinds.split(',') as Kind[]) : undefined,
-  }), [scope, text, p.from, p.to, p.category, p.merchant, p.kinds]);
+  }), [scope, text, p.from, p.to, p.category, p.merchant, p.kinds, p.tags, p.group]);
   const rows = useMemo(() => listTxns(ctx, filter, 400), [ctx, filter]);
   const incoming = p.kinds === 'income' || p.kinds === 'rewards';
   const total = rows.reduce((s, t) => s - t.cents, 0);
-  const label = [p.kinds === 'income' ? 'Earned' : p.kinds === 'rewards' ? 'Rewards' : '', p.category && categoryLabel(p.category), p.merchant, p.from && p.to ? `${p.from} to ${p.to}` : ''].filter(Boolean).join(', ');
+  const label = [p.kinds === 'income' ? 'Earned' : p.kinds === 'rewards' ? 'Rewards' : '', p.tags ? `Tag: ${p.tags.split(',').map((id) => tagState.defs.find((d) => d.id === id)?.label ?? id).join(', ')}` : '', p.group ? `${p.group === 'want' ? 'Wants' : p.group === 'need' ? 'Needs' : 'Mixed'}` : '', p.category && categoryLabel(p.category), p.merchant, p.from && p.to ? `${p.from} to ${p.to}` : ''].filter(Boolean).join(', ');
   return (
     <Screen>
       <ScreenHeader back title="Transactions" sub={label || 'Everything in the ledger'} />
