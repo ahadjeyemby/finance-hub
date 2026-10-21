@@ -9,12 +9,13 @@ import { ScreenHeader } from '@/components/header';
 import { FilePreview } from '@/components/preview';
 import { RedactReview } from '@/components/redact';
 import { findSensitive, parseHideWords, withNewSearch } from '@/core/redact';
+import { autoTagsFor } from '@/core/tags';
 import type { RedactBox } from '@/core/redact';
 import { burnRedactions, discardScan, redactionSupported, scanForRedaction } from '@/data/redact';
 import type { Scan } from '@/data/redact';
 import { matchesFilter, progressLine, runPool, separateByKind, splitRepeats, tally } from '@/core/bulk';
 import type { BulkStatus, Filter } from '@/core/bulk';
-import { CATEGORIES } from '@/core/categories';
+import { allCategories } from '@/core/categories';
 import { todayISO } from '@/core/dates';
 import { findSameReceipt, keyOf, likelyCharges } from '@/core/dedupe';
 import { AUTO_AFTER, applyCardHabit, learnAliases, learnCard, linkTrust, methodKey } from '@/core/learn';
@@ -572,6 +573,15 @@ function Line({ item }: { item: Item }) {
   );
 }
 
+/** The tags the items on a receipt would get, as counts: Health 2, Household 1. Read only here; each item's tags are changed on its charge once it is linked. */
+function TagNote({ lines }: { lines: { item: string; cents: number }[] }) {
+  const { tagState } = useRepo();
+  const counts = new Map<string, { n: number; cents: number }>();
+  for (const l of lines) for (const id of autoTagsFor(l.item, undefined, undefined, tagState.defs)) { const e = counts.get(id) ?? { n: 0, cents: 0 }; e.n++; e.cents += l.cents; counts.set(id, e); }
+  if (!counts.size) return null;
+  return <T size={12} tone="ink3">Tags found from the items: {[...counts.entries()].map(([id, e]) => `${tagState.defs.find((d) => d.id === id)?.label ?? id} ${e.n} (${dollars(e.cents)})`).join(', ')}. Change them per item on the charge page once the receipt is linked.</T>;
+}
+
 function summaryLine(item: Item, accounts: Account[]): string {
   if (item.receipt) { const r = item.receipt; return `${r.merchant || 'Store missing'}, ${r.date ?? 'date missing'}, ${r.totalCents != null ? dollars(r.totalCents) : 'total missing'}, ${r.lines.length} ${r.lines.length === 1 ? 'item' : 'items'}`; }
   const s = item.statement!;
@@ -641,6 +651,7 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
           <Row label="Store" value={rec.merchant || 'missing'} /><Row label="Date" value={rec.date ?? 'missing'} />
           {rec.readBy ? <Row label="Read by" value={rec.readBy} /> : null}
           <Row label="Total paid" value={rec.totalCents != null ? dollars(rec.totalCents) : 'missing'} /><Row label="Items read" value={receiptUnits(rec.lines) !== rec.lines.length ? `${itemLines(rec.lines).length} lines, ${receiptUnits(rec.lines)} items${rec.lines.length !== itemLines(rec.lines).length ? `, ${rec.lines.length - itemLines(rec.lines).length} discount` : ''}${rec.itemCount ? ` (receipt prints ${rec.itemCount})` : ''}` : String(rec.lines.length)} />
+          {rec.lines.length ? <TagNote lines={rec.lines} /> : null}
           {rec.charges?.length ? <Row label="Extra charges" value={`${dollars(rec.charges.reduce((t, x) => t + x.cents, 0))}: ${rec.charges.map((x) => `${x.label} ${dollars(x.cents)}`).join(', ')}`} /> : null}
           {rec.paidOtherCents ? <Row label="Paid with points or credit" value={dollars(rec.paidOtherCents)} /> : null}
           {rec.refundCents ? <Row label="Refunded" value={dollars(rec.refundCents)} /> : null}
@@ -715,7 +726,7 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
             <Chip label="Paid another way (no charge expected)" on={item.link === 'flag'} onPress={() => onSet({ link: 'flag', noLink: item.noLink ?? 'cash' })} />
           </View>
           {item.link === 'flag' ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{RECEIPT_NO_LINK.map((r) => <Chip key={r} label={NO_LINK_LABEL[r]} on={(item.noLink ?? 'cash') === r} onPress={() => onSet({ noLink: r })} />)}</View> : null}
-          {ev.cash ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{CATEGORIES.filter((c) => c.id !== 'uncategorized').map((c) => <Chip key={c.id} label={c.label} on={ev.cashCat === c.id} onPress={() => onSet({ cat: c.id })} />)}</View> : null}
+          {ev.cash ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{allCategories().filter((c) => c.id !== 'uncategorized').map((c) => <Chip key={c.id} label={c.label} on={ev.cashCat === c.id} onPress={() => onSet({ cat: c.id })} />)}</View> : null}
         </View>
       ) : null}
 

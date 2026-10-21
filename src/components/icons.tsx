@@ -1,6 +1,6 @@
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
-export type IconName = 'overview' | 'explore' | 'add' | 'inbox' | 'reports' | 'accounts' | 'links' | 'back';
+export type IconName = 'overview' | 'explore' | 'add' | 'inbox' | 'reports' | 'accounts' | 'links' | 'views' | 'tags' | 'back';
 
 export function Icon({ name, color, size = 22 }: { name: IconName; color: string; size?: number }) {
   const p = { stroke: color, strokeWidth: 2, fill: 'none', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -13,6 +13,8 @@ export function Icon({ name, color, size = 22 }: { name: IconName; color: string
       {name === 'reports' ? <Path d="M5 20V10M12 20V4M19 20v-7" {...p} /> : null}
       {name === 'accounts' ? <><Rect x={3} y={6} width={18} height={12} rx={2} {...p} /><Path d="M3 10.5h18M6.5 15h4" {...p} /></> : null}
       {name === 'links' ? <Path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" {...p} /> : null}
+      {name === 'views' ? <><Circle cx={12} cy={12} r={8} {...p} /><Path d="M12 4v8l5.5 5.5" {...p} /></> : null}
+      {name === 'tags' ? <><Path d="M3.5 12.5V4.5h8l8 8-8 8-8-8z" {...p} /><Circle cx={8} cy={9} r={1.2} {...p} /></> : null}
       {name === 'back' ? <Path d="M15 5l-7 7 7 7" {...p} /> : null}
     </Svg>
   );

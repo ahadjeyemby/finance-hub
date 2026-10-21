@@ -128,6 +128,16 @@ Choosing "keep as printed" on a difference saves the document as it is and recor
 
 The reader runs on your backend, so the file is sent to the model provider you configured. Statements contain account numbers. A statement longer than one model answer can hold (roughly a few hundred rows) is refused with a message; split it by month or use `bun run ledger`. Reading quality on your own banks' layouts is not guaranteed: the balance check exists because the reader can be wrong.
 
+## Categories, tags and views
+
+Every charge, and every item on a receipt, has **one category**, which keeps category totals additive. On top of that it can carry any number of **tags** (Health, Household, Work and Kids to start with, plus your own). Tags overlap on purpose: a pharmacy item bought at a big-box store is Household in one view and Health in another, and nothing is counted twice inside a view.
+
+- **Tags are found automatically**, on statement charges and on receipt items alike, from the words (merchant and bank description for a charge, the item text for an item), from the category, and from the Business switch. The words for each tag are yours to edit under **Categories and tags**; a tag can also be set to "only added by hand".
+- **You add or take away a tag** on a charge or on any single item from the charge page (a tag the rules found says "auto"; a change you make is kept and wins over the rules). Taking a tag off a whole charge takes it off its items unless an item says otherwise. Each item can also be given **a different category** than its charge.
+- **Categories are editable** (Categories and tags): add one, rename it, move it between Need, Want and Mixed, hide it from the pickers, or fold it into another (its charges then count as the other one; nothing on the charges changes, and the merge can be undone). Nothing is deleted, and a category with charges cannot be deleted.
+- **Views** shows the overall picture for a month or all time: a total, a share of spending, the biggest stores and the charges behind it for each tag, plus **Extras** (everything in categories marked Want). A charge with items counts only the items that carry the tag. The totals overlap and are not meant to add up to the total.
+- Stored with the rest of your saved decisions (synced like them), so no database change is needed. Not yet: a tag chosen per receipt before it is linked to a charge, and a tag filter on Explore.
+
 ## Redacting a statement before it is read
 
 In the web version, each statement you add is first scanned **on your device** for details you may not want to share: full account and card numbers (the last four digits are kept, so the statement can still be matched to its account), names above an address, street and city lines, phone numbers, email addresses and tax numbers. You then see every page with the boxes it found. Click a box to switch it off or on, drag across a page to cover something it missed, and list words to always hide (your name, street, employer). Only when you press **Use these redactions** are the boxes burned into the pictures of the pages. The reader and your storage get that redacted copy; the original is dropped from memory and never uploaded. Reading the original instead needs a second, explicit confirmation. The switch **Redact statements first** is on the Import screen (on by default).

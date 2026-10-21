@@ -66,7 +66,10 @@ export interface Txn {
   /** manual entries: when it first reached the database. Stays empty until a push succeeds. */
   uploadedAt?: string;
   /** item lines when the transaction was split from a receipt or typed in */
-  lines?: { item: string; cents: number; category?: CategoryId }[];
+  lines?: { item: string; cents: number; category?: CategoryId; /** derived: the tags this item carries (see tags.ts) */ tags?: string[]; /** derived: the tags found from its own words and its charge, before the person's changes */ autoTags?: string[] }[];
+  /** derived, never stored on the transaction: the tags it carries, and the ones found automatically before the person's changes */
+  tags?: string[];
+  autoTags?: string[];
 }
 
 export type Hint =
@@ -82,7 +85,9 @@ export type CategoryId =
   | 'groceries' | 'household' | 'clothing' | 'fuel' | 'restaurants' | 'medical'
   | 'auto' | 'insurance' | 'phone' | 'subscriptions' | 'travel' | 'education'
   | 'giving' | 'personal_care' | 'online_shopping' | 'mixed_retail' | 'electronics'
-  | 'entertainment' | 'government' | 'people' | 'other' | 'uncategorized';
+  | 'entertainment' | 'government' | 'people' | 'other' | 'uncategorized'
+  /** a category the person added (see categories.ts) */
+  | (string & {});
 
 export interface Category {
   id: CategoryId;
@@ -114,6 +119,10 @@ export interface Overlay {
   merchantRules: Record<string, Partial<Pick<Txn, 'category' | 'business'>>>;
   answered: Record<string, string>;
   savedReports: SavedReport[];
+  /** categories the person added, renamed, hid or merged (see categories.ts) */
+  categories?: import('./categories').CategoryConfig;
+  /** tag definitions and the person's changes to the tags of a charge or one item on it (see tags.ts) */
+  tags?: import('./tags').TagState;
 }
 
 export interface SavedReport {

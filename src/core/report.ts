@@ -1,4 +1,4 @@
-import { CATEGORIES, categoryLabel, isCategoryId } from './categories';
+import { CATEGORIES, allCategories, categoryLabel, isCategoryId } from './categories';
 import { MONTH_NAMES, addMonths, monthEnd, monthLabel, monthOf, monthStart, todayISO } from './dates';
 import { forecastMonth } from './forecast';
 import { dollars, runQuery, summarize } from './queries';
@@ -250,4 +250,4 @@ export function answer(text: string, ctx: Ctx, today = todayISO()): Answer {
   return { text: parts.join(' '), report };
 }
 
-export { CATEGORIES };
+export { CATEGORIES, allCategories };

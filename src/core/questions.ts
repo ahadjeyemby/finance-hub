@@ -1,7 +1,8 @@
-import { CATEGORIES } from './categories';
+import { allCategories } from './categories';
 import type { Overlay, Question, Txn } from './types';
 
-const catChoices = CATEGORIES.filter((c) => c.id !== 'uncategorized').map((c) => ({ value: c.id, label: c.label }));
+// the person's own category list, read when the questions are built so an added or renamed category is offered at once
+const catChoices = () => allCategories().filter((c) => c.id !== 'uncategorized').map((c) => ({ value: c.id, label: c.label }));
 const BP = [{ value: 'personal', label: 'Personal' }, { value: 'business', label: 'Business' }];
 
 /**
@@ -47,7 +48,7 @@ export function buildQuestions(txns: Txn[], overlay: Pick<Overlay, 'answered'>):
       id: `person:${t.id}`, type: 'person_payment', txnIds: [t.id], merchant: t.merchant, cents: Math.abs(t.cents),
       prompt: `What was the $${(Math.abs(t.cents) / 100).toFixed(2)} payment on ${t.date} for? (${t.merchant.replace('Zelle: ', '')})`,
       detail: 'Payments to people carry no receipt, so the category comes from you.',
-      choices: catChoices, canApplyToMerchant: true,
+      choices: catChoices(), canApplyToMerchant: true,
     });
 
   // merchants we could not categorise, and one-off candidates
@@ -61,7 +62,7 @@ export function buildQuestions(txns: Txn[], overlay: Pick<Overlay, 'answered'>):
       id: `cat:${m}`, type: 'category', txnIds: ts.map((t) => t.id), merchant: m, cents,
       prompt: `What do you buy from ${m}? ${ts.length} charge${ts.length > 1 ? 's' : ''}, $${(cents / 100).toFixed(2)} in total.`,
       detail: 'One answer is applied to every charge from this merchant, now and later.',
-      choices: catChoices, canApplyToMerchant: true,
+      choices: catChoices(), canApplyToMerchant: true,
     });
   }
 

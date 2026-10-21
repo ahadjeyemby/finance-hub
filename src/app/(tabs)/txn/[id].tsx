@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { EvidenceCard } from '@/components/evidence';
+import { TagsEditor } from '@/components/tags';
 import { ScreenHeader } from '@/components/header';
-import { CATEGORIES, categoryLabel } from '@/core/categories';
+import { allCategories, categoryLabel } from '@/core/categories';
 import { dayLabel } from '@/core/dates';
 import { CHARGE_NO_LINK, NO_LINK_LABEL } from '@/core/links';
 import { dollars } from '@/core/queries';
@@ -16,7 +17,7 @@ import { Button, Card, Chip, Row, Screen, Segmented, T } from '@/theme/ui';
 
 export default function TxnDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { txns, accounts, patchTxn, links, reloadLinks } = useRepo();
+  const { txns, accounts, patchTxn, links, reloadLinks, tagState, saveTagState } = useRepo();
   const [flagging, setFlagging] = useState(false);
   const [linkError, setLinkError] = useState('');
   const t = txns.find((x) => x.id === id);
@@ -43,8 +44,12 @@ export default function TxnDetail() {
           </Card>
           <Card title="Category">
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-              {CATEGORIES.filter((c) => c.id !== 'uncategorized').map((c) => <Chip key={c.id} label={c.label} on={t.category === c.id} onPress={() => patchTxn(t.id, { category: c.id as CategoryId })} />)}
+              {allCategories().filter((c) => c.id !== 'uncategorized').map((c) => <Chip key={c.id} label={c.label} on={t.category === c.id} onPress={() => patchTxn(t.id, { category: c.id as CategoryId })} />)}
             </View>
+          </Card>
+          <Card title="Tags">
+            <TagsEditor txn={t} tagState={tagState} onChange={saveTagState} />
+            <View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Manage categories and tags" onPress={() => router.push('/categories')} /></View>
           </Card>
           <Card title="Repeats?">
             <Segmented value={t.oneOff ? 'one' : 'rep'} onChange={(v) => patchTxn(t.id, { oneOff: v === 'one' })} options={[{ value: 'rep', label: 'Normal' }, { value: 'one', label: 'One-time' }]} />
@@ -52,7 +57,7 @@ export default function TxnDetail() {
           </Card>
         </>
       ) : null}
-      {t.lines?.length ? (
+      {t.lines?.length && !isSpend ? (
         <Card title="Items">
           {t.lines.map((l, i) => <Row key={i} label={l.item} value={dollars(l.cents)} />)}
           {lineSum !== -t.cents ? <T size={12} tone="ink3">Items add up to {dollars(lineSum)}.</T> : null}

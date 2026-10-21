@@ -12,6 +12,8 @@ export interface Filter {
   to?: string;
   kinds?: Kind[];
   categories?: CategoryId[];
+  /** keep charges carrying any of these tags (see tags.ts) */
+  tags?: string[];
   merchants?: string[];
   accounts?: string[];
   scope?: 'all' | 'personal' | 'business';
@@ -62,6 +64,7 @@ export function matches(t: Txn, f: Filter | undefined): boolean {
   if (f.to && t.date > f.to) return false;
   if (f.kinds && !f.kinds.includes(t.kind)) return false;
   if (f.categories && !(t.category && f.categories.includes(t.category))) return false;
+  if (f.tags && !(t.tags && f.tags.some((x) => t.tags!.includes(x)))) return false;
   if (f.merchants && !f.merchants.includes(t.merchant)) return false;
   if (f.accounts && !f.accounts.includes(t.accountId)) return false;
   if (f.scope === 'business' && !t.business) return false;

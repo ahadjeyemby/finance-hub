@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/header';
-import { CATEGORIES } from '@/core/categories';
+import { allCategories } from '@/core/categories';
 import { todayISO } from '@/core/dates';
 import { likelyCharges } from '@/core/dedupe';
 import { dollars } from '@/core/queries';
@@ -57,7 +57,7 @@ export default function Cash() {
   if (draft.amount != null) history.push(`Paid ${dollars(Math.round(draft.amount * 100))}`);
   if (draft.merchant) history.push(`To ${draft.merchant}`);
   if (draft.what) history.push(`For ${draft.what}`);
-  if (draft.category) history.push(CATEGORIES.find((c) => c.id === draft.category)?.label ?? draft.category);
+  if (draft.category) history.push(allCategories().find((c) => c.id === draft.category)?.label ?? draft.category);
   if (draft.splitAsked) history.push(draft.lines?.length ? `${draft.lines.length} items` : 'One line');
   if (draft.date) history.push(draft.date);
   if (draft.business !== undefined) history.push(draft.business ? 'Business' : 'Personal');
@@ -72,7 +72,7 @@ export default function Cash() {
             <H size={18}>{step.prompt}</H>
             {step.kind === 'category' ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                {[...CATEGORIES.filter((c) => c.id !== 'uncategorized')].sort((a, b) => (a.id === step.suggestion ? -1 : b.id === step.suggestion ? 1 : 0)).map((c) => <Chip key={c.id} label={c.id === step.suggestion ? `${c.label} (suggested)` : c.label} on={c.id === step.suggestion} onPress={() => set({ category: c.id })} />)}
+                {[...allCategories().filter((c) => c.id !== 'uncategorized')].sort((a, b) => (a.id === step.suggestion ? -1 : b.id === step.suggestion ? 1 : 0)).map((c) => <Chip key={c.id} label={c.id === step.suggestion ? `${c.label} (suggested)` : c.label} on={c.id === step.suggestion} onPress={() => set({ category: c.id })} />)}
               </View>
             ) : step.kind === 'yesno' ? (
               <View style={{ flexDirection: 'row', gap: S.sm }}>
