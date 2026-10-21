@@ -1,6 +1,7 @@
 // Reads and writes the receipt_links and link_flags tables (migration 0003). The rules live in core/links.ts; this file only moves rows.
 import { rowToRecord } from '@/core/evidence';
 import type { Link, LinkFlag, NoLinkReason, StoredReceipt } from '@/core/links';
+import { meId } from './scope';
 import { supabase } from './supabase';
 
 const db = () => { if (!supabase) throw new Error('No database is connected.'); return supabase; };
@@ -12,10 +13,10 @@ export const NO_LINKS: LinkData = { links: [], receipts: [], flags: [] };
 // the receipt columns linking needs: everything but the full reader output, of which only a few fields are used
 const RECEIPT_COLS = 'id, kind, merchant, date, time, total_cents, subtotal_cents, tax_cents, tip_cents, discount_cents, currency, payment_method, card_last4, store_address, store_ref, order_ref, lines, source_file, sha256, origin, captured_at, charges:raw->charges, paid_other:raw->paidOther, refund:raw->refund, item_count:raw->itemCount';
 
-async function pages<T>(table: string, cols: string, order: string): Promise<T[]> {
+async function pages<T>(table: string, cols: string, order: string, owner: string = meId()): Promise<T[]> {
   const out: T[] = [];
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await db().from(table).select(cols).order(order).range(from, from + PAGE - 1);
+    const { data, error } = await db().from(table).select(cols).eq('user_id', owner).order(order).range(from, from + PAGE - 1);
     if (error) throw new Error(error.message);
     out.push(...((data ?? []) as unknown as T[]));
     if (!data || data.length < PAGE) return out;
@@ -50,7 +51,7 @@ export async function saveLinks(links: Link[]): Promise<void> {
 }
 
 export async function removeLink(receiptId: string, txnId: string): Promise<void> {
-  const { error } = await db().from('receipt_links').delete().eq('receipt_id', receiptId).eq('txn_id', txnId);
+  const { error } = await db().from('receipt_links').delete().eq('user_id', meId()).eq('receipt_id', receiptId).eq('txn_id', txnId);
   if (error) throw new Error(`Could not remove the link: ${error.message}`);
 }
 
@@ -61,6 +62,6 @@ export async function setFlag(kind: 'receipt' | 'txn', refId: string, reason: No
 }
 
 export async function clearFlag(kind: 'receipt' | 'txn', refId: string): Promise<void> {
-  const { error } = await db().from('link_flags').delete().eq('kind', kind).eq('ref_id', refId);
+  const { error } = await db().from('link_flags').delete().eq('user_id', meId()).eq('kind', kind).eq('ref_id', refId);
   if (error) throw new Error(`Could not clear that: ${error.message}`);
 }

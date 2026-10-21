@@ -67,7 +67,7 @@ function fakeDb(overlayBody: object | null = null) {
     from: (table: string) => ({
       upsert: (rows: any, opts: any) => chain(table, 'upsert', rows, opts),
       insert: (rows: any) => chain(table, 'insert', rows),
-      select: () => ({ maybeSingle: async () => ({ error: null, data: overlayBody ? { body: overlayBody } : null }) }),
+      select: () => { const one = { maybeSingle: async () => ({ error: null, data: overlayBody ? { body: overlayBody } : null }) }; return { ...one, eq: () => one }; },
     }),
     storage: { from: (bucket: string) => ({ upload: async (p: string) => { files.push(`${bucket}:${p}`); return { error: null }; } }) },
   };
