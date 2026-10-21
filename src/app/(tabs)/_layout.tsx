@@ -1,7 +1,9 @@
 import { Tabs } from 'expo-router/js-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View } from 'react-native';
 
 import { Icon } from '@/components/icons';
+import { SIDEBAR_BOTTOM, SIDEBAR_TOP, SidebarBrand } from '@/components/sidebarbrand';
 import type { IconName } from '@/components/icons';
 import { useRepo } from '@/data/repo';
 import { C, F, WIDE } from '@/theme/tokens';
@@ -17,6 +19,7 @@ const hidden = { tabBarButton: () => null, tabBarItemStyle: { display: 'none' as
 
 export default function TabsLayout() {
   const wide = useWide();
+  const insets = useSafeAreaInsets();
   const { questions } = useRepo();
   return (
     <Tabs
@@ -30,7 +33,9 @@ export default function TabsLayout() {
         tabBarActiveBackgroundColor: wide ? C.soft : undefined,
         tabBarLabelStyle: { fontFamily: F.bodyBold, fontSize: 12 },
         tabBarBadgeStyle: { backgroundColor: C.signal, color: C.signalInk, fontFamily: F.bodyBold },
-        tabBarStyle: { backgroundColor: C.paper, borderColor: C.line, minWidth: wide ? 200 : undefined, ...(wide ? {} : { height: 68, paddingTop: 6, paddingBottom: 10 }) },
+        tabBarStyle: { backgroundColor: C.paper, borderColor: C.line, minWidth: wide ? 200 : undefined, ...(wide ? { paddingTop: SIDEBAR_TOP + insets.top, paddingBottom: SIDEBAR_BOTTOM + insets.bottom } : { height: 68, paddingTop: 6, paddingBottom: 10 }) },
+        // on a wide screen the side bar carries the logo at the top and "Powered by Sparktrum" at the bottom
+        tabBarBackground: wide ? () => <SidebarBrand /> : undefined,
         sceneStyle: { backgroundColor: C.ground },
       }}>
       <Tabs.Screen name="index" options={tab('Overview', 'overview')} />
