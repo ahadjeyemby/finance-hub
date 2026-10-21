@@ -41,11 +41,15 @@ export function checkLedgerFile(data: unknown): { ledger: LedgerFile | null; pro
 /** Statement rows only. Cash entries typed in the app live in the overlay, not here. */
 export const statementTxns = (txns: Txn[]): Txn[] => txns.filter((t) => !t.manual);
 
-/** Upsert by (user, id): safe to run again. Accounts first, because transactions reference them. */
-export async function uploadLedger(db: SupabaseClient, ledger: LedgerFile, size = 400): Promise<{ accounts: number; txns: number }> {
-  const a = await db.from('accounts').upsert(ledger.accounts.map(accountToRow), { onConflict: 'user_id,id' });
+/**
+ * Upsert by (user, id): safe to run again. Accounts first, because transactions reference them. `owner` is whose data this is, when it is not the
+ * signed-in person's (an admin adding a statement for a member); the database allows it only for a member of the admin's workspace.
+ */
+export async function uploadLedger(db: SupabaseClient, ledger: LedgerFile, size = 400, owner?: string): Promise<{ accounts: number; txns: number }> {
+  const own = <T extends object>(row: T): T => (owner ? { ...row, user_id: owner } : row);
+  const a = await db.from('accounts').upsert(ledger.accounts.map(accountToRow).map(own), { onConflict: 'user_id,id' });
   if (a.error) throw a.error;
-  const rows = statementTxns(ledger.txns).map(txnToRow);
+  const rows = statementTxns(ledger.txns).map(txnToRow).map(own);
   for (const part of chunk(rows, size)) {
     const r = await db.from('txns').upsert(part, { onConflict: 'user_id,id' });
     if (r.error) throw r.error;
@@ -98,13 +102,13 @@ export async function uploadEvidence(db: SupabaseClient, ledger: LedgerFile, bun
   for (const s of bundle.statements ?? []) {
     const path = await putFile(db, 'statements', o, s.sourceFile, s.sha256);
     if (path) res.files++;
-    const r = await db.from('statements').upsert(statementToRow(s, path), { onConflict: 'user_id,id' });
+    const r = await db.from('statements').upsert({ ...statementToRow(s, path), user_id: o.userId }, { onConflict: 'user_id,id' });
     if (r.error) throw r.error;
     res.statements++;
   }
 
   const known = new Set(ledger.txns.map((t) => t.id));
-  const raw = (bundle.raw ?? []).filter((r) => known.has(r.txnId)).map(rawToRow);
+  const raw = (bundle.raw ?? []).filter((r) => known.has(r.txnId)).map(rawToRow).map((r) => ({ ...r, user_id: o.userId }));
   for (const part of chunk(raw, 300)) {
     const r = await db.from('txn_raw').upsert(part, { onConflict: 'user_id,txn_id' });
     if (r.error) throw r.error;
@@ -120,7 +124,7 @@ export async function uploadEvidence(db: SupabaseClient, ledger: LedgerFile, bun
     // a second document for a purchase already stored (paper photo + e-receipt) is marked as such; both stay as evidence
     const same = findSameReceipt(rec, seenKeys);
     if (same) res.extraDocuments.push({ source: rec.sourceFile ?? rec.merchant ?? 'receipt', of: same.of.label, why: same.why });
-    const row = receiptToRow(same ? { ...rec, duplicateOf: same.of.id } : rec, path, m.txnId);
+    const row = { ...receiptToRow(same ? { ...rec, duplicateOf: same.of.id } : rec, path, m.txnId), user_id: o.userId };
     const q = rec.sha256
       ? await db.from('receipts').upsert(row, { onConflict: 'user_id,sha256' }).select('id').single()
       : await db.from('receipts').insert(row).select('id').single();

@@ -23,15 +23,19 @@ export async function signed(bucket: 'statements' | 'receipts', path: string | n
 }
 
 /** Everything stored about where a transaction came from. Read on demand, so the ledger sync stays small. */
-export async function fetchEvidence(t: Txn, owner?: string): Promise<Evidence> {
+export async function fetchEvidence(t: Txn): Promise<Evidence> {
   const empty: Evidence = { online: false, raw: null, statement: null, receipts: [] };
   if (!supabase) return empty;
   try {
-    const uid = owner ?? meId();
+    // a member's charge reaches an admin with a prefixed id and their user id as owner: the database knows it by the plain id, under that member
+    const me = meId();
+    const foreign = t.owner && t.owner !== me ? t.owner : null;
+    const uid = foreign ?? me;
+    const rawId = foreign && t.id.startsWith(`${foreign}:`) ? t.id.slice(foreign.length + 1) : t.id;
     let raw: RawLine | null = null;
     let statement: Evidence['statement'] = null;
     if (!t.manual) {
-      const r = await supabase.from('txn_raw').select('statement_id,line_no,posted_date,source_file,row').eq('user_id', uid).eq('txn_id', t.id).maybeSingle();
+      const r = await supabase.from('txn_raw').select('statement_id,line_no,posted_date,source_file,row').eq('user_id', uid).eq('txn_id', rawId).maybeSingle();
       if (r.error) throw r.error;
       if (r.data) {
         raw = { statementId: r.data.statement_id, lineNo: r.data.line_no, postedDate: r.data.posted_date, sourceFile: r.data.source_file, row: r.data.row as Record<string, unknown> };
@@ -43,11 +47,11 @@ export async function fetchEvidence(t: Txn, owner?: string): Promise<Evidence> {
       }
     }
     // the links are the record of which receipts belong to this charge; the older receipts.txn_id and the charge's own receiptId are still read so nothing saved before links is hidden
-    const lk = await supabase.from('receipt_links').select('receipt_id, role, method, reason, confirmed').eq('user_id', uid).eq('txn_id', t.id);
+    const lk = await supabase.from('receipt_links').select('receipt_id, role, method, reason, confirmed').eq('user_id', uid).eq('txn_id', rawId);
     const linkRows = lk.error ? [] : (lk.data ?? []);
     const viaLinks = linkRows.length ? await supabase.from('receipts').select('*').eq('user_id', uid).in('id', linkRows.map((l) => l.receipt_id as string)) : { data: [], error: null };
     if (viaLinks.error) throw viaLinks.error;
-    const byTxn = await supabase.from('receipts').select('*').eq('user_id', uid).eq('txn_id', t.id);
+    const byTxn = await supabase.from('receipts').select('*').eq('user_id', uid).eq('txn_id', rawId);
     if (byTxn.error) throw byTxn.error;
     const rows = [...(viaLinks.data ?? [])];
     for (const x of byTxn.data ?? []) if (!rows.some((y) => y.id === x.id)) rows.push(x);

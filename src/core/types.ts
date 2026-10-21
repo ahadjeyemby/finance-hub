@@ -28,10 +28,14 @@ export interface Account {
   coverage: { from: string; to: string };
   /** false = we cannot yet claim every deposit for this person is visible (other accounts exist). */
   incomeComplete?: boolean;
+  /** whose data this is, when more than one person's is on screen (an admin looking at their members). Missing = the signed-in person's own. */
+  owner?: string;
 }
 
 export interface Txn {
   id: string;
+  /** whose data this is, when more than one person's is on screen (an admin looking at their members). Missing = the signed-in person's own. */
+  owner?: string;
   accountId: string;
   date: string; // YYYY-MM-DD
   description: string; // raw bank description

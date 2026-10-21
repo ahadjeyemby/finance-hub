@@ -58,14 +58,14 @@ function Merge({ account, accounts, txnCount, onDone }: { account: Account; acco
 }
 
 /** The statements saved for an account, newest first, each with its balances, whether it added up, and a button that opens the original file. */
-function Statements({ accountId, title }: { accountId: string | null; title: string }) {
+function Statements({ account, title }: { account: Account | null; title: string }) {
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<StatementRef[] | null>(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const toggle = async () => {
     const next = !open; setOpen(next);
-    if (next && list === null) { try { setList(await fetchStatements(accountId)); } catch (e) { setError((e as Error).message); setList([]); } }
+    if (next && list === null) { try { setList(await fetchStatements(account)); } catch (e) { setError((e as Error).message); setList([]); } }
   };
   const openFile = async (s: StatementRef) => {
     setBusy(s.id); setError('');
@@ -99,7 +99,7 @@ function Numbers({ account, onSaved }: { account: Account; onSaved: () => void }
   const [error, setError] = useState('');
   const save = async (next: Account) => {
     setBusy(true); setError('');
-    try { await saveAccountNumbers(account.id, next.extraNumbers ?? []); setText(''); onSaved(); } catch (e) { setError((e as Error).message); }
+    try { await saveAccountNumbers(account, next.extraNumbers ?? []); setText(''); onSaved(); } catch (e) { setError((e as Error).message); }
     setBusy(false);
   };
   const add = () => {
@@ -178,9 +178,9 @@ export default function Accounts() {
             </View>
             <Row label="Statements cover" value={a.type === 'cash' ? 'Entered by you' : `${dayLabel(a.coverage.from)} to ${dayLabel(a.coverage.to)}`} />
             <Row label="Transactions" value={String(n)} />
-            {a.type !== 'cash' && auth.configured ? <Statements accountId={a.id} title="Statements" /> : null}
+            {a.type !== 'cash' && auth.configured ? <Statements account={a} title="Statements" /> : null}
             {a.type !== 'cash' && auth.configured ? <Numbers account={a} onSaved={() => sync.now()} /> : null}
-            {a.type !== 'cash' && auth.configured ? <Merge account={a} accounts={accounts} txnCount={n} onDone={(m) => { setMergeMsg(m); sync.now().then(refreshMerged); }} /> : null}
+            {a.type !== 'cash' && auth.configured && (!a.owner || a.owner === auth.userId) ? <Merge account={a} accounts={accounts} txnCount={n} onDone={(m) => { setMergeMsg(m); sync.now().then(refreshMerged); }} /> : null}
             {a.coverage.to < dataTo && a.type !== 'cash' ? <T size={12} tone="ink3">{daysBetween(a.coverage.to, dataTo)} days behind the newest statement. Totals for those days are incomplete.</T> : null}
           </Card>
         );
@@ -201,7 +201,7 @@ export default function Accounts() {
           {undoError ? <T size={12} tone="bad">{undoError}</T> : null}
         </Card>
       ) : null}
-      {auth.configured ? <Card title="Not tied to an account"><T size={12} tone="ink3">Statements kept as evidence for an account you do not track.</T><Statements accountId={null} title="Show these statements" /></Card> : null}
+      {auth.configured ? <Card title="Not tied to an account"><T size={12} tone="ink3">Statements kept as evidence for an account you do not track.</T><Statements account={null} title="Show these statements" /></Card> : null}
       <View style={{ height: S.md }} />
     </Screen>
   );

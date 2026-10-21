@@ -19,16 +19,16 @@ export async function all<T>(table: string, order: string, owner: string = meId(
 }
 
 /** Statement-derived rows from the database, or null when the person has none yet. */
-export async function fetchLedger(): Promise<{ accounts: Account[]; txns: Txn[] } | null> {
+export async function fetchLedger(owner: string = meId()): Promise<{ accounts: Account[]; txns: Txn[] } | null> {
   // an account that was merged into another is hidden; its transactions already belong to the account it went into
-  const accounts = (await all<AccountRow & { merged_into?: string | null }>('accounts', 'id')).filter((a) => !a.merged_into);
+  const accounts = (await all<AccountRow & { merged_into?: string | null }>('accounts', 'id', owner)).filter((a) => !a.merged_into);
   if (!accounts.length) return null;
-  const txns = await all<TxnRow>('txns', 'id');
+  const txns = await all<TxnRow>('txns', 'id', owner);
   return { accounts: accounts.map(rowToAccount), txns: txns.map(rowToTxn) };
 }
 
-export async function fetchOverlay(): Promise<Overlay | null> {
-  const { data, error } = await db().from('overlays').select('body').eq('user_id', meId()).maybeSingle();
+export async function fetchOverlay(owner: string = meId()): Promise<Overlay | null> {
+  const { data, error } = await db().from('overlays').select('body').eq('user_id', owner).maybeSingle();
   if (error) throw new Error(error.message);
   return data ? parseOverlay(data.body) : null;
 }

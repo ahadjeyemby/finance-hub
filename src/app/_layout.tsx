@@ -9,6 +9,7 @@ import { View } from 'react-native';
 import { NoData } from '@/components/nodata';
 import { SignIn } from '@/components/signin';
 import { SavedCopyNote } from '@/components/source';
+import { ViewSwitch } from '@/components/viewswitch';
 import { RepoProvider, useRepo } from '@/data/repo';
 import { C } from '@/theme/tokens';
 
@@ -25,7 +26,7 @@ function Gate() {
   // no ledger in the database: say so, never show anything else. The import screen is the one way out of an empty database, and the People
   // screen is where an invited person joins a workspace (they have no data of their own yet).
   if (!hasData && pathname !== '/import' && pathname !== '/people') return <NoData />;
-  return <View style={{ flex: 1, backgroundColor: C.ground }}><SavedCopyNote /><Slot /></View>;
+  return <View style={{ flex: 1, backgroundColor: C.ground }}><SavedCopyNote /><ViewSwitch /><Slot /></View>;
 }
 
 export default function Root() {

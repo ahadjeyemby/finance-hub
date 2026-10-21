@@ -15,12 +15,12 @@ export interface SweepResult {
 }
 
 /** Match stored receipts with charges. Returns null when links are not available (no connection, or migration 0003 not run). */
-export async function sweepLinks(txns: Txn[], accounts: Account[]): Promise<SweepResult | null> {
-  const data = await fetchLinkData();
+export async function sweepLinks(txns: Txn[], accounts: Account[], owner?: string): Promise<SweepResult | null> {
+  const data = await fetchLinkData(owner);
   if (!data) return null;
   const keys = storedKeys(data);
   const plan = planLinks({ receipts: data.receipts, txns, links: data.links, flags: data.flags, accounts, aliases: learnAliases(keys, txns), trust: linkTrust(keys, txns, accounts) });
   const sure = plan.proposals.filter((p) => p.sure);
-  await saveLinks(sure.map((p) => ({ receiptId: p.receiptId, txnId: p.txnId, role: p.role, method: p.method, reason: p.reason, confirmed: false })));
+  await saveLinks(sure.map((p) => ({ receiptId: p.receiptId, txnId: p.txnId, role: p.role, method: p.method, reason: p.reason, confirmed: false })), owner);
   return { saved: sure.length, suggested: plan.proposals.length - sure.length, plan };
 }
