@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { canManage, extractToken, hasTeam, isMemberRole, memberName, pendingInvites, visibilityNotice } from '../src/core/workspace';
+import { canManage, extractToken, hasTeam, isContributor, isMemberRole, memberName, memberNotice, pendingInvites, visibilityNotice } from '../src/core/workspace';
 import type { Access, Invite, Member } from '../src/core/workspace';
 
 const m = (over: Partial<Member> = {}): Member => ({ member: 'abcdef123456', role: 'member', can_read_ai: false, active: true, email: 'w@x.test', label: null, created_at: '2026-01-01', ...over });
@@ -41,6 +41,15 @@ test('only invites that are neither accepted nor expired are pending', () => {
 test('the notice says what the admin will see and what the member can use', () => {
   assert.match(visibilityNotice('member', false), /see, add, change and delete everything they add/);
   assert.match(visibilityNotice('member', false), /cannot use the AI readers/);
-  assert.match(visibilityNotice('contributor', true), /only their own/);
+  assert.match(visibilityNotice('contributor', true), /see your spending, refunds and fees/);
+  assert.match(visibilityNotice('contributor', true), /never reach them/);
   assert.match(visibilityNotice('contributor', true), /on your credit/);
+});
+
+test('what a Contributor reads about themselves speaks only of spending', () => {
+  const own = memberNotice('contributor');
+  assert.match(own, /spending/);
+  for (const word of [/income/i, /earn/i, /salary/i, /pay\b/i, /saving/i, /deposit/i, /balance/i, /transfer/i, /never/i, /hidden/i]) assert.doesNotMatch(own, word);
+  assert.match(memberNotice('member'), /only what you add/);
+  assert.ok(isContributor({ role: 'contributor', owner: 'o', can_read_ai: false, active: true }) && !isContributor({ role: 'member', owner: 'o', can_read_ai: false, active: true }) && !isContributor(null));
 });

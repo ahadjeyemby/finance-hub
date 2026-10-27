@@ -1,7 +1,7 @@
 import { rowToReceipt, rowToStatement } from '@/core/evidence';
 import type { ReceiptView, StatementView } from '@/core/evidence';
 import type { Txn } from '@/core/types';
-import { meId } from './scope';
+import { contributorOwner, meId } from './scope';
 import { supabase } from './supabase';
 
 export interface RawLine { statementId: string | null; lineNo: number | null; postedDate: string | null; sourceFile: string | null; row: Record<string, unknown> }
@@ -27,6 +27,7 @@ export async function fetchEvidence(t: Txn): Promise<Evidence> {
   const empty: Evidence = { online: false, raw: null, statement: null, receipts: [] };
   if (!supabase) return empty;
   try {
+    if (contributorOwner()) return await contributorEvidence(t);
     // a member's charge reaches an admin with a prefixed id and their user id as owner: the database knows it by the plain id, under that member
     const me = meId();
     const foreign = t.owner && t.owner !== me ? t.owner : null;
@@ -68,4 +69,18 @@ export async function fetchEvidence(t: Txn): Promise<Evidence> {
   } catch {
     return empty;
   }
+}
+
+/** A Contributor sees the receipts behind a charge, never the statement line or the statement itself (which carries balances). */
+async function contributorEvidence(t: Txn): Promise<Evidence> {
+  const r = await supabase!.rpc('contributor_spending');
+  if (r.error) throw r.error;
+  const d = r.data as { receipts: Record<string, any>[]; links: Record<string, any>[] };
+  const linkRows = d.links.filter((l) => l.txn_id === t.id);
+  const rows = d.receipts.filter((x) => linkRows.some((l) => l.receipt_id === x.id) || x.id === t.receiptId);
+  const receipts = await Promise.all(rows.map(async (x) => {
+    const v = rowToReceipt(x); const l = linkRows.find((y) => y.receipt_id === x.id);
+    return { ...v, url: await signed('receipts', v.storagePath), ...(l ? { link: { role: l.role as string, method: l.method as string, reason: (l.reason as string | null) ?? null, confirmed: !!l.confirmed } } : {}) };
+  }));
+  return { online: true, raw: null, statement: null, receipts };
 }

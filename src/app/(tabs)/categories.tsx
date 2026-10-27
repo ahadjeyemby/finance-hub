@@ -12,12 +12,15 @@ import { useRepo } from '@/data/repo';
 import { F, R, S } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, Chip, Screen, T } from '@/theme/ui';
+import { ownerOnly } from '@/components/owneronly';
 
 const GROUPS: { id: Category['group']; label: string }[] = [{ id: 'need', label: 'Need' }, { id: 'want', label: 'Want' }, { id: 'mixed', label: 'Mixed' }];
 const SPEND = new Set(['spend', 'fee', 'refund']);
 const words = (text: string) => text.split(/[,\n;]+/).map((w) => w.trim()).filter(Boolean);
 
-export default function Categories() {
+export default ownerOnly(Categories);
+
+function Categories() {
   const C = useColors();
   const { txns, categoryConfig, saveCategoryConfig, tagState, saveTagState } = useRepo();
   const [newCat, setNewCat] = useState(''); const [newGroup, setNewGroup] = useState<Category['group']>('need');

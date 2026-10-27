@@ -24,12 +24,14 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     { route: 'categories', label: 'Categories and tags', icon: 'tags' },
   ] },
 ];
+/** Pages kept for the person who runs the workspace: a Contributor's side bar leaves them out (see components/owneronly.tsx). */
+export const OWNER_ROUTES: ReadonlySet<string> = new Set(['accounts', 'income', 'categories']);
 
 /** The side bar on screens 960px and wider: Workspace and Organize, then the statement status, the workspace row and "Powered by Sparktrum". */
 export function Sidebar({ state, navigateToTab }: BottomTabBarProps) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const { questions, dataTo, completeTo, auth, team, hasData } = useRepo();
+  const { questions, dataTo, completeTo, auth, team, hasData, spendingOnly } = useRepo();
   const current = state.routes[state.index]?.name;
   const go = (name: string) => { const r = state.routes.find((x) => x.name === name); if (r) navigateToTab(r.key); };
   const behind = hasData && completeTo < dataTo;
@@ -39,7 +41,7 @@ export function Sidebar({ state, navigateToTab }: BottomTabBarProps) {
         {NAV_GROUPS.map((g) => (
           <View key={g.title} style={{ gap: 2 }}>
             <Text accessibilityRole="header" style={{ fontFamily: F.bodyBold, fontSize: 12, letterSpacing: 1.4, textTransform: 'uppercase', color: c.ink3, paddingHorizontal: 12, paddingBottom: 8 }}>{g.title}</Text>
-            {g.items.map((n) => {
+            {g.items.filter((n) => !spendingOnly || !OWNER_ROUTES.has(n.route)).map((n) => {
               const on = current === n.route;
               const badge = n.badge === 'questions' ? questions.length : 0;
               return (

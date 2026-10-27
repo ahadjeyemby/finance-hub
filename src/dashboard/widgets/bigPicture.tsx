@@ -8,6 +8,7 @@ import { useTheme } from '@/theme/theme';
 import { useWide } from '@/theme/ui';
 import type { DashboardData } from '@/core/dashboard';
 import { monthEnd, monthStart } from '@/core/dates';
+import { useRepo } from '@/data/repo';
 import { AskStrip, LinkButton, Widget } from '../frame';
 import { BigMoney, exact, longMonth, monthSpan, pct0, pct1, shortMonth, signed, whole } from '../money';
 
@@ -35,6 +36,7 @@ function TileChip({ text, tone }: { text: string; tone: 'hero' | 'warn' | 'plain
 /** 1. Month at a glance: Spent (the hero), Earned, Left after spending, Rewards. */
 export function Kpis({ d }: P) {
   const { c } = useTheme();
+  const { spendingOnly } = useRepo();
   const k = d.kpis;
   if (k.readiness === 'data') return <Widget title="Month at a glance" state={k} ghost="numbers" />;
   const when = k.month ? `${longMonth(k.month)}${k.complete ? '' : ' so far'}` : 'all months';
@@ -46,6 +48,7 @@ export function Kpis({ d }: P) {
         <Tile hero label={`Spent ${k.month ? 'in ' : 'across '}${when}`} foot={<TileChip tone="hero" text={change ?? ('none' in k.change ? (k.complete ? 'No month to compare with' : 'Not finished yet') : '')} />}>
           <BigMoney cents={k.spent} color={c.onHero} centsColor={c.heroSoft} />
         </Tile>
+        {spendingOnly ? null : <>
         <Tile label="Earned" foot={k.unconfirmed > 0 ? <TileChip tone="warn" text="Not confirmed yet" /> : <Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink2 }}>{k.incomeIncomplete ? 'Only the connected accounts are counted' : 'Deposits confirmed'}</Text>}>
           <BigMoney cents={k.earned} />
         </Tile>
@@ -55,6 +58,7 @@ export function Kpis({ d }: P) {
         <Tile label="Rewards" foot={<Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink2 }}>Kept apart from earnings</Text>}>
           <BigMoney cents={k.rewards} />
         </Tile>
+        </>}
       </View>
     </View>
   );

@@ -18,20 +18,21 @@ import { S } from '@/theme/tokens';
 import { Banner, Button, Card, Row, Screen, T } from '@/theme/ui';
 
 const SUGGEST = ['Spending report for August', 'Fuel and car maintenance since June', 'Earned vs spent by month', 'Groceries by store', 'Forecast for next month'];
+const SPENDING_SUGGEST = ['Spending report for August', 'Fuel and car maintenance since June', 'Spending by month', 'Groceries by store', 'Forecast for next month'];
 
 export default function Reports() {
-  const { ctx, scope, dataTo, dataFrom, colorOf, overlay, saveReport, deleteReport, completeTo } = useRepo();
+  const { ctx, scope, dataTo, dataFrom, colorOf, overlay, saveReport, deleteReport, completeTo, spendingOnly } = useRepo();
   const [cur, setCur] = useState<{ prompt: string; spec: ReportSpec; saved?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
 
   const build = async (prompt: string) => {
     setBusy(true); setNote('');
-    const env = { today: todayISO(), dataFrom, dataTo, scope };
+    const env = { today: todayISO(), dataFrom, dataTo, scope, spendingOnly };
     const post = makePost();
     try {
       const r = post ? await askAgent(prompt, ctx, env, post) : null;
-      const spec = r?.report ?? planReport(prompt, ctx, env.today);
+      const spec = r?.report ?? planReport(prompt, ctx, env.today, { spendingOnly });
       setCur({ prompt, spec });
       if (r?.note) setNote(r.note);
     } finally { setBusy(false); }
@@ -48,7 +49,7 @@ export default function Reports() {
   return (
     <Screen max={900}>
       <ScreenHeader title="Reports" sub="Describe what you want to see. You get interactive charts." />
-      <AskBox placeholder="e.g. Fuel and medical since July, by store" cta="Build report" suggestions={SUGGEST} busy={busy} onSubmit={build} />
+      <AskBox placeholder="e.g. Fuel and medical since July, by store" cta="Build report" suggestions={spendingOnly ? SPENDING_SUGGEST : SUGGEST} busy={busy} onSubmit={build} />
       {note ? <Banner tone="info" title={note} /> : null}
       {cur ? (
         <View style={{ gap: S.md }}>

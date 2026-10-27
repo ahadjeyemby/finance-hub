@@ -176,14 +176,34 @@ export function parsePeriod(text: string, today: string, dataFrom: string, dataT
   return { from: dataFrom, to: dataTo, label: `${monthLabel(monthOf(dataFrom), true)} to ${monthLabel(monthOf(dataTo))}` };
 }
 
-export function planReport(text: string, ctx: Ctx, today = todayISO()): ReportSpec {
+/** What a Contributor may ask about (migration 0009): their data holds only spending, and no report of theirs may speak of anything else. */
+export const SPENDING_METRICS: Metric[] = ['spend', 'count', 'average'];
+const NOT_SPENDING = /\b(earn\w*|income|salary|salaries|pay ?check\w*|deposit\w*|saving\w*|savings|net|left after|rewards?|transfers?|balances?)\b/i;
+
+/** Why a report is not a spending-only report (empty when it is): a metric other than spending, a table of other kinds, or words about pay or savings. */
+export function notSpendingOnly(spec: ReportSpec): string[] {
+  const out: string[] = [];
+  const q = (x: QuerySpec | undefined, w: string) => { if (x && !SPENDING_METRICS.includes(x.metric)) out.push(`${w}: only spending can be shown`); if (x?.filter?.kinds?.some((k) => !['spend', 'fee', 'refund'].includes(k))) out.push(`${w}: only spending can be shown`); };
+  const words = (t: string | undefined, w: string) => { if (t && NOT_SPENDING.test(t)) out.push(`${w}: only spending can be shown`); };
+  words(spec.title, 'title'); words(spec.subtitle, 'subtitle');
+  spec.blocks.forEach((b, i) => {
+    const w = `blocks[${i}]`;
+    if (b.type === 'kpis') b.items.forEach((it, j) => { q(it.query, `${w}.items[${j}]`); words(it.label, `${w}.items[${j}]`); words(it.note, `${w}.items[${j}]`); });
+    else if (b.type === 'chart') { q(b.query, w); words(b.title, w); words(b.subtitle, w); }
+    else if (b.type === 'table') { q(b.query, w); if (b.filter?.kinds?.some((k) => !['spend', 'fee', 'refund'].includes(k))) out.push(`${w}: only spending can be shown`); words(b.title, w); }
+    else if (b.type === 'text') { words(b.title, w); words(b.text, w); }
+  });
+  return [...new Set(out)];
+}
+
+export function planReport(text: string, ctx: Ctx, today = todayISO(), opts: { spendingOnly?: boolean } = {}): ReportSpec {
   const dates = ctx.txns.map((t) => t.date).sort();
   const dataFrom = dates[0] ?? today, dataTo = dates[dates.length - 1] ?? today;
   const period = parsePeriod(text, today, dataFrom, dataTo);
   const filter: Filter = { from: period.from, to: period.to };
   const cats = CATEGORY_WORDS.filter(([re]) => re.test(text)).map(([, c]) => c);
   const multiMonth = monthOf(period.from) !== monthOf(period.to);
-  const wantsIncome = /\b(earn|income|salary|paid|net|cash ?flow|save|saved)\b/i.test(text);
+  const wantsIncome = !opts.spendingOnly && /\b(earn|income|salary|paid|net|cash ?flow|save|saved)\b/i.test(text);
   const wantsForecast = /\b(forecast|predict|projection|next month|expect|will i spend)\b/i.test(text);
   const wantsStores = /\b(store|stores|merchant|where|shop)\b/i.test(text);
   const wantsNeedsWants = /\bneeds?\b.*\bwants?\b|\bwants?\b.*\bneeds?\b/i.test(text);
@@ -226,8 +246,8 @@ export function planReport(text: string, ctx: Ctx, today = todayISO()): ReportSp
 export interface Answer { text: string; report?: ReportSpec }
 
 /** Plain-language answer from the same engine. The model-backed agent replaces this and returns the same shape. */
-export function answer(text: string, ctx: Ctx, today = todayISO()): Answer {
-  const report = planReport(text, ctx, today);
+export function answer(text: string, ctx: Ctx, today = todayISO(), opts: { spendingOnly?: boolean } = {}): Answer {
+  const report = planReport(text, ctx, today, opts);
   const { from, to, label } = report.period;
   const cats = CATEGORY_WORDS.filter(([re]) => re.test(text)).map(([, c]) => c);
   const f: Filter = { from, to, ...(cats.length ? { categories: cats } : {}) };
@@ -237,7 +257,7 @@ export function answer(text: string, ctx: Ctx, today = todayISO()): Answer {
   if (/\b(forecast|predict|next month|expect|will i spend)\b/i.test(text)) {
     const fc = forecastMonth(ctx, monthOf(today), today);
     parts.push(`I expect about ${dollars(fc.total, { decimals: false })} for ${monthLabel(fc.month)} (likely range ${dollars(fc.low, { decimals: false })} to ${dollars(fc.high, { decimals: false })}). ${fc.caveat}`);
-  } else if (/\b(earn|income|salary)\b/i.test(text)) {
+  } else if (!opts.spendingOnly && /\b(earn|income|salary)\b/i.test(text)) {
     parts.push(`Earned in ${label}: ${dollars(s.earned)} from income deposits, plus ${dollars(s.rewards)} in rewards (kept separate).`);
     if (s.unconfirmedIncome) parts.push(`${dollars(s.unconfirmedIncome)} of that is not confirmed yet, because the bank statement hides who sent it.`);
   } else {

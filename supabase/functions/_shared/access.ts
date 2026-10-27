@@ -13,7 +13,8 @@ export const allowedEmails = (raw: string | undefined): string[] => (raw ?? '').
  * they did before: ALLOWED_EMAIL alone decides).
  *
  *   - Members and contributors are decided by their membership: it must be active, and the readers need can_read_ai. ALLOWED_EMAIL does not
- *     apply to them: the admin invited them. They can never manage a workspace.
+ *     apply to them: the admin invited them. They can never manage a workspace. A Contributor's readings are of documents they hold and add
+ *     to the admin's books (migration 0009); what they then see of those books is decided by the database, not here.
  *   - Admins and people working alone are decided by ALLOWED_EMAIL when it is set (a lock on who may own this deployment), and are otherwise allowed.
  */
 export function decide(access: Access | null, email: string | undefined, allowedEmail: string | undefined, need: Need): Decision {

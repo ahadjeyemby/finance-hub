@@ -4,7 +4,7 @@ import { TextInput, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/header';
 import { dayLabel } from '@/core/dates';
-import { ROLE_HELP, ROLE_LABEL, canManage, extractToken, isMemberRole, memberName, pendingInvites, visibilityNotice } from '@/core/workspace';
+import { ROLE_HELP, ROLE_LABEL, canManage, extractToken, isMemberRole, memberName, memberNotice, pendingInvites, visibilityNotice } from '@/core/workspace';
 import type { Access, Invite, Member } from '@/core/workspace';
 import { useRepo } from '@/data/repo';
 import { acceptInvite, endMembership, inviteMember, listInvites, listMembers, myAccess, revokeInvite, setPassword, updateMember } from '@/data/workspace';
@@ -78,8 +78,8 @@ export default function People() {
 
       {member && access ? (
         <Card title="Your workspace">
-          <T size={14}>You belong to someone else&apos;s workspace. You see only what you add. <T size={14} bold>The person who manages it can see, add, change and delete everything you add.</T></T>
-          <T size={13} tone="ink2">{access.active ? (access.can_read_ai ? 'You may use the AI readers.' : 'The AI readers are switched off for you.') : 'Your access is paused. You still have your own data, and the person who manages the workspace cannot see it while it is paused.'}</T>
+          <T size={14}>{memberNotice(access.role)} <T size={14} bold>The person who manages it can see, add, change and delete everything you add.</T></T>
+          <T size={13} tone="ink2">{access.active ? (access.can_read_ai ? 'You may use the AI readers.' : 'The AI readers are switched off for you.') : access.role === 'contributor' ? 'Your access is paused. Ask the person who manages the workspace to turn it back on.' : 'Your access is paused. You still have your own data, and the person who manages the workspace cannot see it while it is paused.'}</T>
           {confirm === 'leave' ? (
             <View style={{ gap: S.xs }}>
               <T size={13} tone="bad">Leave this workspace? Your data stays yours. They will no longer see it, and you can only rejoin with a new invite.</T>

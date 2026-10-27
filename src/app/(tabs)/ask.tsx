@@ -16,10 +16,11 @@ import { useColors } from '@/theme/theme';
 import { Banner, Button, Screen, T } from '@/theme/ui';
 
 const SUGGEST = ['How much did I spend on fuel in August?', 'What did I earn in July?', 'Biggest purchases this summer', 'What will I spend next month?'];
+const SPENDING_SUGGEST = ['How much was spent on fuel in August?', 'Biggest purchases this summer', 'Groceries by store', 'What will next month cost?'];
 
 export default function Ask() {
   const C = useColors();
-  const { ctx, scope, dataTo, dataFrom, colorOf, completeTo } = useRepo();
+  const { ctx, scope, dataTo, dataFrom, colorOf, completeTo, spendingOnly } = useRepo();
   const [log, setLog] = useState<{ id: number; q: string; a?: AgentResult; open?: boolean }[]>([]);
   const [pending, setPending] = useState(0);
   const busy = pending > 0;
@@ -30,7 +31,7 @@ export default function Ask() {
     setPending((n) => n + 1);
     setLog((l) => [...l, { id, q }]);
     try {
-      const a = await askAgent(q, ctx, { today: todayISO(), dataFrom, dataTo, scope }, makePost());
+      const a = await askAgent(q, ctx, { today: todayISO(), dataFrom, dataTo, scope, spendingOnly }, makePost());
       setLog((l) => l.map((x) => (x.id === id ? { ...x, a } : x)));
     } finally { setPending((n) => n - 1); }
   };
@@ -60,7 +61,7 @@ export default function Ask() {
           ) : <T size={13} tone="ink3">Working...</T>}
         </View>
       ))}
-      <AskBox placeholder="Ask about your money" cta="Ask" suggestions={log.length ? [] : SUGGEST} busy={busy} onSubmit={send} />
+      <AskBox placeholder="Ask about your money" cta="Ask" suggestions={log.length ? [] : spendingOnly ? SPENDING_SUGGEST : SUGGEST} busy={busy} onSubmit={send} />
     </Screen>
   );
 }

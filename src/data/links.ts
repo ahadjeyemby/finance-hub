@@ -1,7 +1,8 @@
 // Reads and writes the receipt_links and link_flags tables (migration 0003). The rules live in core/links.ts; this file only moves rows.
 import { rowToRecord } from '@/core/evidence';
 import type { Link, LinkFlag, NoLinkReason, StoredReceipt } from '@/core/links';
-import { meId } from './scope';
+import { contributorClearFlag, contributorDeleteLink, contributorSaveLinks, contributorSetFlag, fetchContributorSnapshot } from './contributor';
+import { contributorOwner, meId } from './scope';
 import { supabase } from './supabase';
 
 const db = () => { if (!supabase) throw new Error('No database is connected.'); return supabase; };
@@ -30,6 +31,8 @@ const linkToRow = (l: Link) => ({ receipt_id: l.receiptId, txn_id: l.txnId, amou
 export async function fetchLinkData(owner: string = meId()): Promise<LinkData | null> {
   if (!supabase) return null;
   try {
+    // a Contributor gets the links that belong to spending, with the rest of what they may see
+    if (contributorOwner()) return (await fetchContributorSnapshot()).links;
     const [links, flags, receipts] = await Promise.all([
       pages<Record<string, any>>('receipt_links', '*', 'created_at', owner),
       pages<Record<string, any>>('link_flags', '*', 'created_at', owner),
@@ -46,22 +49,26 @@ export async function fetchLinkData(owner: string = meId()): Promise<LinkData | 
 /** Store links. A receipt and a charge are linked once: saving the same pair again updates it. */
 export async function saveLinks(links: Link[], owner?: string): Promise<void> {
   if (!links.length) return;
+  if (contributorOwner()) return contributorSaveLinks(links.map(linkToRow));
   const { error } = await db().from('receipt_links').upsert(links.map(linkToRow).map((r) => (owner ? { ...r, user_id: owner } : r)), { onConflict: 'receipt_id,txn_id' });
   if (error) throw new Error(`Could not save the link: ${error.message}`);
 }
 
 export async function removeLink(receiptId: string, txnId: string): Promise<void> {
+  if (contributorOwner()) return contributorDeleteLink(receiptId, txnId);
   const { error } = await db().from('receipt_links').delete().eq('user_id', meId()).eq('receipt_id', receiptId).eq('txn_id', txnId);
   if (error) throw new Error(`Could not remove the link: ${error.message}`);
 }
 
 /** Say there is no link to expect (paid in cash, no receipt for rent...). Replaces an earlier flag on the same receipt or charge. */
 export async function setFlag(kind: 'receipt' | 'txn', refId: string, reason: NoLinkReason, note?: string, owner?: string): Promise<void> {
+  if (contributorOwner()) return contributorSetFlag(kind, refId, reason, note);
   const { error } = await db().from('link_flags').upsert({ ...(owner ? { user_id: owner } : {}), kind, ref_id: refId, reason, note: note ?? null }, { onConflict: 'user_id,kind,ref_id' });
   if (error) throw new Error(`Could not save that: ${error.message}`);
 }
 
 export async function clearFlag(kind: 'receipt' | 'txn', refId: string): Promise<void> {
+  if (contributorOwner()) return contributorClearFlag(kind, refId);
   const { error } = await db().from('link_flags').delete().eq('user_id', meId()).eq('kind', kind).eq('ref_id', refId);
   if (error) throw new Error(`Could not clear that: ${error.message}`);
 }

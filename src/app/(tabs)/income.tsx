@@ -22,6 +22,7 @@ import { useRepo } from '@/data/repo';
 import { R, S } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, Chip, Screen, T, useInputStyle } from '@/theme/ui';
+import { ownerOnly } from '@/components/owneronly';
 
 const cents = (text: string) => Math.round(Number(text.replace(/[$,\s]/g, '')) * 100);
 const GROUPS = [{ id: 'insurance', label: 'Insurance' }, { id: 'retirement', label: 'Retirement' }, { id: 'other', label: 'Other' }] as const;
@@ -61,7 +62,9 @@ function Lines({ title, lines, onChange, kind }: { title: string; lines: Line[];
  * Where money comes from and what was taken out of it. Income deposits come from the statements; the person says which source each belongs to,
  * and pay records (a paycheck's gross, taxes, deductions and net) are checked to add up and matched to the deposits they name.
  */
-export default function Income() {
+export default ownerOnly(Income);
+
+function Income() {
   const C = useColors();
   const input = useInputStyle();
   const { txns, accounts, income, saveIncome, links, months, period, setPeriod, range } = useRepo();
