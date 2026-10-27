@@ -1,10 +1,11 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import { Bars, HBars } from '@/charts/bars';
 import { ChartCard } from '@/charts/common';
-import { PeriodBar } from '@/components/filters';
-import { ScreenHeader } from '@/components/header';
+import { AskField } from '@/components/shell/parts';
+import { DashboardHeader } from '@/dashboard/header';
+import { isViewId } from '@/dashboard/views';
 import { dayLabel, monthEnd, monthLabel } from '@/core/dates';
 import { forecastMonth } from '@/core/forecast';
 import { dollars, runQuery, summarize } from '@/core/queries';
@@ -16,6 +17,8 @@ import { Banner, Button, Card, Row, Screen, T, TapeCard, useWide } from '@/theme
 
 export default function Overview() {
   const C = useColors();
+  const params = useLocalSearchParams<{ view?: string }>();
+  const view = isViewId(params.view) ? params.view : 'overview';
   const { ctx, scope, scoped, range, period, dataTo, questions, forecastMonth: fcMonth, completeTo, links } = useRepo();
   // receipts are evidence, not transactions: ones dated after the newest statement have no month here until their statement is imported
   const waiting = (links?.receipts ?? []).filter((r) => r.date && r.date > dataTo);
@@ -103,9 +106,9 @@ export default function Overview() {
   );
 
   return (
-    <Screen>
-      <ScreenHeader title="Overview" sub={`Data to ${dayLabel(dataTo)}`} />
-      <PeriodBar />
+    <Screen max={1280}>
+      {wide ? null : <AskField compact />}
+      <DashboardHeader view={view} onView={(v) => router.setParams({ view: v })} onCustomize={() => {}} />
       {banners}
       {wide ? <View style={{ flexDirection: 'row', gap: S.lg, alignItems: 'flex-start' }}>{left}{right}</View> : <>{left}{right}</>}
     </Screen>

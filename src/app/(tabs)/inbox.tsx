@@ -49,7 +49,7 @@ function QuestionCard({ q, onDone }: { q: Question; onDone: (q: Question) => voi
         </View>
       ) : null}
       {q.canApplyToMerchant ? (
-        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: all }} onPress={() => setAll(!all)} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: S.sm }}>
+        <Pressable accessibilityRole="checkbox" aria-checked={all} onPress={() => setAll(!all)} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: S.sm }}>
           <View style={{ width: 22, height: 22, borderRadius: 5, borderWidth: 2, borderColor: C.accent, backgroundColor: all ? C.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{all ? <T size={13} tone="paper" bold>{'✓'}</T> : null}</View>
           <T size={13}>Use this answer for every {q.merchant} charge, including future ones</T>
         </Pressable>
@@ -75,8 +75,8 @@ export default function Inbox() {
       <ScreenHeader title="Inbox" sub={questions.length ? `${questions.length} questions, ${dollars(stake, { decimals: false })} at stake. Biggest first.` : 'Nothing is waiting.'} />
       {last ? (
         <View style={{ backgroundColor: C.accent, borderRadius: R.md, padding: S.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: S.sm }}>
-          <T tone="paper" size={13} style={{ flex: 1 }}>Saved: {last.merchant}</T>
-          <Button small kind="outline" label="Undo" onPress={() => { undo(last); setLast(null); }} style={{ borderColor: C.paper }} />
+          <T size={13} style={{ flex: 1, color: C.onAccent }}>Saved: {last.merchant}</T>
+          <Button small kind="onAccent" label="Undo" onPress={() => { undo(last); setLast(null); }} />
         </View>
       ) : null}
       {biz.length ? <Banner tone="info" title="Developer tools are filed as business.">{biz.length} charges ({dollars(biz.reduce((s, t) => s - t.cents, 0))}) from GitHub, Heroku, Namecheap and similar were filed as business automatically. They stay out of household totals and the forecast. Change any of them from its transaction page.</Banner> : null}

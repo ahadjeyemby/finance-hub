@@ -65,7 +65,8 @@ export interface AuthApi {
 }
 /** Where the numbers on screen came from. 'database' = Supabase answered this session. 'saved' = a copy downloaded earlier from this same project by this same person, shown because Supabase has not answered yet. */
 export interface SourceInfo {
-  kind: LedgerKind;
+  /** where the rows came from; `fixture` only in a development build running a fictional ledger (src/dev/fixture.ts) */
+  kind: LedgerKind | 'fixture';
   /** Supabase project id, the part of the URL before .supabase.co */
   project: string | null;
   /** when the rows were downloaded */
@@ -318,7 +319,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   }), [configured, session]);
   const sync = useMemo<SyncApi>(() => ({ ...syncInfo, state: configured ? syncInfo.state : 'local', now: syncNow }), [syncInfo, configured, syncNow]);
   const ready = loaded && authReady;
-  const source = useMemo<SourceInfo>(() => ({ kind: ledgerFrom.kind, project: projectRef, at: ledgerFrom.at, accounts: ledger.accounts.length, rows: ledger.txns.length }), [ledgerFrom, ledger]);
+  const source = useMemo<SourceInfo>(() => ({ kind: FIXTURE ? 'fixture' : ledgerFrom.kind, project: projectRef, at: ledgerFrom.at, accounts: ledger.accounts.length, rows: ledger.txns.length }), [ledgerFrom, ledger]);
 
   const ownTagState_ = useMemo<TagState>(() => ({ defs: overlay.tags?.defs?.length ? overlay.tags.defs : DEFAULT_TAGS, edits: overlay.tags?.edits ?? {} }), [overlay.tags]);
   // with members, "my data plus theirs" is put side by side (see core/team.ts); with none, this is exactly the single-person data it always was

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { AskBox } from '@/components/askbox';
@@ -28,6 +29,14 @@ export default function Ask() {
     setLog((l) => l.map((x, i) => (i === l.length - 1 ? { q, a } : x)));
     setBusy(false);
   };
+  // a question typed in the Ask field of the top bar arrives as ?q=; it is sent once
+  const { q: asked } = useLocalSearchParams<{ q?: string }>();
+  const sent = useRef<string | null>(null);
+  useEffect(() => {
+    if (!asked || sent.current === asked) return;
+    sent.current = asked;
+    send(asked);
+  });
   return (
     <Screen max={760}>
       <ScreenHeader back title="Ask" sub={makePost() ? 'Answered by the assistant, using your ledger.' : 'Answered by the built-in planner. Connect the assistant for open-ended questions.'} />

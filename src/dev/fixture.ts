@@ -6,11 +6,12 @@
 //   gapped the same, with one card's August statement missing, so that month is not complete
 //   sparse eight days of one card, so most widgets are in their "needs more data" state
 //   empty  accounts with statements but no charges at all
+//   none   no accounts: what a new person sees before importing anything
 import { summarizeRecurring } from '@/core/recurring';
 import { emptyOverlay } from '@/core/types';
 import type { Account, Hint, Overlay, StatementPeriod, Txn } from '@/core/types';
 
-export type FixtureKind = 'full' | 'gapped' | 'sparse' | 'empty';
+export type FixtureKind = 'full' | 'gapped' | 'sparse' | 'empty' | 'none';
 export interface Fixture { accounts: Account[]; txns: Txn[]; statements: StatementPeriod[]; overlay: Overlay }
 
 const CHK = 'juniper-chk-0101';
@@ -53,6 +54,7 @@ function build(kind: FixtureKind): Fixture {
     return id;
   };
 
+  if (kind === 'none') return { accounts: [], txns, statements: [], overlay: emptyOverlay() };
   if (kind === 'sparse') {
     const days = [1, 2, 3, 4, 5, 6, 7, 8];
     for (const d of days) {
@@ -186,4 +188,4 @@ export function fixture(kind: FixtureKind = 'full'): Fixture {
   return cache.get(kind)!;
 }
 
-export const isFixtureKind = (v: unknown): v is FixtureKind => v === 'full' || v === 'gapped' || v === 'sparse' || v === 'empty';
+export const isFixtureKind = (v: unknown): v is FixtureKind => v === 'full' || v === 'gapped' || v === 'sparse' || v === 'empty' || v === 'none';

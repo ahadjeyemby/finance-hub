@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Defs, Line, Path, Pattern, Rect } from 'react-native-svg';
 
 import { dollars } from '@/core/queries';
-import { F, R, S } from '@/theme/tokens';
+import { F, R, S, TABULAR } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { H, Row, T } from '@/theme/ui';
 
@@ -77,7 +77,7 @@ export function Readout({ label, value, note }: { label?: string; value?: string
       {label ? (
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: S.sm, flexWrap: 'wrap' }}>
           <T bold size={14}>{label}</T>
-          <Text style={{ fontFamily: F.display, fontSize: 18, color: C.ink }}>{value}</Text>
+          <Text style={[{ fontFamily: F.display, fontSize: 18, color: C.ink }, TABULAR]}>{value}</Text>
           {note ? <T size={12} tone="ink3">{note}</T> : null}
         </View>
       ) : <T size={12} tone="ink3">Tap a mark for details.</T>}
