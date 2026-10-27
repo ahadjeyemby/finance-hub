@@ -1,7 +1,11 @@
 import { categoryLabel } from './categories';
-import { addMonths, daysInMonth, monthEnd, monthOf, monthStart, monthsBetween } from './dates';
+import { completeMonths, coveredDays } from './coverage';
+import { addMonths, daysInMonth, monthOf } from './dates';
 import type { Ctx } from './queries';
+import { normKey, summarizeRecurring } from './recurring';
 import type { CategoryId, Txn } from './types';
+
+export { completeMonths } from './coverage';
 
 export interface RecurringItem { merchant: string; category?: CategoryId; typical: number; months: number }
 export interface Forecast {
@@ -10,57 +14,42 @@ export interface Forecast {
   recurringTotal: number; variableTotal: number;
   recurring: RecurringItem[];
   variableByCategory: { category: CategoryId; label: string; estimate: number }[];
-  oneOffsExcluded: { merchant: string; date: string; cents: number }[];
+  /** left out of the forecast: confirmed one-offs, and single charges of $1,000 or more nobody has answered for yet (confirmed false) */
+  oneOffsExcluded: { merchant: string; date: string; cents: number; confirmed: boolean }[];
   basisMonths: string[];
   confidence: 'low' | 'medium' | 'high';
   /** plain-language caveat shown next to the number */
   caveat: string;
-  /** when the target month already has data, how the estimate blends it in */
+  /** when the target month already has a week of statements, how the estimate blends it in */
   pace?: { spentSoFar: number; daysElapsed: number; paceTotal: number; weight: number };
 }
 
 const isSpend = (t: Txn) => t.kind === 'spend' || t.kind === 'fee' || t.kind === 'refund';
-const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2); };
 
-/** A month is "complete" only if every spending account's statements cover all of it. */
-export function completeMonths(ctx: Ctx, from: string, to: string): string[] {
-  const spendAccounts = ctx.accounts.filter((a) => a.type === 'credit' || a.type === 'checking');
-  return monthsBetween(monthOf(from), monthOf(to)).filter((m) =>
-    spendAccounts.every((a) => a.coverage.from <= monthStart(m) && a.coverage.to >= monthEnd(m)));
-}
+/** A one-off is left out of averages and forecasts: one the person marked, or a single charge of $1,000 or more they have not said repeats. */
+export const isOneOff = (t: Txn) => t.oneOff === true || (t.cents <= -100000 && t.oneOff !== false);
 
 export function forecastMonth(ctx: Ctx, target: string, asOf: string): Forecast {
-  const lastData = ctx.txns.reduce((m, t) => (t.date > m ? t.date : m), '0000-00-00');
   const basis = completeMonths(ctx, '2000-01-01', addMonths(target, -1)).filter((m) => m < target);
-  const spend = ctx.txns.filter((t) => isSpend(t) && !t.business && basis.includes(monthOf(t.date)));
+  const personal = ctx.txns.filter((t) => !t.business);
+  const spend = personal.filter((t) => isSpend(t) && basis.includes(monthOf(t.date)));
 
-  // one-offs: marked by the user or >= $1,000 in a single charge
-  const oneOffs = spend.filter((t) => t.oneOff || (t.cents <= -100000 && t.oneOff !== false));
+  const oneOffs = spend.filter(isOneOff);
   const oneOffIds = new Set(oneOffs.map((t) => t.id));
   const regular = spend.filter((t) => !oneOffIds.has(t.id));
 
-  // recurring: same merchant in >= 2 complete months with a stable amount (within 25% of the median)
-  const byMerchant = new Map<string, Txn[]>();
-  for (const t of regular) byMerchant.set(t.merchant, [...(byMerchant.get(t.merchant) ?? []), t]);
-  const recurring: RecurringItem[] = [];
-  const recurringMerchants = new Set<string>();
-  for (const [merchant, ts] of byMerchant) {
-    const months = new Map<string, number>();
-    for (const t of ts) months.set(monthOf(t.date), (months.get(monthOf(t.date)) ?? 0) + -t.cents);
-    if (months.size < 2) continue;
-    const monthlyTotals = [...months.values()];
-    const med = median(monthlyTotals);
-    const stable = monthlyTotals.every((v) => Math.abs(v - med) <= med * 0.25);
-    const needsEvery = Math.min(basis.length, 2);
-    if (stable && months.size >= needsEvery && ts.every((t) => t.category !== 'groceries' && t.category !== 'fuel' && t.category !== 'mixed_retail')) {
-      recurring.push({ merchant, category: ts[0].category, typical: med, months: months.size });
-      recurringMerchants.add(merchant);
-    }
-  }
+  // repeating: the same bills the Recurring screen shows, including what the person confirmed, cancelled or added by hand. A bill set aside
+  // as "not recurring" counts as everyday spending again; a cancelled or stopped one is no longer expected and its past charges leave the average.
+  const rec = summarizeRecurring(personal, ctx.recurring, asOf);
+  const on = rec.items.filter((i) => i.status === 'on' && i.health !== 'stopped');
+  const recurring: RecurringItem[] = on.map((i) => ({ merchant: i.merchant, category: i.category as CategoryId | undefined, typical: i.monthlyCents, months: i.count }));
+  const seriesIds = new Set(rec.items.filter((i) => i.status !== 'ignored').flatMap((i) => i.txnIds));
+  // a bill added by hand (say, one seen once and answered "repeats monthly") has no series of its own: its charges leave the average too
+  const manualPayees = new Set(on.filter((i) => i.source === 'manual').map((i) => normKey(i.merchant)));
   recurring.sort((a, b) => b.typical - a.typical);
 
-  // variable: everything else, averaged per complete month
-  const variable = regular.filter((t) => !recurringMerchants.has(t.merchant));
+  // everyday: everything else, averaged per complete month
+  const variable = regular.filter((t) => !seriesIds.has(t.id) && !manualPayees.has(normKey(t.merchant)));
   const perMonth = basis.map((m) => variable.filter((t) => monthOf(t.date) === m).reduce((s, t) => s - t.cents, 0));
   const n = Math.max(basis.length, 1);
   const variableTotal = Math.round(perMonth.reduce((a, b) => a + b, 0) / n);
@@ -72,14 +61,15 @@ export function forecastMonth(ctx: Ctx, target: string, asOf: string): Forecast 
   let total = recurringTotal + variableTotal;
   let low = recurringTotal + (perMonth.length ? Math.min(...perMonth) : 0);
   let high = recurringTotal + (perMonth.length ? Math.max(...perMonth) : 0);
+  // with under three months the spread between them says little: the range is at least 15% of everyday spending either way
+  if (basis.length && basis.length < 3) { const pad = Math.round(variableTotal * 0.15); low = Math.min(low, total - pad); high = Math.max(high, total + pad); }
 
-  // blend in the target month's own data once it has a week of history
+  // blend in the target month's own spending once statements cover a week of it (one-offs stay out, as in the average)
   let pace: Forecast['pace'];
-  const tm = ctx.txns.filter((t) => isSpend(t) && !t.business && monthOf(t.date) === target);
   const dim = daysInMonth(target);
-  const cap = lastData < monthEnd(target) ? lastData : monthEnd(target);
-  const daysElapsed = monthOf(cap) === target ? Number(cap.slice(8)) : 0;
-  if (tm.length && daysElapsed >= 7 && daysElapsed < dim) {
+  const daysElapsed = coveredDays(ctx, target);
+  const tm = personal.filter((t) => isSpend(t) && monthOf(t.date) === target && Number(t.date.slice(8)) <= daysElapsed && !isOneOff(t));
+  if (basis.length && daysElapsed >= 7 && daysElapsed < dim) {
     const spentSoFar = tm.reduce((s, t) => s - t.cents, 0);
     const paceTotal = Math.round((spentSoFar / daysElapsed) * dim);
     const weight = daysElapsed / dim;
@@ -97,7 +87,7 @@ export function forecastMonth(ctx: Ctx, target: string, asOf: string): Forecast 
 
   return {
     month: target, total, low, high, recurringTotal, variableTotal, recurring, variableByCategory,
-    oneOffsExcluded: oneOffs.map((t) => ({ merchant: t.merchant, date: t.date, cents: -t.cents })),
+    oneOffsExcluded: oneOffs.map((t) => ({ merchant: t.merchant, date: t.date, cents: -t.cents, confirmed: t.oneOff === true })),
     basisMonths: basis, confidence, caveat, pace,
   };
 }

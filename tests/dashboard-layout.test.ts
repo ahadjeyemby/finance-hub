@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { CATALOG, PRESETS, WIDGET_IDS } from '../src/dashboard/catalog';
-import { countOn, presetRows, resolveView, toggleWidget } from '../src/dashboard/layout';
+import { countOn, mergePrefs, presetRows, resolveView, toggleWidget } from '../src/dashboard/layout';
 import type { PrefRow } from '../src/dashboard/layout';
 import { VIEW_IDS } from '../src/dashboard/views';
 
@@ -36,6 +36,13 @@ test('a preset widget switched off and on again goes back to its place', () => {
   assert.deepEqual(ids('overview', back), ['kpis L', 'cashflow M', 'donut S', 'trend M', 'forecast S', 'oneTime S', 'attention S', 'dataHealth S', 'fuel S']);
 });
 
+test('an extra widget stays after a preset widget that is switched back on later, even the last one', () => {
+  const off = toggleWidget('overview', null, 'dataHealth', false);
+  const extra = toggleWidget('overview', off, 'fuel', true);
+  const back = toggleWidget('overview', extra, 'dataHealth', true);
+  assert.deepEqual(ids('overview', back).slice(-2), ['dataHealth S', 'fuel S']);
+});
+
 test('switching everything off stays off: it never falls back to the preset', () => {
   let rows: PrefRow[] | null = null;
   for (const [id] of PRESETS.plan) rows = toggleWidget('plan', rows, id, false);
@@ -52,6 +59,15 @@ test('each view keeps its own set, and resetting one view leaves the others alon
   delete saved.overview;
   assert.deepEqual(ids('overview', saved.overview ?? null), ids('overview', null));
   assert.ok(!ids('household', saved.household!).includes('fuel S'), 'household is unchanged');
+});
+
+test("a change made on this device before the database answered keeps that view only; the database's other views still arrive", () => {
+  const remote = { household: toggleWidget('household', null, 'fuel', false), business: toggleWidget('business', null, 'kpis', true) };
+  const local = { overview: toggleWidget('overview', null, 'donut', false) };
+  const merged = mergePrefs(remote, local, ['overview', 'business']);
+  assert.deepEqual(Object.keys(merged).sort(), ['household', 'overview'], 'business was reset on this device and stays reset');
+  assert.equal(merged.household, remote.household);
+  assert.equal(merged.overview, local.overview);
 });
 
 test('saved rows from an older version that miss a widget follow the preset for that widget', () => {

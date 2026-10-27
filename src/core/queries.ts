@@ -1,6 +1,7 @@
 import { categoryGroup, categoryLabel } from './categories';
 import { dayLabel, monthLabel, monthOf, weekStart } from './dates';
-import type { Account, CategoryId, Kind, Overlay, Txn } from './types';
+import type { RecurringState } from './recurring';
+import type { Account, CategoryId, Kind, Overlay, StatementPeriod, Txn } from './types';
 
 // ---------------------------------------------------------------------------
 // One deterministic query engine. The dashboard, the reports and the AI agent
@@ -36,7 +37,14 @@ export interface QuerySpec {
 
 export interface Row { key: string; label: string; long: string; value: number; count: number }
 export interface QueryResult { spec: QuerySpec; rows: Row[]; total: number; count: number }
-export interface Ctx { txns: Txn[]; accounts: Account[] }
+export interface Ctx {
+  txns: Txn[];
+  accounts: Account[];
+  /** the days each saved statement covers; without them an account's coverage is its first-to-last envelope */
+  statements?: StatementPeriod[];
+  /** what the person decided about recurring charges: the forecast reads the same bills the Recurring screen shows */
+  recurring?: RecurringState;
+}
 
 const SPEND_KINDS: Kind[] = ['spend', 'fee', 'refund'];
 

@@ -1,5 +1,5 @@
 import { mergedNumbers, unmergedNumbers, whyNotMerge } from '@/core/accounts';
-import type { Account, AccountNumber } from '@/core/types';
+import type { Account, AccountNumber, StatementPeriod } from '@/core/types';
 import { rowToAccount } from '@/core/sync';
 import type { AccountRow } from '@/core/sync';
 import { signed } from './evidence';
@@ -38,6 +38,14 @@ export async function fetchStatements(account: Pick<Account, 'id' | 'owner'> | n
     rows: typeof (r.reconciliation as { rows?: number } | null)?.rows === 'number' ? (r.reconciliation as { rows: number }).rows : null,
     sourceFile: r.source_file as string | null, pages: r.pages as number | null, storagePath: r.storage_path as string | null,
   }));
+}
+
+/** The days every saved statement of the signed-in person covers, for telling complete months from ones with a statement missing. */
+export async function fetchStatementPeriods(): Promise<StatementPeriod[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('statements').select('account_id, period_from, period_to').eq('user_id', meId()).not('account_id', 'is', null);
+  if (error) throw new Error(error.message);
+  return (data ?? []).filter((r) => r.period_from && r.period_to).map((r) => ({ accountId: r.account_id as string, from: r.period_from as string, to: r.period_to as string }));
 }
 
 /** A link to the original PDF or photo that opens for a few minutes. null when no original was stored. */
