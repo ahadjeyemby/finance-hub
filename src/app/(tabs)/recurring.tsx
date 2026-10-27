@@ -8,17 +8,19 @@ import { dollars } from '@/core/queries';
 import { CADENCE_LABEL, addManual, decide, incomeVsFixed, removeManual, summarizeRecurring } from '@/core/recurring';
 import type { Cadence, RecurringItem } from '@/core/recurring';
 import { useRepo } from '@/data/repo';
-import { C, F, R, S } from '@/theme/tokens';
-import { Banner, Button, Card, Chip, Screen, T } from '@/theme/ui';
+import { S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
+import { Banner, Button, Card, Chip, Screen, T, useInputStyle } from '@/theme/ui';
 
 const CADENCES = Object.keys(CADENCE_LABEL) as Cadence[];
-const input = { minHeight: 44, borderRadius: R.md, backgroundColor: C.ground, paddingHorizontal: S.md, fontFamily: F.body, fontSize: 15, color: C.ink } as const;
 
 /**
  * Everything that comes round on a rhythm, with the one number to plan around: what has to be there each month. Found from the statements,
  * confirmed or set aside by the person, and topped up by hand for what no statement shows (rent paid in cash).
  */
 export default function Recurring() {
+  const C = useColors();
+  const input = useInputStyle();
   const { txns, ctx, dataTo, recurring, saveRecurring } = useRepo();
   const today = todayISO();
   // business-marked charges are excluded from personal totals everywhere else, so they are here too

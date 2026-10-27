@@ -9,10 +9,12 @@ import { dollars, listTxns } from '@/core/queries';
 import type { Filter } from '@/core/queries';
 import type { CategoryId, Kind } from '@/core/types';
 import { useRepo } from '@/data/repo';
-import { C, F, R, S } from '@/theme/tokens';
+import { F, R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Card, Screen, T } from '@/theme/ui';
 
 export default function Ledger() {
+  const C = useColors();
   const p = useLocalSearchParams<{ from?: string; to?: string; category?: string; merchant?: string; kinds?: string; tags?: string; group?: string }>();
   const { ctx, scope, tagState } = useRepo();
   const [text, setText] = useState('');

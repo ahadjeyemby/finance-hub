@@ -10,10 +10,12 @@ import { forecastMonth } from '@/core/forecast';
 import { dollars, runQuery, summarize } from '@/core/queries';
 import { categoryRows } from '@/lib/rows';
 import { useRepo } from '@/data/repo';
-import { C, F, S } from '@/theme/tokens';
+import { F, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, Row, Screen, T, TapeCard, useWide } from '@/theme/ui';
 
 export default function Overview() {
+  const C = useColors();
   const { ctx, scope, scoped, range, period, dataTo, questions, forecastMonth: fcMonth, completeTo, links } = useRepo();
   // receipts are evidence, not transactions: ones dated after the newest statement have no month here until their statement is imported
   const waiting = (links?.receipts ?? []).filter((r) => r.date && r.date > dataTo);

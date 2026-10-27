@@ -73,6 +73,9 @@ export const GENERIC_RULES: MerchantRule[] = [
   { re: /comcast|xfinity|spectrum|verizon|at&t/, merchant: 'Internet & phone', category: 'phone' },
   { re: /state farm/, merchant: 'State Farm', category: 'insurance' },
   { re: /geico|progressive ins/, merchant: 'Insurance', category: 'insurance' },
+  // housing and utilities: the dashboard warns when neither is seen, since then they are paid from an account the app cannot see
+  { re: /\bmortgage\b|home loan|\brent pay(ment)?\b|property mgmt|property management|\bapartments?\b/, merchant: 'Rent or mortgage', category: 'housing' },
+  { re: /electric (co|company|coop|cooperative|utility)|power (co|company)\b|\benergy\b|water (dept|utility|district|works)|\bsewer\b|natural gas|\bpg&e\b|con ?edison|duke energy/, merchant: 'Utilities', category: 'utilities' },
   // medical
   { re: /laboratory corporation|labcorp/, merchant: 'Labcorp', category: 'medical' },
   { re: /\bcvs\b|walgreens/, merchant: 'Pharmacy', category: 'medical' },

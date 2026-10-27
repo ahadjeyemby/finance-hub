@@ -12,13 +12,15 @@ import type { Txn } from '@/core/types';
 import { clearFlag, removeLink, saveLinks, setFlag } from '@/data/links';
 import { sweepLinks } from '@/data/linking';
 import { useRepo } from '@/data/repo';
-import { C, R, S } from '@/theme/tokens';
+import { R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, Chip, Screen, T } from '@/theme/ui';
 
 const SHOWN = 25;
 const dayGap = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86400000;
 
 export default function Links() {
+  const C = useColors();
   const { links, txns, accounts, reloadLinks } = useRepo();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');

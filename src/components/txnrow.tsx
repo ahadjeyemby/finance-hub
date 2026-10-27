@@ -6,10 +6,12 @@ import { dayLabel } from '@/core/dates';
 import { dollars } from '@/core/queries';
 import type { Txn } from '@/core/types';
 import { useRepo } from '@/data/repo';
-import { C, S } from '@/theme/tokens';
+import { S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { T } from '@/theme/ui';
 
 export function TxnRow({ t }: { t: Txn }) {
+  const C = useColors();
   const { tagState } = useRepo();
   const sub = [dayLabel(t.date), t.kind === 'transfer' ? 'Transfer' : t.kind === 'income' ? 'Income' : t.kind === 'rewards' ? 'Rewards' : categoryLabel(t.category)];
   // for money coming in, the bank's own wording and the account say where it came from

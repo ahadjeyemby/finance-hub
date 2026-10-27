@@ -2,11 +2,13 @@ import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import { useRepo } from '@/data/repo';
-import { C, F, R, S } from '@/theme/tokens';
+import { F, R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Button, H, T } from '@/theme/ui';
 
 /** What the person sees whenever the database has no ledger for them. The app never substitutes bundled or sample data. */
 export function NoData() {
+  const C = useColors();
   const { auth, sync } = useRepo();
   const missingTables = !!sync.error && /schema cache|does not exist|relation .* does not exist/i.test(sync.error);
   const loading = auth.configured && !!auth.email && (sync.state === 'syncing' || sync.state === 'local');

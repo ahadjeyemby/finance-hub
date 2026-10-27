@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
-import { C, F, R, S } from '@/theme/tokens';
+import { F, R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Button, Chip, T } from '@/theme/ui';
 
 export function AskBox({ placeholder, cta, suggestions, busy, onSubmit }: { placeholder: string; cta: string; suggestions: string[]; busy?: boolean; onSubmit: (text: string) => void }) {
+  const C = useColors();
   const [text, setText] = useState('');
   const go = (t: string) => { if (t.trim() && !busy) onSubmit(t.trim()); };
   return (

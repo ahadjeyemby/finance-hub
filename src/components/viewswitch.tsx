@@ -2,7 +2,8 @@ import { View } from 'react-native';
 
 import { memberName } from '@/core/workspace';
 import { useRepo } from '@/data/repo';
-import { C, S } from '@/theme/tokens';
+import { S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Chip, T } from '@/theme/ui';
 
 /**
@@ -10,6 +11,7 @@ import { Chip, T } from '@/theme/ui';
  * lets this person read. Nothing is shown to a person with no members.
  */
 export function ViewSwitch() {
+  const C = useColors();
   const { team } = useRepo();
   if (!team.active) return null;
   const who = team.viewing === 'all' ? 'everyone' : team.viewing === 'me' ? 'you' : memberName(team.members.find((m) => m.member === team.viewing) ?? { member: team.viewing, email: null, label: null });

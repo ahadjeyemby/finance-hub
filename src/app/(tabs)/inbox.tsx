@@ -7,7 +7,8 @@ import { dayLabel } from '@/core/dates';
 import { dollars } from '@/core/queries';
 import type { Question } from '@/core/types';
 import { useRepo } from '@/data/repo';
-import { C, F, R, S } from '@/theme/tokens';
+import { F, R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, H, Screen, T } from '@/theme/ui';
 
 const LABEL: Record<string, string> = {
@@ -16,6 +17,7 @@ const LABEL: Record<string, string> = {
 };
 
 function QuestionCard({ q, onDone }: { q: Question; onDone: (q: Question) => void }) {
+  const C = useColors();
   const { answer, txns, accounts } = useRepo();
   const [all, setAll] = useState(true);
   const [see, setSee] = useState(false);
@@ -62,6 +64,7 @@ function QuestionCard({ q, onDone }: { q: Question; onDone: (q: Question) => voi
 }
 
 export default function Inbox() {
+  const C = useColors();
   const { questions, undo, txns } = useRepo();
   const [last, setLast] = useState<Question | null>(null);
   const [shown, setShown] = useState(8);

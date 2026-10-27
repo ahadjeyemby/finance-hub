@@ -10,13 +10,15 @@ import type { Account, AccountNumberKind } from '@/core/types';
 import { fetchMergedAccounts, fetchStatements, mergeAccounts, saveAccountNumbers, statementFileUrl, unmergeAccount } from '@/data/accounts';
 import type { StatementRef } from '@/data/accounts';
 import { useRepo } from '@/data/repo';
-import { C, F, R, S } from '@/theme/tokens';
+import { F, R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, Chip, Row, Screen, T } from '@/theme/ui';
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 
 /** Merge this account into another one that is really the same account. Nothing is deleted: its transactions and statements move, and it can be undone. */
 function Merge({ account, accounts, txnCount, onDone }: { account: Account; accounts: Account[]; txnCount: number; onDone: (msg: string) => void }) {
+  const C = useColors();
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState<Account | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,6 +61,7 @@ function Merge({ account, accounts, txnCount, onDone }: { account: Account; acco
 
 /** The statements saved for an account, newest first, each with its balances, whether it added up, and a button that opens the original file. */
 function Statements({ account, title }: { account: Account | null; title: string }) {
+  const C = useColors();
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<StatementRef[] | null>(null);
   const [busy, setBusy] = useState('');
@@ -93,6 +96,7 @@ function Statements({ account, title }: { account: Account | null; title: string
 
 /** The numbers that mean this account, and a way to add more: a reissued card, an old account number, a debit or credit card that belongs to it. */
 function Numbers({ account, onSaved }: { account: Account; onSaved: () => void }) {
+  const C = useColors();
   const [text, setText] = useState('');
   const [kind, setKind] = useState<AccountNumberKind>('replaced');
   const [busy, setBusy] = useState(false);
@@ -132,6 +136,7 @@ function Numbers({ account, onSaved }: { account: Account; onSaved: () => void }
 }
 
 export default function Accounts() {
+  const C = useColors();
   const { accounts, txns, dataFrom, dataTo, auth, sync, source } = useRepo();
   const span = Math.max(1, daysBetween(dataFrom, dataTo));
   const orphan = txns.filter((t) => t.kind === 'transfer' && t.subtype === 'card_payment' && !t.pairId);

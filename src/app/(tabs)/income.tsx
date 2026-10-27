@@ -19,16 +19,18 @@ import { burnRedactions, discardScan, redactionSupported, scanForRedaction } fro
 import type { Scan } from '@/data/redact';
 import { useRedactSettings } from '@/data/redactSettings';
 import { useRepo } from '@/data/repo';
-import { C, F, R, S } from '@/theme/tokens';
-import { Banner, Button, Card, Chip, Screen, T } from '@/theme/ui';
+import { R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
+import { Banner, Button, Card, Chip, Screen, T, useInputStyle } from '@/theme/ui';
 
-const input = { minHeight: 44, borderRadius: R.md, backgroundColor: C.ground, paddingHorizontal: S.md, fontFamily: F.body, fontSize: 15, color: C.ink } as const;
 const cents = (text: string) => Math.round(Number(text.replace(/[$,\s]/g, '')) * 100);
 const GROUPS = [{ id: 'insurance', label: 'Insurance' }, { id: 'retirement', label: 'Retirement' }, { id: 'other', label: 'Other' }] as const;
 
 interface Line { label: string; amount: string; group?: 'insurance' | 'retirement' | 'other'; last4?: string }
 
 function Field({ value, onChange, placeholder, label, wide }: { value: string; onChange: (v: string) => void; placeholder: string; label: string; wide?: boolean }) {
+  const C = useColors();
+  const input = useInputStyle();
   return <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={C.ink3} accessibilityLabel={label} style={[input, { flex: wide ? 2 : 1, minWidth: wide ? 140 : 90 }]} />;
 }
 
@@ -60,6 +62,8 @@ function Lines({ title, lines, onChange, kind }: { title: string; lines: Line[];
  * and pay records (a paycheck's gross, taxes, deductions and net) are checked to add up and matched to the deposits they name.
  */
 export default function Income() {
+  const C = useColors();
+  const input = useInputStyle();
   const { txns, accounts, income, saveIncome, links, months, period, setPeriod, range } = useRepo();
   const receipts = useMemo(() => (links?.receipts ?? []).map((r) => ({ date: r.date ?? null, taxCents: r.taxCents ?? null })), [links]);
   const sum = useMemo(() => summarizeIncome(txns, accounts, income, range, receipts), [txns, accounts, income, range, receipts]);

@@ -3,7 +3,8 @@ import type { ReactElement } from 'react';
 import { Image, Platform, ScrollView, View, useWindowDimensions } from 'react-native';
 
 import { toBase64 } from '@/core/sha256';
-import { C, R, S } from '@/theme/tokens';
+import { R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Button, Chip, T } from '@/theme/ui';
 
 export interface PreviewFile { name: string; type: string; bytes: Uint8Array }
@@ -16,6 +17,7 @@ const ZOOMS = [1, 2, 3] as const;
  * viewer in the app, so it says so.
  */
 export function FilePreview({ file, onClose }: { file: PreviewFile; onClose: () => void }) {
+  const C = useColors();
   const isWeb = Platform.OS === 'web';
   const isPdf = file.type === 'application/pdf';
   const { height } = useWindowDimensions();
@@ -46,7 +48,7 @@ export function FilePreview({ file, onClose }: { file: PreviewFile; onClose: () 
   }
 
   return (
-    <View style={{ backgroundColor: C.paper, borderRadius: R.md, padding: S.lg, gap: S.sm }} onLayout={(e) => setWidth(e.nativeEvent.layout.width - S.lg * 2)}>
+    <View style={{ backgroundColor: C.paper, borderRadius: R.card, borderWidth: 1, borderColor: C.line, padding: 22, gap: S.sm }} onLayout={(e) => setWidth(e.nativeEvent.layout.width - S.lg * 2)}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: S.sm }}>
         <View style={{ flex: 1 }}><T size={13} bold numberOfLines={1}>Original: {file.name}</T></View>
         <Button small kind="ghost" label="Close" onPress={onClose} />

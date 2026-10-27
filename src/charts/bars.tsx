@@ -3,14 +3,17 @@ import { Pressable, View } from 'react-native';
 import Svg, { G, Line, Rect, Text as SvgText } from 'react-native-svg';
 
 import { dollars } from '@/core/queries';
-import { C, F, S } from '@/theme/tokens';
+import { F, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { T } from '@/theme/ui';
 import { HatchDefs, Measured, Readout, axisMoney, niceMax } from './common';
 
 export interface BarRow { key: string; label: string; value: number; long?: string; hatch?: boolean; note?: string; color?: string }
 
 /** Vertical bars (months, weeks). Negative values hang below the baseline. Hatched = partial period. */
-export function Bars({ rows, height = 190, color = C.bar, onSelect }: { rows: BarRow[]; height?: number; color?: string; onSelect?: (key: string) => void }) {
+export function Bars({ rows, height = 190, color: colorProp, onSelect }: { rows: BarRow[]; height?: number; color?: string; onSelect?: (key: string) => void }) {
+  const C = useColors();
+  const color = colorProp ?? C.bar;
   const [sel, setSel] = useState<string | null>(null);
   const hid = 'hb' + Math.abs(hash(color));
   const pos = Math.max(0, ...rows.map((r) => r.value));
@@ -59,7 +62,9 @@ export function Bars({ rows, height = 190, color = C.bar, onSelect }: { rows: Ba
 function hash(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
 
 /** Horizontal ranked bars. Hatched bars mean the dollars have no item detail yet. */
-export function HBars({ rows, color = C.bar, max, onSelect, sub }: { rows: BarRow[]; color?: string; max?: number; onSelect?: (key: string) => void; sub?: (r: BarRow) => string | undefined }) {
+export function HBars({ rows, color: colorProp, max, onSelect, sub }: { rows: BarRow[]; color?: string; max?: number; onSelect?: (key: string) => void; sub?: (r: BarRow) => string | undefined }) {
+  const C = useColors();
+  const color = colorProp ?? C.bar;
   const m = max ?? Math.max(1, ...rows.map((r) => Math.abs(r.value)));
   return (
     <View>

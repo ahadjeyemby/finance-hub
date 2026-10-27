@@ -11,11 +11,11 @@ import { likelyCharges } from '@/core/dedupe';
 import { parseDateISO } from '@/core/intake';
 import { dollars } from '@/core/queries';
 import { useRepo } from '@/data/repo';
-import { C, F, R, S } from '@/theme/tokens';
-import { Banner, Button, Card, Chip, Row, Screen, Segmented, T } from '@/theme/ui';
+import { R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
+import { Banner, Button, Card, Chip, Row, Screen, Segmented, T, useInputStyle } from '@/theme/ui';
 
 const addDays = (iso: string, n: number) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-const input = { minHeight: 48, borderRadius: R.md, backgroundColor: C.ground, paddingHorizontal: S.md, fontFamily: F.body, fontSize: 16, color: C.ink } as const;
 const STATUS_TEXT = { done: 'Done', todo: 'To do', error: 'Check', optional: 'Optional' } as const;
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
@@ -27,6 +27,8 @@ function Field({ label, error, children }: { label: string; error?: string; chil
  * and the tabs say which are done. The same screen changes an entry saved earlier (open it from the transaction, or with ?id=).
  */
 export default function Cash() {
+  const C = useColors();
+  const input = { ...useInputStyle(), minHeight: 48, fontSize: 16 };
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { txns, addCash, updateCash, removeCash, auth } = useRepo();
   const today = todayISO();

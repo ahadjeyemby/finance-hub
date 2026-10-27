@@ -2,11 +2,13 @@ import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { C, S } from '@/theme/tokens';
+import { S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { H, T } from '@/theme/ui';
 import { Icon } from './icons';
 
 export function ScreenHeader({ title, sub, back, right }: { title: string; sub?: string; back?: boolean; right?: ReactNode }) {
+  const C = useColors();
   return (
     <View style={{ gap: 2 }}>
       {back ? (

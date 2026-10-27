@@ -4,12 +4,14 @@ import Svg, { G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { dollars } from '@/core/queries';
 import type { StackResult } from '@/core/report';
-import { C, F, S } from '@/theme/tokens';
+import { F, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Legend, Measured, Readout, axisMoney, niceMax } from './common';
 import type { BarRow } from './bars';
 
 /** Stacked columns with a 2px surface gap between segments. */
 export function StackBars({ data, colorFor, height = 220 }: { data: StackResult; colorFor: (key: string, i: number) => string; height?: number }) {
+  const C = useColors();
   const [sel, setSel] = useState<{ col: number; ser: string } | null>(null);
   const totals = data.cols.map((_, c) => data.series.reduce((s, x) => s + x.values[c], 0));
   const top = niceMax(Math.max(0, ...totals));
@@ -54,6 +56,7 @@ export function StackBars({ data, colorFor, height = 220 }: { data: StackResult;
 
 /** Donut: share of a whole. Tap a slice for the exact figure. */
 export function Donut({ rows, colorFor, size = 180 }: { rows: BarRow[]; colorFor: (key: string, i: number) => string; size?: number }) {
+  const C = useColors();
   const [sel, setSel] = useState<string | null>(null);
   const total = rows.reduce((s, r) => s + Math.max(0, r.value), 0) || 1;
   const cx = size / 2, R0 = size / 2 - 4, r0 = R0 * 0.62;

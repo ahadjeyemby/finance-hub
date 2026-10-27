@@ -4,11 +4,13 @@ import type { TextInputInstance } from 'react-native';
 
 import { Lockup } from '@/components/brand';
 import { useRepo } from '@/data/repo';
-import { C, F, R, S } from '@/theme/tokens';
+import { F, R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Button, H, T } from '@/theme/ui';
 
 /** Simple email and password sign-in. Accounts are created by the owner in the Supabase dashboard; there is no sign-up here. */
 export function SignIn() {
+  const C = useColors();
   const { auth } = useRepo();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

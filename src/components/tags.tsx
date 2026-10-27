@@ -6,11 +6,13 @@ import { lineKeys, saveTag, setItemCategory, setTag, txnKey } from '@/core/tags'
 import type { TagDef, TagState } from '@/core/tags';
 import { dollars } from '@/core/queries';
 import type { Txn } from '@/core/types';
-import { C, F, R, S } from '@/theme/tokens';
+import { F, R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Button, Chip, T } from '@/theme/ui';
 
 /** Every tag as a chip: on when the thing carries it. Press to add or take away; one the rules found says "auto" until it is taken away. */
 export function TagPicker({ defs, on, auto, onToggle, onCreate }: { defs: TagDef[]; on: string[]; auto: string[]; onToggle: (id: string, on: boolean) => void; onCreate?: (label: string) => void }) {
+  const C = useColors();
   const [adding, setAdding] = useState(false);
   const [text, setText] = useState('');
   return (
@@ -35,6 +37,7 @@ export function TagPicker({ defs, on, auto, onToggle, onCreate }: { defs: TagDef
  * taken away. A tag the rules found says "auto"; a change made here is kept and wins over the rules.
  */
 export function TagsEditor({ txn, tagState, onChange }: { txn: Txn; tagState: TagState; onChange: (next: TagState) => void }) {
+  const C = useColors();
   const [open, setOpen] = useState<number | null>(null);
   const [pickCat, setPickCat] = useState<number | null>(null);
   const defs = tagState.defs;

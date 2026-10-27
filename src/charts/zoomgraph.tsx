@@ -8,7 +8,9 @@ import { LEVEL_NAMES, graphChildren, graphFilter, graphRoots, isLeaf } from '@/c
 import type { GNode, Seg } from '@/core/graph';
 import { dollars } from '@/core/queries';
 import type { Ctx, Filter } from '@/core/queries';
-import { C, F, R, S } from '@/theme/tokens';
+import { F, R, S } from '@/theme/tokens';
+import type { Palette } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Button, T, useWide } from '@/theme/ui';
 
 interface Props { ctx: Ctx; scope: Filter['scope']; colorOf: (category: string) => string; onOpen?: (f: Filter) => void }
@@ -20,7 +22,7 @@ const darkText = (hex: string) => {
   return 0.299 * r + 0.587 * g + 0.114 * b > 150;
 };
 
-function colorFor(n: GNode, colorOf: Props['colorOf']): string {
+function colorFor(n: GNode, colorOf: Props['colorOf'], C: Palette): string {
   const cat = n.path.find((s) => s.level === 'category');
   if (cat) return colorOf(cat.key);
   return n.level === 'kind' && n.key !== 'spend' ? C.ink3 : C.bar;
@@ -37,6 +39,7 @@ export function ZoomGraph(p: Props) {
 // Wide screens: zoom columns with ribbons from the selected node to its children.
 // ---------------------------------------------------------------------------
 function Columns({ ctx, scope, colorOf, onOpen }: Props) {
+  const C = useColors();
   const { width: winW } = useWindowDimensions();
   const colW = Math.max(112, Math.min(170, Math.floor((winW - 200 - 48 - 32 - 5 * GAP) / 6)));
   const scroller = useRef<ScrollViewInstance>(null);
@@ -97,14 +100,14 @@ function Columns({ ctx, scope, colorOf, onOpen }: Props) {
                   const share = Math.abs(cb.n.cents) / next.total;
                   const ya = sk.y + (acc * sk.h), yb = ya + share * sk.h; acc += share;
                   const d = `M${x0} ${ya} C${xm} ${ya} ${xm} ${cb.y} ${x1} ${cb.y} L${x1} ${cb.y + cb.h} C${xm} ${cb.y + cb.h} ${xm} ${yb} ${x0} ${yb} Z`;
-                  return <Path key={`${k}${cb.n.id}`} d={d} fill={colorFor(cb.n, colorOf)} opacity={0.22} />;
+                  return <Path key={`${k}${cb.n.id}`} d={d} fill={colorFor(cb.n, colorOf, C)} opacity={0.22} />;
                 });
               })}
             </Svg>
             {layout.map((lay, k) => lay.blocks.map(({ n, y, h }) => {
               const picked = sel[k]?.key === n.key;
               const dim = sel[k] && !picked;
-              const col = colorFor(n, colorOf);
+              const col = colorFor(n, colorOf, C);
               const fg = n.hatch ? C.ink : darkText(col) ? C.ink : C.paper;
               return (
                 <Pressable key={n.id} accessibilityRole="button" accessibilityState={{ selected: picked }} accessibilityLabel={`${n.label}, ${dollars(n.cents)}${n.hatch ? ', no item detail' : ''}`}
@@ -127,6 +130,7 @@ function Columns({ ctx, scope, colorOf, onOpen }: Props) {
 }
 
 function Detail({ nodes, onJump, onClear, onOpen, current, colIdx }: { nodes: GNode[]; onJump: (i: number) => void; onClear: () => void; onOpen?: () => void; current?: GNode; colIdx: number }) {
+  const C = useColors();
   return (
     <View style={{ backgroundColor: C.paper, borderRadius: R.md, padding: S.md, gap: S.xs }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}>
@@ -154,6 +158,7 @@ function Detail({ nodes, onJump, onClear, onOpen, current, colIdx }: { nodes: GN
 // Phone: indented outline, one tap opens the next level, bars show share of parent.
 // ---------------------------------------------------------------------------
 function Outline({ ctx, scope, colorOf, onOpen }: Props) {
+  const C = useColors();
   const roots = useMemo(() => graphRoots(ctx, scope), [ctx, scope]);
   const [open, setOpen] = useState<Set<string>>(() => new Set(roots[0] ? [roots[0].id] : []));
   const toggle = (id: string) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -166,10 +171,11 @@ function Outline({ ctx, scope, colorOf, onOpen }: Props) {
 }
 
 function OutlineRow({ n, depth, open, toggle, ctx, scope, colorOf, onOpen }: { n: GNode; depth: number; open: Set<string>; toggle: (id: string) => void; ctx: Ctx; scope: Filter['scope']; colorOf: Props['colorOf']; onOpen?: (f: Filter) => void }) {
+  const C = useColors();
   const isOpen = open.has(n.id);
   const leaf = isLeaf(n);
   const kids = useMemo(() => (isOpen && !leaf ? graphChildren(ctx, n.path, scope) : []), [isOpen, leaf, ctx, n.path, scope]);
-  const col = colorFor(n, colorOf);
+  const col = colorFor(n, colorOf, C);
   return (
     <View>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: leaf ? undefined : isOpen }} accessibilityLabel={`${n.label}, ${dollars(n.cents)}`}
