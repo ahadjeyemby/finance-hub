@@ -23,7 +23,7 @@ type Drill = { label: string; filter: Filter };
 
 export default function Explore() {
   const { ctx, scope, scoped, range, colorOf, accounts, completeTo } = useRepo();
-  const [mode, setMode] = useState<'bars' | 'graph'>('bars');
+  const [mode, setMode] = useState<'bars' | 'graph'>('graph');
   const [dim, setDim] = useState<GroupBy>('category');
   const [drills, setDrills] = useState<Drill[]>([]);
 

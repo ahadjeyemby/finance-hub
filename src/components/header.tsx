@@ -12,7 +12,7 @@ export function ScreenHeader({ title, sub, back, right }: { title: string; sub?:
   return (
     <View style={{ gap: 2 }}>
       {back ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.replace('/')} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
           <Icon name="back" color={C.ink2} size={18} /><T size={13} tone="ink2" bold>Back</T>
         </Pressable>
       ) : null}
