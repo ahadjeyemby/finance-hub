@@ -21,6 +21,7 @@ import { emptyOverlay } from '@/core/types';
 import type { Account, CategoryId, Overlay, Question, StatementPeriod, Txn } from '@/core/types';
 import { useTheme } from '@/theme/theme';
 import { setCurrentUser } from './scope';
+import { fetchStatementPeriods } from './accounts';
 import { fetchLedger, fetchOverlay, pushOverlay } from './sync';
 import { fetchTeamData } from './team';
 import { listMembers, myAccess } from './workspace';
@@ -120,6 +121,10 @@ export interface Repo {
   range: { from: string; to: string; label: string; complete: boolean };
   forecastMonth: string;
   answer: (q: Question, choice: string, toMerchant: boolean) => { goto?: 'add' };
+  /** answer several questions the same way in one change, so none of them is lost (Business and Personal for every charge, Mark all as business) */
+  answerMany: (qs: Question[], choice: string, toMerchant: boolean) => void;
+  /** the days each saved statement covers (empty when they could not be loaded) */
+  statements: StatementPeriod[];
   undo: (q: Question) => void;
   addCash: (d: CashDraft) => Txn;
   saveReport: (prompt: string, spec: ReportSpec) => string;
@@ -245,7 +250,9 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     try {
       const remoteLedger = (await fetchLedger()) ?? EMPTY;
       const at = new Date().toISOString();
-      setLedger(remoteLedger);
+      // which days each saved statement covers; without them (migration 0002 not run) each account counts from its first to its last day
+      const statements = await fetchStatementPeriods().catch(() => [] as StatementPeriod[]);
+      setLedger({ ...remoteLedger, statements });
       setLedgerFrom({ kind: 'database', at });
       if (remoteLedger.accounts.length && projectRef && userIdRef.current) AsyncStorage.setItem(LEDGER_KEY, JSON.stringify(makeLedgerCache(projectRef, userIdRef.current, at, remoteLedger))).catch(() => {});
       else AsyncStorage.removeItem(LEDGER_KEY).catch(() => {});
@@ -342,7 +349,8 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   // the switcher: everything the screens use is already limited to whose data is on show
   const txns = useMemo(() => (combined && userId && viewing !== 'all' ? everyone.filter((t) => inView(t.owner, viewing, userId)) : everyone), [everyone, combined, userId, viewing]);
   const accounts = useMemo(() => (combined && userId && viewing !== 'all' ? baseAccounts.filter((a) => inView(a.owner, viewing, userId)) : baseAccounts), [baseAccounts, combined, userId, viewing]);
-  const ctx = useMemo<Ctx>(() => ({ txns, accounts }), [txns, accounts]);
+  // the statements' days and the recurring decisions travel with the rows, so every screen's forecast and month counts agree
+  const ctx = useMemo<Ctx>(() => ({ txns, accounts, statements: ledger.statements, recurring: overlay.recurring }), [txns, accounts, ledger.statements, overlay.recurring]);
   const questions = useMemo(() => buildQuestions(txns, overlay), [txns, overlay]);
 
   const hasData = accounts.length > 0;
@@ -369,7 +377,9 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     ready, hasData, auth, sync, source, accounts, txns, ctx, scope, setScope, overlay, questions, dataTo, dataFrom, completeTo, months, period, setPeriod, range,
     scoped: (f) => ({ ...(f ?? {}), scope }),
     forecastMonth: addMonths(monthOf(dataTo), 1),
-    answer: (q, choice, toMerchant) => { const r = applyAnswer(q, choice, toMerchant, overlay); commit(r.overlay); return { goto: r.goto }; },
+    answer: (q, choice, toMerchant) => { const r = applyAnswer(q, choice, toMerchant, overlayRef.current); commit(r.overlay); return { goto: r.goto }; },
+    answerMany: (qs, choice, toMerchant) => commit(qs.reduce((o, q) => applyAnswer(q, choice, toMerchant, o).overlay, overlayRef.current)),
+    statements: ledger.statements ?? [],
     undo: (q) => commit(undoAnswer(q, overlay)),
     // mutators read the live overlay (a ref), not the one captured at render, so several calls in one loop (bulk save) do not overwrite each other
     addCash: (d) => { const o = overlayRef.current; const t = cashToTxn(d, todayISO()); commit({ ...o, manual: [...o.manual, t] }); return t; },
@@ -403,7 +413,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     attachReceipt: (txnId, lines, uri) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [txnId]: { ...o.patches[txnId], lines, receiptId: uri } } }); },
     colorOf: (category) => cat[colorGroupOf(category)],
     reset: () => commit(emptyOverlay()),
-  }), [ready, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, cat, commit, baseLinks, reloadLinks, tagState, incomeAll, categories, team, teamApi]);
+  }), [ready, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, cat, commit, ledger.statements, baseLinks, reloadLinks, tagState, incomeAll, categories, team, teamApi]);
 
   return <Ctx_.Provider value={value}>{children}</Ctx_.Provider>;
 }

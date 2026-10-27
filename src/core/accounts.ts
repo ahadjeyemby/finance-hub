@@ -1,7 +1,7 @@
 // Account numbers. One account can have several: a reissued card, a changed account number, a debit or credit card that belongs to a checking
 // account. The main number is Account.last4; the others are Account.extraNumbers. Anything that asks "is this number that account's?" uses
 // these helpers so a second number is never forgotten in one place. Pure TypeScript.
-import type { Account, AccountNumber, AccountNumberKind } from './types';
+import type { Account, AccountNumber, AccountNumberKind, Txn } from './types';
 
 export const NUMBER_KIND_LABEL: Record<AccountNumberKind, string> = {
   account: 'Account number', credit_card: 'Credit card', debit_card: 'Debit card', replaced: 'Old or replaced number', other: 'Other',
@@ -64,3 +64,16 @@ export function unmergedNumbers(target: Account, source: Account): AccountNumber
 
 /** Coverage of the kept account after the merge: from the earlier start to the later end. */
 export const mergedCoverage = (a: Account, b: Account) => ({ from: a.coverage.from < b.coverage.from ? a.coverage.from : b.coverage.from, to: a.coverage.to > b.coverage.to ? a.coverage.to : b.coverage.to });
+
+/**
+ * Card payments with no matching other leg. On a card (card side) the money came from an account the app cannot see: that is the
+ * "paid from an account Finora can't see" figure. On checking (bank side) the card's own statement for that period is probably missing. The
+ * two mean different things and are never added together.
+ */
+export function unmatchedCardPayments(txns: Txn[], accounts: Account[]): { cardSide: Txn[]; bankSide: Txn[]; cardTotal: number } {
+  const type = new Map(accounts.map((a) => [a.id, a.type]));
+  const orphan = txns.filter((t) => t.kind === 'transfer' && t.subtype === 'card_payment' && !t.pairId);
+  const cardSide = orphan.filter((t) => type.get(t.accountId) === 'credit');
+  const bankSide = orphan.filter((t) => type.get(t.accountId) === 'checking');
+  return { cardSide, bankSide, cardTotal: cardSide.reduce((s, t) => s + Math.abs(t.cents), 0) };
+}

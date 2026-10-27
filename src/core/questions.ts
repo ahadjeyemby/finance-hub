@@ -107,6 +107,22 @@ export function buildQuestions(txns: Txn[], overlay: Pick<Overlay, 'answered'>):
   return out.sort((a, b) => b.cents - a.cents);
 }
 
+/**
+ * The dollars a set of questions covers, each charge counted once: one charge can be in several questions at once (business or personal, a
+ * possible one-off, a basket with no receipt), so adding up the questions' own amounts would count it two or three times.
+ */
+export function uniqueCents(questions: Pick<Question, 'txnIds' | 'cents'>[], txns: Txn[]): number {
+  const byId = new Map(txns.map((t) => [t.id, t]));
+  const seen = new Set<string>();
+  let total = 0;
+  for (const q of questions) {
+    const ids = q.txnIds.filter((id) => byId.has(id));
+    if (!ids.length) { total += q.cents; continue; }
+    for (const id of ids) { if (seen.has(id)) continue; seen.add(id); total += Math.abs(byId.get(id)!.cents); }
+  }
+  return total;
+}
+
 // ---------------------------------------------------------------------------
 // Cash entry: a short conversation that keeps asking until the record is usable.
 // ---------------------------------------------------------------------------

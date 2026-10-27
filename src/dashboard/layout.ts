@@ -32,17 +32,33 @@ export function resolveView(view: ViewId, rows: PrefRow[] | null | undefined): P
     .map((r) => ({ id: r.widget, size: sizeIn.get(r.widget) ?? META[r.widget].defaultSize }));
 }
 
+/** Widgets added outside the preset are numbered from here, so they always come after the preset's own, even one switched back on later. */
+export const EXTRA_FROM = 1000;
+
 /** Switch one widget on or off. Returns the view's full new snapshot. */
 export function toggleWidget(view: ViewId, rows: PrefRow[] | null | undefined, id: WidgetId, on: boolean): PrefRow[] {
   const all = rows && rows.length ? complete(view, rows) : presetRows(view);
   const inPreset = PRESETS[view].some(([w]) => w === id);
-  const last = Math.max(-1, ...all.filter((r) => r.enabled && r.widget !== id).map((r) => r.position));
+  const lastExtra = Math.max(EXTRA_FROM - 1, ...all.filter((r) => r.enabled && r.widget !== id && r.position >= EXTRA_FROM).map((r) => r.position));
   return all.map((r) => {
     if (r.widget !== id) return r;
-    // a preset widget keeps its place when it comes back; anything else joins the end
-    if (on && !r.enabled && !inPreset) return { ...r, enabled: true, position: last + 1 };
+    // a preset widget keeps its place when it comes back; anything else joins the end, after the preset widgets and earlier extras
+    if (on && !r.enabled && !inPreset) return { ...r, enabled: true, position: lastExtra + 1 };
     return { ...r, enabled: on };
   });
+}
+
+/** Every view's saved snapshot; a view that is missing shows its preset. */
+export type Prefs = Partial<Record<ViewId, PrefRow[]>>;
+
+/**
+ * The database's copy and this device's, put together: a view changed on this device and not yet saved keeps the device's version (or its
+ * reset, when the device has none); every other view takes the database's.
+ */
+export function mergePrefs(remote: Prefs, local: Prefs, unsaved: Iterable<ViewId>): Prefs {
+  const out: Prefs = { ...remote };
+  for (const v of unsaved) { if (local[v]) out[v] = local[v]; else delete out[v]; }
+  return out;
 }
 
 /** How many widgets are on in a view. */

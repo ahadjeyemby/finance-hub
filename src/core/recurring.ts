@@ -6,7 +6,7 @@
 // cannot see (rent paid in cash before there is a history). Nothing here guesses silently: each item says how many charges it rests on.
 import { categoryLabel } from './categories';
 import { monthOf } from './dates';
-import { completeMonths } from './forecast';
+import { completeMonths } from './coverage';
 import type { Ctx } from './queries';
 import type { Txn } from './types';
 
@@ -83,7 +83,8 @@ const step = (iso: string, c: Cadence, times = 1): string =>
   c === 'weekly' ? addDays(iso, 7 * times) : c === 'biweekly' ? addDays(iso, 14 * times) : addMonthsTo(iso, ({ monthly: 1, quarterly: 3, semiannual: 6, annual: 12 } as const)[c] * times);
 
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2); };
-const normKey = (merchant: string) => merchant.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\b\d+\b/g, '').replace(/\s+/g, ' ').trim();
+/** The payee a charge belongs to, for telling one series from another: lower case, no store numbers or punctuation. */
+export const normKey = (merchant: string) => merchant.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\b\d+\b/g, '').replace(/\s+/g, ' ').trim();
 
 /** Which rhythm the dates follow, if one fits at least three quarters of the gaps between them. */
 export function detectCadence(dates: string[]): Cadence | null {

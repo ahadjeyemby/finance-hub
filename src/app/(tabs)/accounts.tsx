@@ -3,7 +3,7 @@ import { Linking, TextInput, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/header';
 import { sourceWhen } from '@/components/source';
-import { NUMBER_KINDS, NUMBER_KIND_LABEL, accountNumbers, parseLast4, whyNotMerge, withNumber, withoutNumber } from '@/core/accounts';
+import { NUMBER_KINDS, NUMBER_KIND_LABEL, accountNumbers, parseLast4, unmatchedCardPayments, whyNotMerge, withNumber, withoutNumber } from '@/core/accounts';
 import { dayLabel } from '@/core/dates';
 import { dollars } from '@/core/queries';
 import type { Account, AccountNumberKind } from '@/core/types';
@@ -139,10 +139,7 @@ export default function Accounts() {
   const C = useColors();
   const { accounts, txns, dataFrom, dataTo, auth, sync, source } = useRepo();
   const span = Math.max(1, daysBetween(dataFrom, dataTo));
-  const orphan = txns.filter((t) => t.kind === 'transfer' && t.subtype === 'card_payment' && !t.pairId);
-  const cardSide = orphan.filter((t) => accounts.find((a) => a.id === t.accountId)?.type === 'credit');
-  const bankSide = orphan.filter((t) => accounts.find((a) => a.id === t.accountId)?.type === 'checking');
-  const cardTotal = cardSide.reduce((s, t) => s + t.cents, 0);
+  const { cardSide, bankSide, cardTotal } = unmatchedCardPayments(txns, accounts);
   const [merged, setMerged] = useState<Awaited<ReturnType<typeof fetchMergedAccounts>>>([]);
   const [mergeMsg, setMergeMsg] = useState('');
   const [undoError, setUndoError] = useState('');
