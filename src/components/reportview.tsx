@@ -17,12 +17,14 @@ import { S } from '@/theme/tokens';
 import { useColors, useTheme } from '@/theme/theme';
 import { Banner, Button, Card, H, Row, T } from '@/theme/ui';
 import { TxnRow } from './txnrow';
+import { useTxPanel } from '@/components/txpanelctx';
 
 const fmt = (spec: QuerySpec, v: number) => (spec.metric === 'count' ? String(v) : dollars(v, { decimals: false }));
 
 function ChartBlock({ b, ctx, colorOf, completeTo }: { b: Extract<Block, { type: 'chart' }>; ctx: Ctx; colorOf: (c: string) => string; completeTo: string }) {
   const C = useColors();
   const { series: SERIES } = useTheme();
+  const { openList } = useTxPanel();
   const g = b.query.groupBy;
   const res = useMemo(() => runQuery(b.query, ctx), [b, ctx]);
   const rows = toBarRows(res.rows, g, completeTo);
@@ -37,7 +39,7 @@ function ChartBlock({ b, ctx, colorOf, completeTo }: { b: Extract<Block, { type:
       {b.chart === 'bars' ? <Bars rows={rows} />
         : b.chart === 'line' || b.chart === 'area' ? <LineChart rows={rows} area={b.chart === 'area'} />
         : b.chart === 'donut' ? <Donut rows={rows} colorFor={(k, i) => (g === 'category' ? colorOf(k) : SERIES[i] ?? C.other)} />
-        : <HBars rows={rows} onSelect={g === 'category' ? (k) => router.push({ pathname: '/ledger', params: { category: k, from: b.query.filter?.from, to: b.query.filter?.to } }) : undefined} />}
+        : <HBars rows={rows} onSelect={g === 'category' ? (k) => openList({ category: k, from: b.query.filter?.from, to: b.query.filter?.to }) : undefined} />}
     </ChartCard>
   );
 }

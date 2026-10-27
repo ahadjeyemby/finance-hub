@@ -11,6 +11,7 @@ import { useRepo } from '@/data/repo';
 import { F, R, S } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, H, Screen, T } from '@/theme/ui';
+import { useTxPanel } from '@/components/txpanelctx';
 
 const LABEL: Record<string, string> = {
   confirm_income: 'Deposit', transfer_account: 'Transfer', person_payment: 'Payment to a person', category: 'Category',
@@ -20,6 +21,7 @@ const LABEL: Record<string, string> = {
 function QuestionCard({ q, onDone }: { q: Question; onDone: (q: Question) => void }) {
   const C = useColors();
   const { answer, txns, accounts } = useRepo();
+  const { openList, openTxn } = useTxPanel();
   const [all, setAll] = useState(true);
   const [see, setSee] = useState(false);
   const rows = q.txnIds.map((id) => txns.find((t) => t.id === id)).filter((t): t is NonNullable<typeof t> => !!t);
@@ -42,11 +44,11 @@ function QuestionCard({ q, onDone }: { q: Question; onDone: (q: Question) => voi
                 <T size={13} tone="ink2">{dayLabel(t.date)}, {a ? `${a.name}${a.last4 ? ` (${a.institution} ${a.last4})` : ''}` : t.accountId}</T>
                 <T size={13} tone="ink2">As the bank printed it: {t.description || 'no description'}</T>
                 {t.source ? <T size={12} tone="ink3">From: {t.source}{t.ref ? `, reference ${t.ref}` : ''}</T> : null}
-                <View style={{ flexDirection: 'row' }}><Button small kind="outline" label="Open details and statement line" onPress={() => router.push({ pathname: '/txn/[id]', params: { id: t.id } })} /></View>
+                <View style={{ flexDirection: 'row' }}><Button small kind="outline" label="Open details and statement line" onPress={() => openTxn(t.id)} /></View>
               </View>
             );
           })}
-          {rows.length > 6 ? <View style={{ gap: S.xs }}><T size={12} tone="ink3">{rows.length - 6} more not shown.</T><View style={{ flexDirection: 'row' }}><Button small kind="outline" label={`All ${q.merchant} transactions`} onPress={() => router.push({ pathname: '/ledger', params: { merchant: q.merchant } })} /></View></View> : null}
+          {rows.length > 6 ? <View style={{ gap: S.xs }}><T size={12} tone="ink3">{rows.length - 6} more not shown.</T><View style={{ flexDirection: 'row' }}><Button small kind="outline" label={`All ${q.merchant} transactions`} onPress={() => openList({ merchant: q.merchant })} /></View></View> : null}
         </View>
       ) : null}
       {q.canApplyToMerchant ? (

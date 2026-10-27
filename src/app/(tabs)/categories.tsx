@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -13,6 +12,7 @@ import { F, R, S } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, Chip, Screen, T } from '@/theme/ui';
 import { ownerOnly } from '@/components/owneronly';
+import { useTxPanel } from '@/components/txpanelctx';
 
 const GROUPS: { id: Category['group']; label: string }[] = [{ id: 'need', label: 'Need' }, { id: 'want', label: 'Want' }, { id: 'mixed', label: 'Mixed' }];
 const SPEND = new Set(['spend', 'fee', 'refund']);
@@ -23,6 +23,7 @@ export default ownerOnly(Categories);
 function Categories() {
   const C = useColors();
   const { txns, categoryConfig, saveCategoryConfig, tagState, saveTagState } = useRepo();
+  const { openList } = useTxPanel();
   const [newCat, setNewCat] = useState(''); const [newGroup, setNewGroup] = useState<Category['group']>('need');
   const [newTag, setNewTag] = useState(''); const [newWords, setNewWords] = useState('');
   const [mergeFrom, setMergeFrom] = useState<string | null>(null);
@@ -105,7 +106,7 @@ function Categories() {
               <T size={12} tone="ink3">{[d.categories?.length ? `Also given to charges and items in: ${d.categories.map((id) => cats.find((c) => c.id === id)?.label ?? id).join(', ')}.` : '', d.business ? 'Also given to charges marked Business.' : ''].filter(Boolean).join(' ') || 'Only the words above give it.'}</T>
               <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
                 <Chip label={d.auto ? 'Found automatically' : 'Only added by hand'} on={d.auto} onPress={() => saveTagState(saveTag(tagState, { id: d.id, label: d.label, auto: !d.auto }))} />
-                <Button small kind="outline" label="See the charges" onPress={() => router.push({ pathname: '/ledger', params: { tags: d.id } })} />
+                <Button small kind="outline" label="See the charges" onPress={() => openList({ tags: d.id })} />
                 <Button small kind="ghost" label={sure === `t:${d.id}` ? 'Press again to delete' : 'Delete tag'} onPress={() => { if (sure === `t:${d.id}`) { saveTagState(deleteTag(tagState, d.id)); setSure(null); } else setSure(`t:${d.id}`); }} />
               </View>
             </View>

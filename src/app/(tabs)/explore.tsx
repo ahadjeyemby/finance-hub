@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -7,12 +6,13 @@ import { ChartCard } from '@/charts/common';
 import { ZoomGraph } from '@/charts/zoomgraph';
 import { PeriodBar } from '@/components/filters';
 import { ScreenHeader } from '@/components/header';
-import { dollars, drillFilter, runQuery } from '@/core/queries';
+import { dollars, drillFilter, listTxns, runQuery } from '@/core/queries';
 import type { Filter, GroupBy, QuerySpec } from '@/core/queries';
 import { useRepo } from '@/data/repo';
 import { toBarRows } from '@/lib/rows';
 import { S } from '@/theme/tokens';
 import { Button, Card, Chip, ChipRow, Screen, Segmented, T } from '@/theme/ui';
+import { useTxPanel } from '@/components/txpanelctx';
 
 const DIMS: { value: GroupBy; label: string }[] = [
   { value: 'category', label: 'Category' }, { value: 'merchant', label: 'Store' }, { value: 'month', label: 'Month' },
@@ -23,6 +23,7 @@ type Drill = { label: string; filter: Filter };
 
 export default function Explore() {
   const { ctx, scope, scoped, range, colorOf, accounts, completeTo } = useRepo();
+  const { openList, openTxn } = useTxPanel();
   const [mode, setMode] = useState<'bars' | 'graph'>('graph');
   const [dim, setDim] = useState<GroupBy>('category');
   const [drills, setDrills] = useState<Drill[]>([]);
@@ -38,7 +39,12 @@ export default function Explore() {
     const row = rows.find((r) => r.key === key);
     setDrills([...drills, { label: row?.label ?? key, filter: drillFilter(spec, key) }]);
   };
-  const open = (f: Filter) => router.push({ pathname: '/ledger', params: { from: f.from, to: f.to, category: f.categories?.[0], merchant: f.merchants?.[0], kinds: f.kinds?.join(',') } });
+  // one matching transaction opens that transaction; anything else opens the list
+  const open = (f: Filter) => {
+    const hits = listTxns(ctx, f, 2);
+    if (hits.length === 1) { openTxn(hits[0].id); return; }
+    openList({ from: f.from, to: f.to, category: f.categories?.[0], merchant: f.merchants?.[0], kinds: f.kinds?.join(',') });
+  };
 
   return (
     <Screen>

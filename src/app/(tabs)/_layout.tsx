@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router/js-tabs';
 import { View } from 'react-native';
 
 import { PhoneAppBar, PhoneTabBar } from '@/components/shell/phone';
+import { TxPanelProvider } from '@/components/txpanel';
 import { Sidebar } from '@/components/shell/sidebar';
 import { TopBar } from '@/components/shell/topbar';
 import { useColors } from '@/theme/theme';
@@ -20,15 +21,17 @@ export default function TabsLayout() {
   const C = useColors();
   const wide = useWide();
   return (
-    <View style={{ flex: 1, backgroundColor: C.ground }}>
-      {wide ? <TopBar /> : <PhoneAppBar />}
-      <Tabs
-        // Back returns to the screen the person was on, as a web page does. The default sends every Back to the first tab, the dashboard.
-        backBehavior="fullHistory"
-        tabBar={(props) => (wide ? <Sidebar {...props} /> : <PhoneTabBar {...props} />)}
-        screenOptions={{ headerShown: false, tabBarPosition: wide ? 'left' : 'bottom', sceneStyle: { backgroundColor: C.ground } }}>
-        {SCREENS.map(([name, title]) => <Tabs.Screen key={name} name={name} options={{ title }} />)}
-      </Tabs>
-    </View>
+    <TxPanelProvider>
+      <View style={{ flex: 1, backgroundColor: C.ground }}>
+        {wide ? <TopBar /> : <PhoneAppBar />}
+        <Tabs
+          // Back returns to the screen the person was on, as a web page does. The default sends every Back to the first tab, the dashboard.
+          backBehavior="fullHistory"
+          tabBar={(props) => (wide ? <Sidebar {...props} /> : <PhoneTabBar {...props} />)}
+          screenOptions={{ headerShown: false, tabBarPosition: wide ? 'left' : 'bottom', sceneStyle: { backgroundColor: C.ground } }}>
+          {SCREENS.map(([name, title]) => <Tabs.Screen key={name} name={name} options={{ title }} />)}
+        </Tabs>
+      </View>
+    </TxPanelProvider>
   );
 }

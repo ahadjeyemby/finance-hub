@@ -11,6 +11,7 @@ import { monthEnd, monthStart } from '@/core/dates';
 import { useRepo } from '@/data/repo';
 import { AskStrip, LinkButton, Widget } from '../frame';
 import { BigMoney, exact, longMonth, monthSpan, pct0, pct1, shortMonth, signed, whole } from '../money';
+import { useTxPanel } from '@/components/txpanelctx';
 
 type P = { d: DashboardData };
 
@@ -67,6 +68,7 @@ export function Kpis({ d }: P) {
 /** 2. Money in vs out: Earned rising from zero, Spent coming down from it, Left as the rest. */
 export function Cashflow({ d }: P) {
   const { c } = useTheme();
+  const { openList } = useTxPanel();
   const w = d.cashflow;
   const sub = d.kpis.month ? `${longMonth(d.kpis.month)}${d.kpis.complete ? '' : ' so far'}` : 'All months';
   const note = (color: string, head: string, body: string) => (
@@ -77,7 +79,7 @@ export function Cashflow({ d }: P) {
   );
   return (
     <Widget title="Money in vs out" sub={sub} state={w} ghost="waterfall"
-      right={<LinkButton label="See every deposit" onPress={() => router.push({ pathname: '/ledger', params: { kinds: 'income', ...(d.kpis.month ? { from: monthStart(d.kpis.month), to: monthEnd(d.kpis.month) } : {}) } })} />}>
+      right={<LinkButton label="See every deposit" onPress={() => openList({ kinds: 'income', ...(d.kpis.month ? { from: monthStart(d.kpis.month), to: monthEnd(d.kpis.month) } : {}) })} />}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 20, alignItems: 'flex-end' }}>
         <View style={{ flexGrow: 1, flexBasis: 320, minWidth: 0 }}>
           <Waterfall earned={w.earned} spent={w.spent} money={(v, s) => (s ? signed(v) : exact(v))} label={`Waterfall: earned ${exact(w.earned)}, spent ${exact(w.spent)}, left ${signed(w.left)}`} />

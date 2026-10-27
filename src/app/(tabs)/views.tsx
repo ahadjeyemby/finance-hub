@@ -11,16 +11,18 @@ import { useRepo } from '@/data/repo';
 import { S } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Button, Card, Chip, Screen, T } from '@/theme/ui';
+import { useTxPanel } from '@/components/txpanelctx';
 
 /** The overall picture across categories: each tag as its own total, plus the Want group. These overlap on purpose and are never added together. */
 export default function Views() {
   const C = useColors();
   const { txns, tagState, months, period, setPeriod, range } = useRepo();
+  const { openList } = useTxPanel();
   const inPeriod = useMemo(() => txns.filter((t) => matches(t, { from: range.from, to: range.to, kinds: ['spend', 'fee', 'refund'] })), [txns, range.from, range.to]);
   const totals = useMemo(() => tagTotals(inPeriod, tagState.defs), [inPeriod, tagState.defs]);
   const wants = useMemo(() => groupCents(inPeriod, 'want'), [inPeriod]);
   const all = inPeriod.reduce((s, t) => s - t.cents, 0);
-  const go = (params: Record<string, string>) => router.push({ pathname: '/ledger', params: { from: range.from, to: range.to, ...params } });
+  const go = (params: Record<string, string>) => openList({ from: range.from, to: range.to, ...params });
 
   return (
     <Screen max={820}>

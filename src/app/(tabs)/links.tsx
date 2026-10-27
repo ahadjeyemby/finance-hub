@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -15,6 +14,7 @@ import { useRepo } from '@/data/repo';
 import { R, S } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, Chip, Screen, T } from '@/theme/ui';
+import { useTxPanel } from '@/components/txpanelctx';
 
 const SHOWN = 25;
 const dayGap = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86400000;
@@ -22,6 +22,7 @@ const dayGap = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b))
 export default function Links() {
   const C = useColors();
   const { links, txns, accounts, reloadLinks } = useRepo();
+  const { openTxn } = useTxPanel();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -189,7 +190,7 @@ export default function Links() {
               <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
                 {!l.confirmed ? <Button small kind="outline" label="Confirm" disabled={busy} onPress={() => act(() => saveLinks([{ ...l, confirmed: true }]))} /> : null}
                 <Button small kind="ghost" label="Unlink" disabled={busy} onPress={() => act(() => removeLink(l.receiptId, l.txnId), 'Unlinked.')} />
-                <Button small kind="ghost" label="Open charge" onPress={() => router.push({ pathname: '/txn/[id]', params: { id: l.txnId } })} />
+                <Button small kind="ghost" label="Open charge" onPress={() => openTxn(l.txnId)} />
               </View>
             </View>
           );

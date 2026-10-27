@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -11,6 +10,7 @@ import { useRepo } from '@/data/repo';
 import { S } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, Chip, Screen, T, useInputStyle } from '@/theme/ui';
+import { useTxPanel } from '@/components/txpanelctx';
 
 const CADENCES = Object.keys(CADENCE_LABEL) as Cadence[];
 
@@ -22,6 +22,7 @@ export default function Recurring() {
   const C = useColors();
   const input = useInputStyle();
   const { txns, ctx, dataTo, recurring, saveRecurring, spendingOnly } = useRepo();
+  const { openList } = useTxPanel();
   const today = todayISO();
   // business-marked charges are excluded from personal totals everywhere else, so they are here too
   const sum = useMemo(() => summarizeRecurring(txns.filter((t) => !t.business), recurring, dataTo, today), [txns, recurring, dataTo, today]);
@@ -126,7 +127,7 @@ export default function Recurring() {
           {i.status === 'on' ? <Button small kind="ghost" label="Not recurring" onPress={() => set('ignored')} /> : null}
           {i.status === 'on' ? <Button small kind="ghost" label="I cancelled it" onPress={() => set('cancelled')} /> : null}
           {i.status !== 'on' ? <Button small kind="outline" label="Restore" onPress={() => set(null)} /> : null}
-          {i.txnIds.length ? <Button small kind="ghost" label="See charges" onPress={() => router.push({ pathname: '/ledger', params: { merchant: i.merchant } })} /> : null}
+          {i.txnIds.length ? <Button small kind="ghost" label="See charges" onPress={() => openList({ merchant: i.merchant })} /> : null}
           {manualId ? <Button small kind="ghost" label="Remove" onPress={() => saveRecurring(removeManual(recurring, manualId))} /> : null}
         </View>
       </View>

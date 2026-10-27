@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -23,6 +22,7 @@ import { R, S } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, Chip, Screen, T, useInputStyle } from '@/theme/ui';
 import { ownerOnly } from '@/components/owneronly';
+import { useTxPanel } from '@/components/txpanelctx';
 
 const cents = (text: string) => Math.round(Number(text.replace(/[$,\s]/g, '')) * 100);
 const GROUPS = [{ id: 'insurance', label: 'Insurance' }, { id: 'retirement', label: 'Retirement' }, { id: 'other', label: 'Other' }] as const;
@@ -68,6 +68,7 @@ function Income() {
   const C = useColors();
   const input = useInputStyle();
   const { txns, accounts, income, saveIncome, links, months, period, setPeriod, range } = useRepo();
+  const { openTxn } = useTxPanel();
   const receipts = useMemo(() => (links?.receipts ?? []).map((r) => ({ date: r.date ?? null, taxCents: r.taxCents ?? null })), [links]);
   const sum = useMemo(() => summarizeIncome(txns, accounts, income, range, receipts), [txns, accounts, income, range, receipts]);
   const matches = useMemo(() => matchAll(income.records, txns, accounts), [income.records, txns, accounts]);
@@ -207,7 +208,7 @@ function Income() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: S.sm }}><T size={14} style={{ flex: 1 }}>{dayLabel(t.date)}  {t.merchant}</T><T size={14} bold>{dollars(t.cents, { decimals: true })}</T></View>
               <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
                 {income.sources.map((s) => <Chip key={s.id} label={s.name} onPress={() => saveIncome(assignDeposit(income, t.id, s.id))} />)}
-                <Button small kind="ghost" label="See it" onPress={() => router.push({ pathname: '/txn/[id]', params: { id: t.id } })} />
+                <Button small kind="ghost" label="See it" onPress={() => openTxn(t.id)} />
               </View>
             </View>
           ))}
@@ -318,7 +319,7 @@ function Income() {
                 </T>
               ) : <T size={12} tone="ink3">No deposits listed, so nothing to check on the statements.</T>}
               <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
-                {ms.filter((m) => m.txnId && txnById.get(m.txnId)).slice(0, 1).map((m) => <Button key={m.txnId} small kind="ghost" label="See a deposit" onPress={() => router.push({ pathname: '/txn/[id]', params: { id: m.txnId! } })} />)}
+                {ms.filter((m) => m.txnId && txnById.get(m.txnId)).slice(0, 1).map((m) => <Button key={m.txnId} small kind="ghost" label="See a deposit" onPress={() => openTxn(m.txnId!)} />)}
                 <Button small kind="ghost" label="Remove" onPress={() => saveIncome(removeRecord(income, r.id))} />
               </View>
             </View>
