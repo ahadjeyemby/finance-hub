@@ -43,7 +43,7 @@ export function Forecast({ d, view }: P) {
 }
 
 /** 13. What next month is made of: repeating bills against the everyday average, what is left out on purpose, and the bills seen once. */
-export function ForecastBuild({ d }: P) {
+export function ForecastBuild({ d, view }: P) {
   const { c } = useTheme();
   const w = d.forecastBuild;
   const f = w.forecast;
@@ -65,7 +65,8 @@ export function ForecastBuild({ d }: P) {
   const pending = f ? f.oneOffsExcluded.filter((o) => !o.confirmed) : [];
   const confirmed = f ? f.oneOffsExcluded.filter((o) => o.confirmed) : [];
   return (
-    <Widget title={`What ${longMonth(w.target)} is made of`} sub={f ? `Forecast ${whole(f.total)}, likely ${whole(f.low)} to ${whole(f.high)}` : undefined} state={w} ghost="split">
+    <Widget title={`What ${longMonth(w.target)} is made of`} sub={f ? `Forecast ${whole(f.total)}, likely ${whole(f.low)} to ${whole(f.high)}` : undefined} state={w} ghost="split"
+      askAction={w.ask && !w.ask.questionIds.length ? <LinkButton label={view === 'plan' ? 'Mark them in Bills seen once' : 'Open Plan ahead'} onPress={() => router.setParams({ view: 'plan' })} /> : undefined}>
       {f ? (
         <>
           <SplitBar height={28} parts={[{ value: f.recurringTotal, color: c.accent }, { value: f.variableTotal, color: c.flexC }]}
@@ -100,7 +101,7 @@ export function Pace({ d }: P) {
             {[1, mid, w.daysInMonth].map((day) => <Text key={day} style={{ fontFamily: F.body, fontSize: 12, color: c.ink3 }}>{shortMonth(w.month)} {day}</Text>)}
           </View>
           <Text style={{ fontFamily: F.body, fontSize: 14, color: c.ink2 }}>
-            <Text style={{ fontFamily: F.bodyBold, color: c.ink }}>{exact(w.spent)}</Text> in {w.days} days. A straight line to the forecast would be {whole(Math.round((w.forecast * w.days) / w.daysInMonth))} by now.
+            <Text style={{ fontFamily: F.bodyBold, color: c.ink }}>{exact(w.spent)}</Text> in {w.days} days. A straight line to the forecast would be {whole(w.expectedByNow ?? 0)} by now.
           </Text>
         </>
       ) : null}
@@ -124,7 +125,7 @@ export function BillsOnce({ d }: P) {
       {w.bills.length ? w.bills.map((b) => (
         <View key={b.txnId} style={{ gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: c.line }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-            <View><Text style={{ fontFamily: F.bodyBold, fontSize: 15, color: c.ink }}>{b.merchant}</Text><Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink3 }}>Seen {dayLabel(b.date)}</Text></View>
+            <View style={{ flex: 1, minWidth: 0 }}><Text numberOfLines={2} style={{ fontFamily: F.bodyBold, fontSize: 15, color: c.ink }}>{b.merchant}</Text><Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink3 }}>Seen {dayLabel(b.date)}</Text></View>
             <Text style={[{ fontFamily: F.bodyBold, fontSize: 15, color: c.ink }, TABULAR]}>{exact(b.cents)}</Text>
           </View>
           <View accessibilityRole="radiogroup" accessibilityLabel={`${b.merchant}: repeats or one-time`} style={{ flexDirection: 'row', gap: 6 }}>

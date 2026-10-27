@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useColorScheme } from 'react-native';
 
-import { CATEGORY_COLORS, PALETTES, SERIES_BY_SCHEME } from './tokens';
+import { BIGBOX_SHADES, CATEGORY_COLORS, PALETTES, SERIES_BY_SCHEME } from './tokens';
 import type { CategoryGroup, Palette, Scheme } from './tokens';
 
 /** What the person chose: follow the system, or always light or dark. */
@@ -16,6 +16,7 @@ export interface Theme {
   c: Palette;
   cat: Record<CategoryGroup, string>;
   series: readonly string[];
+  bigbox: readonly string[];
   setMode: (m: ThemeMode) => void;
   /** flip between light and dark; the choice is kept on this device */
   toggle: () => void;
@@ -24,7 +25,7 @@ export interface Theme {
 const KEY = 'finora.theme';
 
 const themeFor = (scheme: Scheme, mode: ThemeMode, setMode: (m: ThemeMode) => void): Theme => ({
-  scheme, mode, c: PALETTES[scheme], cat: CATEGORY_COLORS[scheme], series: SERIES_BY_SCHEME[scheme],
+  scheme, mode, c: PALETTES[scheme], cat: CATEGORY_COLORS[scheme], series: SERIES_BY_SCHEME[scheme], bigbox: BIGBOX_SHADES[scheme],
   setMode, toggle: () => setMode(scheme === 'dark' ? 'light' : 'dark'),
 });
 

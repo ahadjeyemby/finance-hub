@@ -15,9 +15,8 @@ type P = { d: DashboardData };
 export function Attention({ d }: P) {
   const { c } = useTheme();
   const w = d.attention;
-  const top = w.top.reduce((s, q) => s + q.cents, 0);
   return (
-    <Widget title="Needs your attention" sub={w.count ? `The top ${w.top.length} cover ${exact(top)}` : 'Nothing is waiting'} state={w} ghost="list" gap={12}
+    <Widget title="Needs your attention" sub={w.count ? `The top ${w.top.length} cover ${exact(w.topCents)}` : 'Nothing is waiting'} state={w} ghost="list" gap={12}
       right={<Chip label={`${w.count} open`} tone={w.count ? 'accent' : 'good'} />}>
       {w.count ? (
         <View>

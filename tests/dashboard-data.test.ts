@@ -336,6 +336,35 @@ test('the basket recommendation counts items that cost more at a store against i
   assert.equal(best.savingPerBasket, (350 - 400) + (250 - 300) + (25000 - 20000));
 });
 
+// ---- fixes from the phase 5 review ---------------------------------------------------------------------------------------------------
+
+test('a bill added by hand is a household bill: it stays out of the Business view', () => {
+  const i = inputFor('full');
+  const recurring = addManual(i.ctx.recurring, { merchant: 'Hilltop Storage', cents: 100000, cadence: 'monthly', anchor: '2026-10-01' });
+  const withBill = { ...i, ctx: { ...i.ctx, recurring } };
+  const biz = dashboardData(withBill, 'business');
+  assert.ok(!biz.subscriptions.rows.some((r) => r.merchant === 'Hilltop Storage'));
+  assert.equal(biz.forecast.forecast!.recurringTotal, dashboardData(i, 'business').forecast.forecast!.recurringTotal);
+  assert.ok(dashboardData(withBill, 'personal').subscriptions.rows.some((r) => r.merchant === 'Hilltop Storage'));
+});
+
+test('a refund larger than its group never pushes a slice past 100%', () => {
+  const tx = (id: string, category: string, cents: number, kind: Txn['kind'] = 'spend'): Txn => ({ id, accountId: 'meadow-card-0202', date: '2026-09-03', description: id, merchant: id, cents, kind, category, source: 't' });
+  const d = data('empty', 'all', { txns: [tx('g', 'groceries', -10000), tx('r', 'travel', 5000, 'refund')] });
+  assert.equal(d.donut.total, 5000);
+  assert.equal(d.donut.netCredit, 5000);
+  assert.ok(d.donut.slices.every((s) => s.share <= 1));
+  assert.equal(d.donut.slices.reduce((s, x) => s + x.share, 0), 1);
+});
+
+test('fixed bills vs everyday asks for the bills it found to be confirmed', () => {
+  const i = inputFor('full');
+  const noOneOffs = { ...i, questions: i.questions.filter((q) => q.type !== 'one_off') };
+  const d = dashboardData(noOneOffs, 'personal');
+  assert.equal(d.fixedFlex.readiness, 'answers');
+  assert.match(d.fixedFlex.ask!.text, /not confirmed/);
+});
+
 // ---- views -------------------------------------------------------------------------------------------------------------------------------
 
 test('each view counts its own spending: Household leaves business out, Business counts only business', () => {

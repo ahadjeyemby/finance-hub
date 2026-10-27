@@ -26,7 +26,7 @@ export function CutIdeas({ d }: P) {
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ fontFamily: F.bodyBold, fontSize: 15, color: c.ink }}>{i.title}</Text>
               <Text style={{ marginTop: 2, fontFamily: F.body, fontSize: 14, lineHeight: 20, color: c.ink2 }}>{i.text}</Text>
-              <Pressable accessibilityRole="link" onPress={() => go(i.action.kind)} style={{ minHeight: 32, justifyContent: 'center', alignSelf: 'flex-start' }}>
+              <Pressable accessibilityRole="link" onPress={() => go(i.action.kind)} style={{ minHeight: MIN_TOUCH, justifyContent: 'center', alignSelf: 'flex-start' }}>
                 <Text style={{ fontFamily: F.bodyBold, fontSize: 13, color: c.accentInk }}>{i.action.label}</Text>
               </Pressable>
             </View>
@@ -78,10 +78,9 @@ export function Subscriptions({ d }: P) {
     <Widget title="Repeating bills" sub={w.rows.length ? `${exact(w.monthly)} a month, ${exact(w.yearly)} a year` : 'Nothing repeats yet'} state={w} ghost="list"
       askAction={<Pressable accessibilityRole="link" onPress={() => go('recurring')} style={{ minHeight: MIN_TOUCH, justifyContent: 'center' }}><Text style={{ fontFamily: F.bodyBold, fontSize: 13, color: c.warnInk, textDecorationLine: 'underline' }}>Confirm bills</Text></Pressable>}>
       {w.rows.length ? (
-        <BarRows rows={w.rows.slice(0, 8).map((r) => ({ key: r.key, name: r.merchant, value: r.monthly, text: exact(r.monthly) }))}
+        <BarRows rows={w.rows.map((r) => ({ key: r.key, name: r.merchant, value: r.monthly, text: exact(r.monthly) }))}
           label={`Repeating bills per month: ${w.rows.map((r) => `${r.merchant} ${exact(r.monthly)}`).join(', ')}`} />
       ) : <Text style={{ fontFamily: F.body, fontSize: 14, color: c.ink2 }}>No charge has repeated on the statements so far. A bill you pay elsewhere can be added by hand.</Text>}
-      {w.rows.length > 8 ? <Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink3 }}>and {w.rows.length - 8} more</Text> : null}
       <WideButton label="Review repeating bills" onPress={() => go('recurring')} />
     </Widget>
   );
@@ -97,7 +96,7 @@ export function Grocery({ d }: P) {
         {w.rows.map((r) => (
           <View key={r.item} accessible accessibilityLabel={`${r.item}: cheapest at ${r.store}, ${exact(r.price)}, ${exact(r.save)} less than at ${r.next}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, borderTopWidth: 1, borderTopColor: c.line }}>
             <Text style={{ flex: 1, fontFamily: F.body, fontSize: 14, color: c.ink }} numberOfLines={1}>{r.item}</Text>
-            <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: c.goodSoft }}><Text style={[{ fontFamily: F.bodyBold, fontSize: 12, color: c.goodInk }, TABULAR]}>{r.store} {exact(r.price)}</Text></View>
+            <View style={{ flexShrink: 1, maxWidth: '55%', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: c.goodSoft }}><Text numberOfLines={1} style={[{ fontFamily: F.bodyBold, fontSize: 12, color: c.goodInk }, TABULAR]}>{r.store} {exact(r.price)}</Text></View>
             <Text style={[{ minWidth: 54, textAlign: 'right', fontFamily: F.bodyBold, fontSize: 14, color: c.ink }, TABULAR]}>-{exact(r.save)}</Text>
           </View>
         ))}
@@ -113,18 +112,19 @@ export function Grocery({ d }: P) {
 
 /** 10. Big-box stores: spending split by store, with the way to split it by item. */
 export function BigBox({ d }: P) {
-  const { c, cat } = useTheme();
+  const { c, bigbox } = useTheme();
   const w = d.bigbox;
-  const shades = [cat.bigbox, mix(cat.bigbox, c.paper, 0.45), mix(cat.bigbox, c.ink, 0.35), mix(cat.bigbox, c.paper, 0.7)];
+  // the first three stores in shades of the big-box colour, any others in the Everything else grey
+  const shades = [...bigbox, c.other];
   return (
     <Widget title="Big-box stores" sub={w.total > 0 ? `${monthSpan(d.donut.from, d.donut.to)}, ${exact(w.total)}` : monthSpan(d.donut.from, d.donut.to)} state={w} ghost="split">
       {w.rows.length ? (
         <>
-          <SplitBar parts={w.rows.map((r, i) => ({ value: r.cents, color: shades[i % shades.length] }))} label={w.rows.map((r) => `${r.merchant} ${pct0(r.share)}`).join(', ')} />
+          <SplitBar parts={w.rows.map((r, i) => ({ value: r.cents, color: shades[Math.min(i, shades.length - 1)] }))} label={w.rows.map((r) => `${r.merchant} ${pct0(r.share)}`).join(', ')} />
           <View style={{ gap: 6 }}>
             {w.rows.map((r, i) => (
               <View key={r.merchant} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 32 }}>
-                <View style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: shades[i % shades.length] }} />
+                <View style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: shades[Math.min(i, shades.length - 1)] }} />
                 <Text style={{ flex: 1, fontFamily: F.body, fontSize: 14, color: c.ink }}>{r.merchant}</Text>
                 <Text style={[{ fontFamily: F.bodyBold, fontSize: 14, color: c.ink }, TABULAR]}>{exact(r.cents)}</Text>
                 <Text style={[{ width: 44, textAlign: 'right', fontFamily: F.body, fontSize: 14, color: c.ink3 }, TABULAR]}>{pct0(r.share)}</Text>
@@ -162,11 +162,4 @@ export function Fuel({ d }: P) {
         : <Text style={{ fontFamily: F.body, fontSize: 14, color: c.ink2 }}>No fuel on the statements so far.</Text>}
     </Widget>
   );
-}
-
-/** Blend two hex colours: shades of one category colour for the stores inside it. */
-function mix(a: string, b: string, t: number): string {
-  const p = (h: string) => { const n = parseInt(h.replace('#', '').slice(0, 6), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
-  const [x, y] = [p(a), p(b)];
-  return `#${x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')}`;
 }

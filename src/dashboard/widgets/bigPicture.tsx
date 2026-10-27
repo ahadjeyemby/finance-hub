@@ -18,7 +18,7 @@ function Tile({ label, children, foot, hero, dashed }: { label: string; children
   return (
     <View style={{ flexGrow: 1, flexBasis: 220, minHeight: 150, borderRadius: R.card, paddingVertical: 20, paddingHorizontal: 22, gap: 6,
       backgroundColor: hero ? c.hero : c.paper, borderWidth: hero ? 0 : 1, borderStyle: dashed ? 'dashed' : 'solid', borderColor: dashed ? c.line2 : c.line }}>
-      <Text style={{ fontFamily: F.bodySemi, fontSize: 14, color: hero ? '#FFFFFF' : c.ink2 }}>{label}</Text>
+      <Text style={{ fontFamily: F.bodySemi, fontSize: 14, color: hero ? c.onHero : c.ink2 }}>{label}</Text>
       {children}
       {foot ? <View style={{ marginTop: 'auto' }}>{foot}</View> : null}
     </View>
@@ -28,7 +28,7 @@ function Tile({ label, children, foot, hero, dashed }: { label: string; children
 function TileChip({ text, tone }: { text: string; tone: 'hero' | 'warn' | 'plain' }) {
   const { c } = useTheme();
   const bg = tone === 'hero' ? c.heroChip : tone === 'warn' ? c.warnBg : c.seg;
-  const ink = tone === 'hero' ? '#FFFFFF' : tone === 'warn' ? c.warnInk : c.ink2;
+  const ink = tone === 'hero' ? c.onHero : tone === 'warn' ? c.warnInk : c.ink2;
   return <View style={{ alignSelf: 'flex-start', minHeight: 28, paddingHorizontal: 10, borderRadius: 14, backgroundColor: bg, justifyContent: 'center' }}><Text style={[{ fontFamily: F.bodyBold, fontSize: 13, color: ink }, TABULAR]}>{text}</Text></View>;
 }
 
@@ -44,7 +44,7 @@ export function Kpis({ d }: P) {
       {k.readiness === 'answers' && k.ask ? <AskStrip ask={k.ask} /> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
         <Tile hero label={`Spent ${k.month ? 'in ' : 'across '}${when}`} foot={<TileChip tone="hero" text={change ?? ('none' in k.change ? (k.complete ? 'No month to compare with' : 'Not finished yet') : '')} />}>
-          <BigMoney cents={k.spent} color="#FFFFFF" centsColor={c.heroSoft} />
+          <BigMoney cents={k.spent} color={c.onHero} centsColor={c.heroSoft} />
         </Tile>
         <Tile label="Earned" foot={k.unconfirmed > 0 ? <TileChip tone="warn" text="Not confirmed yet" /> : <Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink2 }}>{k.incomeIncomplete ? 'Only the connected accounts are counted' : 'Deposits confirmed'}</Text>}>
           <BigMoney cents={k.earned} />
@@ -113,6 +113,7 @@ export function Donut({ d }: P) {
           ))}
         </View>
       ) : <Text style={{ fontFamily: F.body, fontSize: 14, color: c.ink2 }}>No spending on the statements so far.</Text>}
+      {w.netCredit > 0 ? <Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink3 }}>{exact(w.netCredit)} of refunds came back in a category with less spending than that, so it has no slice; the total is after refunds.</Text> : null}
     </Widget>
   );
 }
