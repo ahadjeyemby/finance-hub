@@ -107,7 +107,7 @@ function Columns({ ctx, scope, colorOf, onOpen }: Props) {
               const fg = n.hatch ? C.ink : readableOn(col);
               return (
                 <Pressable key={n.id} accessibilityRole="button" aria-selected={picked} accessibilityLabel={`${n.label}, ${dollars(n.cents)}${n.hatch ? ', no item detail' : ''}`}
-                  onPress={() => (isLeaf(n) ? undefined : select(n, k))}
+                  onPress={() => (isLeaf(n) ? (n.hatch ? onOpen?.(graphFilter(n.path, scope)) : undefined) : select(n, k))}
                   style={{ position: 'absolute', left: k * (colW + GAP), top: y, width: colW, height: h, borderRadius: 6, paddingHorizontal: 8, justifyContent: 'center', backgroundColor: n.hatch ? C.paper : col, borderWidth: picked ? 2 : n.hatch ? 1.5 : 0, borderColor: picked ? C.ink : col, borderStyle: n.hatch && !picked ? 'dashed' : 'solid', opacity: dim ? 0.55 : 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 4 }}>
                     <T size={12} bold numberOfLines={1} style={{ color: fg, flex: 1 }}>{n.label}</T>
@@ -175,7 +175,7 @@ function OutlineRow({ n, depth, open, toggle, ctx, scope, colorOf, onOpen }: { n
   return (
     <View>
       <Pressable accessibilityRole="button" aria-expanded={leaf ? undefined : isOpen} accessibilityLabel={`${n.label}, ${dollars(n.cents)}`}
-        onPress={() => (leaf ? undefined : toggle(n.id))} onLongPress={() => onOpen?.(graphFilter(n.path, scope))}
+        onPress={() => (leaf ? (n.hatch ? onOpen?.(graphFilter(n.path, scope)) : undefined) : toggle(n.id))} onLongPress={() => onOpen?.(graphFilter(n.path, scope))}
         style={{ minHeight: 52, paddingLeft: 4 + depth * 16, paddingRight: 6, flexDirection: 'row', alignItems: 'center', gap: S.sm }}>
         <T size={16} tone="ink3" style={{ width: 16, textAlign: 'center' }}>{leaf ? '' : isOpen ? '−' : '+'}</T>
         <View style={{ flex: 1, gap: 3 }}>
