@@ -172,7 +172,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const selComplete = selMonth ? complete.has(selMonth) : false;
   const incomeQs = touching(qOf('confirm_income'), new Set(unconfirmedTxns.map((t) => t.id)));
   const moneyState = !selCovered ? locked(selMonth ? 'No statement covers this month yet.' : NO_STATEMENT)
-    : askIf(incomeQs, (n) => `${plural(n, 'deposit question')} decide what counts as Earned.`);
+    : askIf(incomeQs, (n) => `${plural(n, 'deposit question')} ${n === 1 ? 'decides' : 'decide'} what counts as Earned.`);
   const prev = selMonth ? addMonths(selMonth, -1) : null;
   const change: KpisData['change'] = !selMonth ? { none: 'Pick a month to compare it with the one before.' }
     : !selComplete ? { none: 'This month is not complete yet, so it is not compared.' }
