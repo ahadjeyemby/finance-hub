@@ -5,13 +5,15 @@ import type { Analysis, Gap, ReadingDiff, ReceiptDiff, StatementDraft } from '@/
 import type { ReceiptRecord } from '@/core/evidence';
 import { addRow, flipRow, MAX_HINT, removeRow } from '@/core/intake';
 import { dollars } from '@/core/queries';
-import { C, F, R, S } from '@/theme/tokens';
-import { Banner, Button, Chip, T } from '@/theme/ui';
+import { R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
+import { Banner, Button, Chip, T, useInputStyle } from '@/theme/ui';
 
-export const input = { minHeight: 44, borderRadius: R.md, backgroundColor: C.ground, paddingHorizontal: S.md, fontFamily: F.body, fontSize: 15, color: C.ink } as const;
 
 /** One text box. Its value is applied when the person leaves the box, presses Enter, or presses the button that appears as soon as the text differs, so an edit is never silently waiting. Remounts (via key) when the stored value changes. */
 export function FieldInput({ label, value, onCommit, multiline, error }: { label: string; value: string; onCommit: (text: string) => void; multiline?: boolean; error?: string }) {
+  const C = useColors();
+  const input = useInputStyle();
   const [text, setText] = useState(value);
   return (
     <View style={{ gap: 2 }}>
@@ -28,6 +30,8 @@ export function FieldInput({ label, value, onCommit, multiline, error }: { label
 
 /** A question the document left open: type the answer, pick one, or say it is not printed. */
 export function GapForm({ gap, onAnswer, onSkip, error }: { gap: Gap; onAnswer: (text: string) => void; onSkip: () => void; error?: string }) {
+  const C = useColors();
+  const input = useInputStyle();
   const [text, setText] = useState('');
   const options = gap.options ?? [];
   return (
@@ -82,6 +86,8 @@ export function Findings({ analysis, errors, onAnswer, onSkip, onAcknowledge, ma
 
 /** Statement rows with the two fixes that cover most reading mistakes, plus a way to add a row the reader missed. */
 export function RowsEditor({ draft, onChange }: { draft: StatementDraft; onChange: (d: StatementDraft) => void }) {
+  const C = useColors();
+  const input = useInputStyle();
   const [date, setDate] = useState(''); const [desc, setDesc] = useState(''); const [amt, setAmt] = useState(''); const [err, setErr] = useState('');
   const [all, setAll] = useState(false);
   const rows = all ? draft.rows : draft.rows.slice(0, 8);
@@ -133,6 +139,8 @@ export function RereadBox({ open, busy, error, proposal, used, max, models, onTo
   open: boolean; busy: boolean; error?: string; proposal?: Proposal; used: number; max: number; models: string[];
   onToggle: () => void; onSend: (text: string, model?: string) => void; onUse: () => void; onKeep: () => void;
 }) {
+  const C = useColors();
+  const input = useInputStyle();
   const [text, setText] = useState('');
   const [model, setModel] = useState<string | undefined>(undefined);
   const left = max - used;
@@ -177,6 +185,8 @@ export interface ReceiptProposal { record: ReceiptRecord; diff: ReceiptDiff; hin
 export function ReceiptAgainBox({ busy, error, proposal, used, max, models, onRetry, onUse, onKeep }: {
   busy: boolean; error?: string; proposal?: ReceiptProposal; used: number; max: number; models: string[]; onRetry: (model?: string, hint?: string) => void; onUse: () => void; onKeep: () => void;
 }) {
+  const C = useColors();
+  const input = useInputStyle();
   const left = max - used;
   const [model, setModel] = useState<string | undefined>(undefined);
   const [noting, setNoting] = useState(false);

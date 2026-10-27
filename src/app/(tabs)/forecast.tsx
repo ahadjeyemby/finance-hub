@@ -6,11 +6,13 @@ import { dayLabel, monthLabel } from '@/core/dates';
 import { forecastMonth } from '@/core/forecast';
 import { dollars } from '@/core/queries';
 import { useRepo } from '@/data/repo';
-import { C, F } from '@/theme/tokens';
+import { F } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Banner, Card, Row, Screen, T } from '@/theme/ui';
 import { Text } from 'react-native';
 
 export default function Forecast() {
+  const C = useColors();
   const { ctx, forecastMonth: month, dataTo } = useRepo();
   const fc = forecastMonth(ctx, month, dataTo);
   const rows = fc.variableByCategory.map((v) => ({ key: v.category, label: v.label || categoryLabel(v.category), value: v.estimate }));

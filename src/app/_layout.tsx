@@ -1,5 +1,5 @@
-import { BricolageGrotesque_600SemiBold, BricolageGrotesque_700Bold } from '@expo-google-fonts/bricolage-grotesque';
-import { HankenGrotesk_400Regular, HankenGrotesk_500Medium, HankenGrotesk_700Bold, useFonts } from '@expo-google-fonts/hanken-grotesk';
+import { PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
+import { Sora_600SemiBold, Sora_700Bold, useFonts } from '@expo-google-fonts/sora';
 import { Slot, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -11,14 +11,15 @@ import { SignIn } from '@/components/signin';
 import { SavedCopyNote } from '@/components/source';
 import { ViewSwitch } from '@/components/viewswitch';
 import { RepoProvider, useRepo } from '@/data/repo';
-import { C } from '@/theme/tokens';
+import { ThemeProvider, useColors, useTheme } from '@/theme/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function Gate() {
+  const C = useColors();
   const { ready, auth, hasData } = useRepo();
   const pathname = usePathname();
-  const [fonts, fontError] = useFonts({ BricolageGrotesque_600SemiBold, BricolageGrotesque_700Bold, HankenGrotesk_400Regular, HankenGrotesk_500Medium, HankenGrotesk_700Bold });
+  const [fonts, fontError] = useFonts({ Sora_600SemiBold, Sora_700Bold, PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold });
   useEffect(() => { if (ready && (fonts || fontError)) SplashScreen.hideAsync().catch(() => {}); }, [ready, fonts, fontError]);
   if (!ready || (!fonts && !fontError)) return <View style={{ flex: 1, backgroundColor: C.ground }} />;
   // with a backend configured, nothing is shown until someone signs in
@@ -29,11 +30,18 @@ function Gate() {
   return <View style={{ flex: 1, backgroundColor: C.ground }}><SavedCopyNote /><ViewSwitch /><Slot /></View>;
 }
 
+function ThemedStatusBar() {
+  const { scheme } = useTheme();
+  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
+}
+
 export default function Root() {
   return (
-    <RepoProvider>
-      <StatusBar style="dark" />
-      <Gate />
-    </RepoProvider>
+    <ThemeProvider>
+      <RepoProvider>
+        <ThemedStatusBar />
+        <Gate />
+      </RepoProvider>
+    </ThemeProvider>
   );
 }

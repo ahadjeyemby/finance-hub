@@ -32,6 +32,9 @@ export interface Account {
   owner?: string;
 }
 
+/** The days one saved statement covers for one account (both inclusive). Months are only complete where these leave no gap. */
+export interface StatementPeriod { accountId: string; from: string; to: string }
+
 export interface Txn {
   id: string;
   /** whose data this is, when more than one person's is on screen (an admin looking at their members). Missing = the signed-in person's own. */
@@ -89,7 +92,7 @@ export type Hint =
 
 export type CategoryId =
   | 'groceries' | 'household' | 'clothing' | 'fuel' | 'restaurants' | 'medical'
-  | 'auto' | 'insurance' | 'phone' | 'subscriptions' | 'travel' | 'education'
+  | 'auto' | 'insurance' | 'housing' | 'utilities' | 'phone' | 'subscriptions' | 'travel' | 'education'
   | 'giving' | 'personal_care' | 'online_shopping' | 'mixed_retail' | 'electronics'
   | 'entertainment' | 'government' | 'people' | 'other' | 'uncategorized'
   /** a category the person added (see categories.ts) */

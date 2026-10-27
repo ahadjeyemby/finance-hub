@@ -6,7 +6,7 @@ import { AppState } from 'react-native';
 
 import { applyAnswer, cashToTxn, undoAnswer } from '@/core/answers';
 import { addMonths, monthEnd, monthOf, monthStart, monthsBetween, todayISO } from '@/core/dates';
-import { applyOverlay, runQuery } from '@/core/queries';
+import { applyOverlay } from '@/core/queries';
 import type { Ctx, Filter } from '@/core/queries';
 import { buildQuestions } from '@/core/questions';
 import { emptyIncome } from '@/core/income';
@@ -18,8 +18,8 @@ import type { ReportSpec } from '@/core/report';
 import { adoptUploadStamps, makeLedgerCache, mergeOverlays, overlayIsEmpty, ownerTag, ownerVerdict, parseLedgerCache, stampUploads } from '@/core/sync';
 import type { LedgerKind } from '@/core/sync';
 import { emptyOverlay } from '@/core/types';
-import type { Account, CategoryId, Overlay, Question, Txn } from '@/core/types';
-import { C, SERIES } from '@/theme/tokens';
+import type { Account, CategoryId, Overlay, Question, StatementPeriod, Txn } from '@/core/types';
+import { useTheme } from '@/theme/theme';
 import { setCurrentUser } from './scope';
 import { fetchLedger, fetchOverlay, pushOverlay } from './sync';
 import { fetchTeamData } from './team';
@@ -31,20 +31,24 @@ import { canManage } from '@/core/workspace';
 import type { Access, Member } from '@/core/workspace';
 import { combineTeam, inView, mergeCategoryConfigs, mergeIncomes, mergeTagStates, ownCategoryConfig, ownIncomeState, ownTagState } from '@/core/team';
 import type { PersonData, Viewing } from '@/core/team';
-import { setCategoryConfig } from '@/core/categories';
+import { colorGroupOf, setCategoryConfig } from '@/core/categories';
 import type { CategoryConfig } from '@/core/categories';
 import { DEFAULT_TAGS, applyTags } from '@/core/tags';
 import type { TagState } from '@/core/tags';
 import { projectRef, supabase } from './supabase';
+import { fixture, isFixtureKind } from '@/dev/fixture';
 
-const KEY = 'audit.overlay.v1';
+const FIXTURE_ENV = process.env.EXPO_PUBLIC_FIXTURE;
+/** Development only, and never with a backend: a fictional ledger (src/dev/fixture.ts) so the screens can be seen without anyone's real data. */
+const FIXTURE = !supabase && __DEV__ && isFixtureKind(FIXTURE_ENV) ? FIXTURE_ENV : null;
+const KEY = FIXTURE ? `audit.overlay.fixture.${FIXTURE}` : 'audit.overlay.v1';
 const LEDGER_KEY = 'audit.ledger.v1';
 const DIRTY_KEY = 'audit.dirty.v1';
 const SYNCED_KEY = 'audit.synced.v1';
 const OWNER_KEY = 'audit.owner.v1';
 export type Scope = 'all' | 'personal' | 'business';
 
-interface Seed { accounts: Account[]; txns: Txn[] }
+interface Seed { accounts: Account[]; txns: Txn[]; statements?: StatementPeriod[] }
 /** The app ships with no ledger. Statement data comes only from the person's own database. */
 const EMPTY: Seed = { accounts: [], txns: [] };
 
@@ -146,7 +150,7 @@ export interface Repo {
   links: LinkData | null;
   /** fetch the links again, after one was saved or changed */
   reloadLinks: () => Promise<void>;
-  /** stable colour per category: top five by all-time spend get a series colour, the rest are grey */
+  /** the fixed colour of a category: one of six colour groups (travel, big-box, groceries, fuel, medical, everything else) */
   colorOf: (category: string) => string;
   reset: () => void;
 }
@@ -154,9 +158,10 @@ export interface Repo {
 const Ctx_ = createContext<Repo | null>(null);
 
 export function RepoProvider({ children }: { children: ReactNode }) {
+  const { cat } = useTheme();
   const configured = !!supabase;
   const [overlay, setOverlay] = useState<Overlay>(emptyOverlay());
-  const [ledger, setLedger] = useState<Seed>(EMPTY);
+  const [ledger, setLedger] = useState<Seed>(FIXTURE ? fixture(FIXTURE) : EMPTY);
   const [linkData, setLinkData] = useState<LinkData | null>(null);
   const [team, setTeam] = useState<{ access: Access | null; members: Member[]; data: PersonData[] }>({ access: null, members: [], data: [] });
   const [viewingState, setViewingState] = useState<Viewing>('me');
@@ -181,6 +186,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
       try {
         const raw = await AsyncStorage.getItem(KEY);
         if (raw) { const o = { ...emptyOverlay(), ...JSON.parse(raw) } as Overlay; overlayRef.current = o; setOverlay(o); }
+        else if (FIXTURE) { const o = fixture(FIXTURE).overlay; overlayRef.current = o; setOverlay(o); }
         if (configured) {
           const dirty = await AsyncStorage.getItem(DIRTY_KEY);
           const synced = await AsyncStorage.getItem(SYNCED_KEY);
@@ -353,11 +359,6 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     ? { from: dataFrom, to: lastDate, label: 'All data', complete: false }
     : { from: monthStart(period), to: monthEnd(period), label: period, complete: monthEnd(period) <= completeTo }, [period, dataFrom, lastDate, completeTo]);
 
-  const colors = useMemo(() => {
-    const top = runQuery({ metric: 'spend', groupBy: 'category', sort: 'value_desc', limit: 5 }, ctx).rows.map((r) => r.key);
-    return new Map(top.map((k, i) => [k, SERIES[i]]));
-  }, [ctx]);
-
   const teamApi = useMemo<TeamApi>(() => ({
     access: team.access, members: team.members, me: userId, viewing, setViewing: setViewingState, active: team.data.length > 0,
     dataOf: (who) => (who === 'me' || who === userId ? { accounts: ledger.accounts, txns: ledger.txns, links: linkData } : team.data.find((m) => m.id === who) ?? null),
@@ -399,9 +400,9 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     recurring: overlay.recurring ?? emptyRecurring(), saveRecurring: (next) => commit({ ...overlayRef.current, recurring: next }),
     categoryConfig: categories, saveCategoryConfig: (next) => commit({ ...overlayRef.current, categories: team.data.length ? ownCategoryConfig(next, mergeCategoryConfigs(undefined, team.data.map((m) => m.overlay.categories)), overlayRef.current.categories) : next }),
     attachReceipt: (txnId, lines, uri) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [txnId]: { ...o.patches[txnId], lines, receiptId: uri } } }); },
-    colorOf: (category) => colors.get(category) ?? C.other,
+    colorOf: (category) => cat[colorGroupOf(category)],
     reset: () => commit(emptyOverlay()),
-  }), [ready, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, colors, commit, baseLinks, reloadLinks, tagState, incomeAll, categories, team, teamApi]);
+  }), [ready, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, cat, commit, baseLinks, reloadLinks, tagState, incomeAll, categories, team, teamApi]);
 
   return <Ctx_.Provider value={value}>{children}</Ctx_.Provider>;
 }

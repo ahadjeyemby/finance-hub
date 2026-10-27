@@ -10,12 +10,14 @@ import { todayISO } from '@/core/dates';
 import { makePost } from '@/data/agentClient';
 import { useRepo } from '@/data/repo';
 import { withScope } from '@/lib/reportScope';
-import { C, R, S } from '@/theme/tokens';
+import { R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Banner, Button, Screen, T } from '@/theme/ui';
 
 const SUGGEST = ['How much did I spend on fuel in August?', 'What did I earn in July?', 'Biggest purchases this summer', 'What will I spend next month?'];
 
 export default function Ask() {
+  const C = useColors();
   const { ctx, scope, dataTo, dataFrom, colorOf, completeTo } = useRepo();
   const [log, setLog] = useState<{ q: string; a?: AgentResult; open?: boolean }[]>([]);
   const [busy, setBusy] = useState(false);

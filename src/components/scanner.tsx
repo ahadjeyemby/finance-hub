@@ -5,7 +5,8 @@ import { FULL_FRAME, isValidQuad, moveCorner, nearestCorner } from '@/core/scan'
 import type { Pt, Quad, ScanMode } from '@/core/scan';
 import { previewScan } from '@/data/scan';
 import type { Shot } from '@/data/scan';
-import { C, S } from '@/theme/tokens';
+import { S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Button, Segmented, T } from '@/theme/ui';
 
 const MODES: { value: ScanMode; label: string }[] = [{ value: 'gray', label: 'Black and white' }, { value: 'color', label: 'Colour' }, { value: 'original', label: 'As taken' }];
@@ -19,6 +20,7 @@ export function ScanReview({ shot, busy, error, onUse, onOriginal, onDiscard }: 
   shot: Shot; busy: boolean; error?: string;
   onUse: (quad: Quad, mode: ScanMode, turns: number) => void; onOriginal: () => void; onDiscard: () => void;
 }) {
+  const C = useColors();
   const [quad, setQuad] = useState<Quad>(shot.suggestion.quad);
   const [mode, setMode] = useState<ScanMode>('gray');
   const [turns, setTurns] = useState(0);

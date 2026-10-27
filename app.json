@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "finora",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#151D2D",
@@ -26,9 +26,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F4F6FA",
+          "backgroundColor": "#F4F5FA",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 132
+          "imageWidth": 132,
+          "dark": {
+            "backgroundColor": "#0D1320",
+            "image": "./assets/images/splash-icon.png"
+          }
         }
       ],
       "expo-font",

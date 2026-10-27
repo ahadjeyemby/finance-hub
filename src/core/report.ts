@@ -152,7 +152,7 @@ function colRange(g: GroupBy | undefined, key: string, f?: Filter): Filter {
 const CATEGORY_WORDS: [RegExp, CategoryId][] = [
   [/\b(fuel|gas|gasoline|petrol)\b/i, 'fuel'], [/\bgrocer(y|ies)\b|\bfood shopping\b/i, 'groceries'], [/\bmedical|doctor|health ?care|lab\b/i, 'medical'],
   [/\bcar (maintenance|repair)|\bauto\b|\bmaintenance\b/i, 'auto'], [/\bhousehold\b|\bsupplies\b/i, 'household'], [/\bclothing|clothes|shoes\b/i, 'clothing'],
-  [/\brestaurants?|dining|eating out\b/i, 'restaurants'], [/\binsurance\b/i, 'insurance'], [/\bphone\b|\butilities\b/i, 'phone'],
+  [/\brestaurants?|dining|eating out\b/i, 'restaurants'], [/\binsurance\b/i, 'insurance'], [/\bphone\b/i, 'phone'], [/\butilities\b/i, 'utilities'], [/\brent\b|\bmortgage\b|\bhousing\b/i, 'housing'],
   [/\bsubscriptions?|software\b/i, 'subscriptions'], [/\btravel|trip\b/i, 'travel'], [/\beducation|school|kids?|childcare\b/i, 'education'],
   [/\bgiving|donations?|charity\b/i, 'giving'], [/\bonline shopping|amazon\b/i, 'online_shopping'], [/\bwalmart|sam'?s|costco|big-box\b/i, 'mixed_retail'],
 ];

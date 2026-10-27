@@ -3,12 +3,15 @@ import { View } from 'react-native';
 import Svg, { Circle, G, Line, Path, Text as SvgText } from 'react-native-svg';
 
 import { dollars } from '@/core/queries';
-import { C, F, S } from '@/theme/tokens';
+import { F, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Measured, Readout, axisMoney, niceMax } from './common';
 import type { BarRow } from './bars';
 
 /** Line or area over ordered points (weeks, days, months). Touch or drag to read a point. */
-export function LineChart({ rows, area, height = 190, color = C.bar }: { rows: BarRow[]; area?: boolean; height?: number; color?: string }) {
+export function LineChart({ rows, area, height = 190, color: colorProp }: { rows: BarRow[]; area?: boolean; height?: number; color?: string }) {
+  const C = useColors();
+  const color = colorProp ?? C.bar;
   const [sel, setSel] = useState<number | null>(null);
   const top = niceMax(Math.max(0, ...rows.map((r) => r.value)));
   const cur = sel != null ? rows[sel] : undefined;

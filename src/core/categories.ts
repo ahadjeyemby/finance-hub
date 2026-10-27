@@ -8,7 +8,9 @@ export const CATEGORIES: Category[] = [
   { id: 'medical', label: 'Medical', group: 'need' },
   { id: 'auto', label: 'Car maintenance & registration', group: 'need' },
   { id: 'insurance', label: 'Insurance', group: 'need' },
-  { id: 'phone', label: 'Phone & utilities', group: 'need' },
+  { id: 'housing', label: 'Rent & mortgage', group: 'need' },
+  { id: 'utilities', label: 'Utilities', group: 'need' },
+  { id: 'phone', label: 'Phone & internet', group: 'need' },
   { id: 'education', label: 'Education & kids', group: 'need' },
   { id: 'personal_care', label: 'Personal care', group: 'need' },
   { id: 'government', label: 'Government & fees', group: 'need' },
@@ -67,6 +69,11 @@ export const everyCategory = (): Category[] => [...CATEGORIES, ...config.custom]
 export const categoryLabel = (id?: CategoryId | string): string => (resolveCategory(id) && lookup(resolveCategory(id)!)?.label) || 'Needs a category';
 export const categoryGroup = (id?: CategoryId): Category['group'] => (resolveCategory(id) && lookup(resolveCategory(id)!)?.group) || 'mixed';
 export const isCategoryId = (s: string): s is CategoryId => !!lookup(s);
+
+/** The six colour groups every chart uses (fixed per category, never reassigned): each category counts in exactly one. */
+export type ColorGroup = 'travel' | 'bigbox' | 'groceries' | 'fuel' | 'medical' | 'other';
+const COLOR_GROUP: Record<string, ColorGroup> = { travel: 'travel', mixed_retail: 'bigbox', groceries: 'groceries', fuel: 'fuel', medical: 'medical' };
+export const colorGroupOf = (id?: CategoryId | string): ColorGroup => COLOR_GROUP[resolveCategory(id) ?? ''] ?? 'other';
 
 /** An id for a category the person adds, from its name, that no other category has. */
 export function newCategoryId(label: string): string {

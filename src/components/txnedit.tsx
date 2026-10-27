@@ -6,10 +6,10 @@ import { parseLines } from '@/core/questions';
 import { dollars } from '@/core/queries';
 import type { Txn } from '@/core/types';
 import { useRepo } from '@/data/repo';
-import { C, F, R, S } from '@/theme/tokens';
-import { Button, Card, T } from '@/theme/ui';
+import { S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
+import { Button, Card, T, useInputStyle } from '@/theme/ui';
 
-const input = { minHeight: 44, borderRadius: R.md, backgroundColor: C.ground, paddingHorizontal: S.md, fontFamily: F.body, fontSize: 15, color: C.ink } as const;
 const REST = 'Other (not itemised)';
 
 /**
@@ -17,6 +17,8 @@ const REST = 'Other (not itemised)';
  * the bank said), but its name and its items can be changed, and each change can be taken back.
  */
 export function EditEntry({ txn }: { txn: Txn }) {
+  const C = useColors();
+  const input = useInputStyle();
   const { overlay, patchTxn, clearPatch, auth } = useRepo();
   const mine = !txn.owner || txn.owner === auth.userId;
   const patch = overlay.patches[txn.id];

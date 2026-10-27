@@ -41,7 +41,8 @@ import { canPickFolder, findDuplicate, loadStoredReceipts, makePicked, pickFiles
 import type { PickedFile } from '@/data/intake';
 import { useRepo } from '@/data/repo';
 import { supabase } from '@/data/supabase';
-import { C, R, S } from '@/theme/tokens';
+import { R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, Chip, Row, Screen, Segmented, T } from '@/theme/ui';
 
 interface Item {
@@ -172,6 +173,7 @@ function evaluateAll(items: Item[], ctx: Ctx): Map<string, Ev> {
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export default function Import() {
+  const C = useColors();
   const repo = useRepo();
   const { hasData, sync, addCash, reloadLinks, team } = repo;
   // whose data a document is added to: the signed-in person's, or (for an admin viewing one member) that member's. Everyone is treated as me.
@@ -643,6 +645,7 @@ const STATUS_TEXT: Record<BulkStatus, string> = { queued: 'Waiting', reading: 'R
 
 /** One line for a file that is waiting, being read, saving, or already saved. */
 function Line({ item }: { item: Item }) {
+  const C = useColors();
   return (
     <View style={{ gap: 2, paddingVertical: S.xs, paddingHorizontal: S.md, backgroundColor: C.paper, borderRadius: R.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: S.sm }}>
@@ -705,6 +708,7 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
   onReread: (text: string, model?: string) => void; onToggleAsk: () => void; onUseReading: () => void; onKeepReading: () => void;
   onRetryReceipt: (model?: string, hint?: string) => void; onUseReceipt: () => void; onKeepReceipt: () => void;
 }) {
+  const C = useColors();
   const title = item.file?.name ?? 'Receipt typed by hand';
   const tag = item.kind === 'statement' ? 'Statement' : 'Receipt';
   if (item.status === 'queued') return <Card title={title} right={<T size={12} tone="ink3">Waiting</T>}><T size={13} tone="ink2">In line to be read.</T><View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Discard" onPress={onRemove} /></View></Card>;

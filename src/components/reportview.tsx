@@ -13,13 +13,16 @@ import type { Ctx, QuerySpec } from '@/core/queries';
 import { runStack } from '@/core/report';
 import type { Block, ReportSpec } from '@/core/report';
 import { toBarRows } from '@/lib/rows';
-import { C, S, SERIES } from '@/theme/tokens';
+import { S } from '@/theme/tokens';
+import { useColors, useTheme } from '@/theme/theme';
 import { Banner, Button, Card, H, Row, T } from '@/theme/ui';
 import { TxnRow } from './txnrow';
 
 const fmt = (spec: QuerySpec, v: number) => (spec.metric === 'count' ? String(v) : dollars(v, { decimals: false }));
 
 function ChartBlock({ b, ctx, colorOf, completeTo }: { b: Extract<Block, { type: 'chart' }>; ctx: Ctx; colorOf: (c: string) => string; completeTo: string }) {
+  const C = useColors();
+  const { series: SERIES } = useTheme();
   const g = b.query.groupBy;
   const res = useMemo(() => runQuery(b.query, ctx), [b, ctx]);
   const rows = toBarRows(res.rows, g, completeTo);
@@ -40,6 +43,7 @@ function ChartBlock({ b, ctx, colorOf, completeTo }: { b: Extract<Block, { type:
 }
 
 export function ReportView({ spec, ctx, colorOf, dataTo, completeTo }: { spec: ReportSpec; ctx: Ctx; colorOf: (c: string) => string; dataTo: string; completeTo: string }) {
+  const C = useColors();
   const empty = spec.period.from > dataTo;
   return (
     <View style={{ gap: S.lg }}>

@@ -9,12 +9,14 @@ import { formatStamp } from '@/core/sync';
 import type { Txn } from '@/core/types';
 import { fetchEvidence } from '@/data/evidence';
 import type { Evidence } from '@/data/evidence';
-import { C, F, R, S } from '@/theme/tokens';
+import { F, R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Button, H, T } from '@/theme/ui';
 
 const cents = (c: number | null | undefined) => (c == null ? '' : dollars(c));
 
 function Field({ label, value }: { label: string; value?: string | null }) {
+  const C = useColors();
   if (value == null || value === '') return null;
   return (
     <View style={{ flexDirection: 'row', gap: S.md, paddingVertical: 3 }}>
@@ -24,6 +26,7 @@ function Field({ label, value }: { label: string; value?: string | null }) {
   );
 }
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const C = useColors();
   return <View style={{ backgroundColor: C.ground, borderRadius: R.md, padding: S.md, gap: 2 }}><H size={15} style={{ marginBottom: 4 }}>{title}</H>{children}</View>;
 }
 const open = (url: string | null) => { if (url) Linking.openURL(url).catch(() => {}); };
@@ -108,6 +111,7 @@ function Body({ t, ev, loading, onEdit }: { t: Txn; ev: Evidence | null; loading
 
 /** A card on the transaction screen that opens the evidence pop-up. */
 export function EvidenceCard({ txn }: { txn: Txn }) {
+  const C = useColors();
   const [shown, setShown] = useState(false);
   const [ev, setEv] = useState<Evidence | null>(null);
   const [loading, setLoading] = useState(false);
@@ -118,12 +122,12 @@ export function EvidenceCard({ txn }: { txn: Txn }) {
   };
 
   return (
-    <View style={{ backgroundColor: C.paper, borderRadius: R.md, padding: S.lg, gap: S.sm }}>
+    <View style={{ backgroundColor: C.paper, borderRadius: R.card, borderWidth: 1, borderColor: C.line, padding: 22, gap: S.sm }}>
       <H size={16}>Evidence</H>
       <T size={13} tone="ink2">{originOf(txn, null)}.</T>
       <Button kind="outline" label="Show evidence" onPress={show} style={{ alignSelf: 'flex-start' }} />
       <Modal visible={shown} animationType="slide" transparent onRequestClose={() => setShown(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: C.scrim, justifyContent: 'flex-end', alignItems: 'center' }}>
           <Pressable accessibilityLabel="Close" onPress={() => setShown(false)} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
           <View accessibilityViewIsModal style={{ width: '100%', maxWidth: 640, maxHeight: '90%', backgroundColor: C.paper, borderTopLeftRadius: R.lg, borderTopRightRadius: R.lg, padding: S.lg, gap: S.md }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: S.sm }}>

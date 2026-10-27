@@ -13,10 +13,12 @@ import { dollars } from '@/core/queries';
 import type { CategoryId } from '@/core/types';
 import { clearFlag, setFlag } from '@/data/links';
 import { useRepo } from '@/data/repo';
-import { C, F, R, S } from '@/theme/tokens';
+import { F, R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Button, Card, Chip, Row, Screen, Segmented, T } from '@/theme/ui';
 
 export default function TxnDetail() {
+  const C = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { txns, accounts, patchTxn, links, reloadLinks, tagState, saveTagState } = useRepo();
   const [flagging, setFlagging] = useState(false);

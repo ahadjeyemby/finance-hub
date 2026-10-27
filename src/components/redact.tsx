@@ -4,7 +4,8 @@ import { TextInput, View } from 'react-native';
 import { REDACT_LABEL, countByReason, drawnBox, parseHideWords, removeDrawn, setReason, toggleBox } from '@/core/redact';
 import type { RedactBox } from '@/core/redact';
 import type { Scan } from '@/data/redact';
-import { C, F, R, S } from '@/theme/tokens';
+import { F, R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { Button, Chip, T } from '@/theme/ui';
 
 type Pt = { x: number; y: number };
@@ -22,6 +23,7 @@ export function RedactReview({ scan, boxes, hideText, busy, error, noun = 'state
   kept?: boolean;
   onBoxes: (next: RedactBox[]) => void; onSearch: (words: string[], text: string) => void; onApprove: () => void; onSkip: () => void; onDiscard: () => void;
 }) {
+  const C = useColors();
   const [text, setText] = useState(hideText);
   const [drag, setDrag] = useState<{ page: number; a: Pt; b: Pt } | null>(null);
   const [confirmSkip, setConfirmSkip] = useState(false);

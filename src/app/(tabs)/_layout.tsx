@@ -6,7 +6,8 @@ import { Icon } from '@/components/icons';
 import { SIDEBAR_BOTTOM, SIDEBAR_TOP, SidebarBrand } from '@/components/sidebarbrand';
 import type { IconName } from '@/components/icons';
 import { useRepo } from '@/data/repo';
-import { C, F, WIDE } from '@/theme/tokens';
+import { F, WIDE } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
 import { H, useWide } from '@/theme/ui';
 
 const tab = (title: string, icon: IconName, badge?: number) => ({
@@ -18,6 +19,7 @@ const tab = (title: string, icon: IconName, badge?: number) => ({
 const hidden = { tabBarButton: () => null, tabBarItemStyle: { display: 'none' as const }, title: '' };
 
 export default function TabsLayout() {
+  const C = useColors();
   const wide = useWide();
   const insets = useSafeAreaInsets();
   const { questions } = useRepo();

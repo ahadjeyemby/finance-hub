@@ -9,10 +9,10 @@ import type { Access, Invite, Member } from '@/core/workspace';
 import { useRepo } from '@/data/repo';
 import { acceptInvite, endMembership, inviteMember, listInvites, listMembers, myAccess, revokeInvite, setPassword, updateMember } from '@/data/workspace';
 import type { InviteResult } from '@/data/workspace';
-import { C, F, R, S } from '@/theme/tokens';
-import { Banner, Button, Card, Chip, Screen, T } from '@/theme/ui';
+import { R, S } from '@/theme/tokens';
+import { useColors } from '@/theme/theme';
+import { Banner, Button, Card, Chip, Screen, T, useInputStyle } from '@/theme/ui';
 
-const input = { minHeight: 44, borderRadius: R.md, backgroundColor: C.ground, paddingHorizontal: S.md, fontFamily: F.body, fontSize: 15, color: C.ink } as const;
 const ROLES = ['member', 'contributor'] as const;
 
 /**
@@ -20,6 +20,8 @@ const ROLES = ['member', 'contributor'] as const;
  * own data and is told so here. Every rule is enforced by the database: this screen only asks for things and shows what it allows.
  */
 export default function People() {
+  const C = useColors();
+  const input = useInputStyle();
   const { auth } = useRepo();
   const params = useLocalSearchParams<{ token?: string }>();
   const [access, setAccess] = useState<Access | null>(null);
