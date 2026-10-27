@@ -48,17 +48,25 @@ export function compareItems(txns: Txn[]): { compare: ItemCompare[]; itemisedCen
 export const usualBasket = (compare: ItemCompare[], size = 5) => [...compare].sort((a, b) => b.bought - a.bought || a.key.localeCompare(b.key)).slice(0, size);
 
 /**
- * The store that is cheapest for the most items in the usual basket, and how much less a basket costs there than what was paid on average:
- * the sum, over the items it is cheapest for, of the average paid minus its price. null when no store saves anything.
+ * The one store where the usual basket costs least against what was paid for it: for every store, the items in the basket it has a price for,
+ * each counted at (average paid − that store's price), so an item that is dearer there counts against it. Only a store that prices at least
+ * half of the basket is considered, and only a total saving above zero is reported. null when no store qualifies.
  */
-export function bestStore(basket: ItemCompare[]): { store: string; cheapestFor: number; of: number; savingPerBasket: number } | null {
-  const by = new Map<string, { count: number; saving: number }>();
-  for (const it of basket) {
-    const s = it.rows[0].store;
-    const cur = by.get(s) ?? { count: 0, saving: 0 };
-    by.set(s, { count: cur.count + 1, saving: cur.saving + Math.max(0, it.paidAvg - it.rows[0].avg) });
+export function bestStore(basket: ItemCompare[]): { store: string; covers: number; cheapestFor: number; of: number; savingPerBasket: number } | null {
+  const stores = new Set(basket.flatMap((it) => it.rows.map((r) => r.store)));
+  const need = Math.ceil(basket.length / 2);
+  let best: { store: string; covers: number; cheapestFor: number; of: number; savingPerBasket: number } | null = null;
+  for (const store of [...stores].sort()) {
+    let covers = 0, cheapestFor = 0, saving = 0;
+    for (const it of basket) {
+      const row = it.rows.find((r) => r.store === store);
+      if (!row) continue;
+      covers++;
+      if (it.rows[0].store === store) cheapestFor++;
+      saving += it.paidAvg - row.avg;
+    }
+    if (covers < need || saving <= 0) continue;
+    if (!best || saving > best.savingPerBasket) best = { store, covers, cheapestFor, of: basket.length, savingPerBasket: saving };
   }
-  const best = [...by.entries()].sort((a, b) => b[1].count - a[1].count || b[1].saving - a[1].saving)[0];
-  if (!best || best[1].saving <= 0) return null;
-  return { store: best[0], cheapestFor: best[1].count, of: basket.length, savingPerBasket: best[1].saving };
+  return best;
 }

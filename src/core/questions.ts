@@ -111,8 +111,8 @@ export function buildQuestions(txns: Txn[], overlay: Pick<Overlay, 'answered'>):
  * The dollars a set of questions covers, each charge counted once: one charge can be in several questions at once (business or personal, a
  * possible one-off, a basket with no receipt), so adding up the questions' own amounts would count it two or three times.
  */
-export function uniqueCents(questions: Pick<Question, 'txnIds' | 'cents'>[], txns: Txn[]): number {
-  const byId = new Map(txns.map((t) => [t.id, t]));
+export function uniqueCents(questions: Pick<Question, 'txnIds' | 'cents'>[], txns: Txn[] | ReadonlyMap<string, Txn>): number {
+  const byId = Array.isArray(txns) ? new Map(txns.map((t) => [t.id, t])) : (txns as ReadonlyMap<string, Txn>);
   const seen = new Set<string>();
   let total = 0;
   for (const q of questions) {

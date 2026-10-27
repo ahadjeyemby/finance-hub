@@ -73,7 +73,8 @@ export const mergedCoverage = (a: Account, b: Account) => ({ from: a.coverage.fr
 export function unmatchedCardPayments(txns: Txn[], accounts: Account[]): { cardSide: Txn[]; bankSide: Txn[]; cardTotal: number } {
   const type = new Map(accounts.map((a) => [a.id, a.type]));
   const orphan = txns.filter((t) => t.kind === 'transfer' && t.subtype === 'card_payment' && !t.pairId);
-  const cardSide = orphan.filter((t) => type.get(t.accountId) === 'credit');
+  // a card-side payment is money coming in to the card; a reversal (money going back out) is not funding from anywhere
+  const cardSide = orphan.filter((t) => type.get(t.accountId) === 'credit' && t.cents > 0);
   const bankSide = orphan.filter((t) => type.get(t.accountId) === 'checking');
   return { cardSide, bankSide, cardTotal: cardSide.reduce((s, t) => s + Math.abs(t.cents), 0) };
 }

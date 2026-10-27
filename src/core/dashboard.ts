@@ -9,10 +9,10 @@
 import { unmatchedCardPayments } from './accounts';
 import { categoryLabel, colorGroupOf } from './categories';
 import type { ColorGroup } from './categories';
-import { completeMonths, coveredDays, gaps, intervalsFor, spendAccounts } from './coverage';
+import { completeMonths, coveredDays, coversAny, gaps, intervalsFor, spendAccounts } from './coverage';
 import type { Interval } from './coverage';
 import { addMonths, daysInMonth, monthEnd, monthOf, monthStart } from './dates';
-import { forecastMonth, isOneOff } from './forecast';
+import { forecastMonth, recurringBasis } from './forecast';
 import type { Forecast } from './forecast';
 import { attribute } from './income';
 import type { IncomeState } from './income';
@@ -20,7 +20,7 @@ import { bestStore, compareItems, usualBasket } from './prices';
 import type { ItemCompare } from './prices';
 import type { Ctx } from './queries';
 import { uniqueCents } from './questions';
-import { normKey, summarizeRecurring } from './recurring';
+import { addManual, normKey } from './recurring';
 import type { RecurringItem } from './recurring';
 import type { Question, Txn } from './types';
 
@@ -128,21 +128,27 @@ function statementMonths(from: string, to: string): string[] {
   return res;
 }
 
-/** Recurring bills for a set of charges, with the person's decisions; only the ones still expected. */
-function activeBills(txns: Txn[], ctx: Ctx, asOf: string): RecurringItem[] {
-  return summarizeRecurring(txns, ctx.recurring, asOf).items.filter((i) => i.status === 'on' && i.health !== 'stopped');
-}
-
+/**
+ * Every widget for one view. `scope` is whose spending the view counts (Overview everything, Household and Plan ahead personal, Business
+ * business), and every widget shown in that view follows it; the Business widgets are about business by definition.
+ */
 export function dashboardData(input: DashboardInput, scope: Scope): DashboardData {
   const { ctx, questions, period, dataFrom, dataTo, income } = input;
   const hasAccounts = spendAccounts(ctx.accounts).length > 0;
   const scoped = ctx.txns.filter(inScope(scope));
-  const personal = ctx.txns.filter(inScope('personal'));
+  const sctx: Ctx = { ...ctx, txns: scoped };
+  const byId = new Map(ctx.txns.map((t) => [t.id, t]));
+  const uniq = (qs: Question[]) => uniqueCents(qs, byId);
   const months = hasAccounts ? statementMonths(dataFrom, dataTo) : [];
   const complete = new Set(hasAccounts ? completeMonths(ctx, dataFrom, dataTo) : []);
   const anyData = hasAccounts && months.length > 0;
   const qOf = (type: Question['type']) => questions.filter((q) => q.type === type);
   const NO_STATEMENT = 'No statement covers any month yet.';
+  // the bills and one-offs every average and forecast in this view is built from (the same rules as the forecast and the Recurring screen)
+  const basis = recurringBasis(scoped, ctx.recurring, dataTo);
+  const isOneOff = basis.isOneOff;
+  /** questions about large charges that would change a complete-month average: open one-off candidates in complete months */
+  const oneOffQsIn = (monthsSet: Set<string>) => touching(qOf('one_off'), new Set(scoped.filter((t) => isSpend(t) && monthsSet.has(monthOf(t.date)) && isOneOff(t) && t.oneOff !== true).map((t) => t.id)));
 
   // ---- Big picture ----------------------------------------------------------------------------------------------------------------------
   const selMonth = period === 'all' ? null : period;
@@ -153,13 +159,16 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const incomeTxns = ctx.txns.filter((t) => t.kind === 'income' && inSel(t));
   const businessSources = new Set(income.sources.filter((s) => s.type === 'business').map((s) => s.id));
   const sourceOf = attribute(ctx.txns, income, ctx.accounts);
-  const earnedTxns = scope === 'business' ? incomeTxns.filter((t) => businessSources.has(sourceOf.get(t.id) ?? '')) : incomeTxns;
+  const isBizIncome = (t: Txn) => businessSources.has(sourceOf.get(t.id) ?? '');
+  // Business counts business income only; Household leaves it out; Overview counts every deposit
+  const earnedTxns = scope === 'business' ? incomeTxns.filter(isBizIncome) : scope === 'personal' ? incomeTxns.filter((t) => !isBizIncome(t)) : incomeTxns;
   const earned = earnedTxns.reduce((s, t) => s + t.cents, 0);
   const spent = sum(selSpend);
   const rewards = ctx.txns.filter((t) => t.kind === 'rewards' && inSel(t)).reduce((s, t) => s + t.cents, 0);
   const unconfirmedTxns = earnedTxns.filter((t) => t.subtype === 'unconfirmed');
   const unconfirmed = unconfirmedTxns.reduce((s, t) => s + t.cents, 0);
-  const selCovered = hasAccounts && (selMonth ? coveredDays(ctx, selMonth) > 0 || complete.has(selMonth) : anyData);
+  // a month has numbers as soon as any statement covers any day of it
+  const selCovered = hasAccounts && (selMonth ? coversAny(ctx, monthStart(selMonth), monthEnd(selMonth)) : anyData);
   const selComplete = selMonth ? complete.has(selMonth) : false;
   const incomeQs = touching(qOf('confirm_income'), new Set(unconfirmedTxns.map((t) => t.id)));
   const moneyState = !selCovered ? locked(selMonth ? 'No statement covers this month yet.' : NO_STATEMENT)
@@ -174,8 +183,9 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     incomeIncomplete: ctx.accounts.some((a) => a.type === 'checking' && a.incomeComplete === false),
   };
   // transfers: each movement once (the bank side, or a card side with no bank leg), never spending
+  const typeOf = new Map(ctx.accounts.map((a) => [a.id, a.type]));
   const transfers = ctx.txns.filter((t) => t.kind === 'transfer' && inSel(t)).reduce((s, t) => {
-    const type = ctx.accounts.find((a) => a.id === t.accountId)?.type;
+    const type = typeOf.get(t.accountId);
     if (type === 'checking' || type === 'cash') return t.cents < 0 ? s - t.cents : s;
     return t.pairId ? s : s + Math.abs(t.cents);
   }, 0);
@@ -192,14 +202,17 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     slices: (Object.keys(groups) as ColorGroup[]).map((g) => ({ group: g, cents: groups[g], share: donutTotal > 0 ? groups[g] / donutTotal : 0 })).filter((s) => s.cents > 0).sort((a, b) => b.cents - a.cents),
   };
 
+  const spendByMonth = new Map<string, Txn[]>();
+  for (const t of allSpend) { const m = monthOf(t.date); spendByMonth.set(m, [...(spendByMonth.get(m) ?? []), t]); }
+  const inMonth = (m: string) => spendByMonth.get(m) ?? [];
   const trendMonths: TrendMonth[] = months.map((m) => {
     const byGroup = emptyGroups();
-    for (const t of allSpend) if (monthOf(t.date) === m) byGroup[colorGroupOf(t.category)] += out(t);
+    for (const t of inMonth(m)) byGroup[colorGroupOf(t.category)] += out(t);
     return { month: m, partial: !complete.has(m), total: Object.values(byGroup).reduce((a, b) => a + b, 0), byGroup };
   });
   const fullMonths = trendMonths.filter((m) => !m.partial);
   // the average leaves out partial months and one-offs
-  const avgOf = (m: string) => sum(allSpend.filter((t) => monthOf(t.date) === m && !isOneOff(t)));
+  const avgOf = (m: string) => sum(inMonth(m).filter((t) => !isOneOff(t)));
   const trend: TrendData = {
     ...catState(), months: trendMonths, selected: selMonth, averageOf: fullMonths.length,
     average: fullMonths.length ? Math.round(fullMonths.reduce((s, m) => s + avgOf(m.month), 0) / fullMonths.length) : null,
@@ -215,9 +228,9 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     largest: largestOne ? { merchant: largestOne.merchant, cents: out(largestOne), date: largestOne.date } : null, pending: sum(candidates),
   };
 
-  // ---- Save money (household money: personal) -------------------------------------------------------------------------------------------
-  const pSpendAll = personal.filter((t) => isSpend(t) && inRange(t, dataFrom, dataTo));
-  const bills = activeBills(personal, ctx, dataTo);
+  // ---- Save money ------------------------------------------------------------------------------------------------------------------------
+  const pSpendAll = allSpend;
+  const bills = basis.on;
   const yearly = (i: RecurringItem) => i.monthlyCents * 12;
   const { compare } = compareItems(pSpendAll);
   const basket = usualBasket(compare);
@@ -225,7 +238,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const unsplitTxns = pSpendAll.filter((t) => t.category === 'mixed_retail' && t.hints?.includes('needs_items') && !t.lines?.length);
   const unsplit = sum(unsplitTxns);
   const ideas: CutIdea[] = [];
-  if (best) ideas.push({ kind: 'basket', title: `Buy your usual basket at ${best.store}`, text: `Cheapest for ${best.cheapestFor} of the ${best.of} items you buy most, from your receipts.`, figure: money(best.savingPerBasket), unit: 'less per basket', action: { label: 'Compare prices', kind: 'prices' } });
+  if (best) ideas.push({ kind: 'basket', title: `Buy your usual basket at ${best.store}`, text: `It prices ${best.covers} of the ${best.of} items you buy most, and is cheapest for ${best.cheapestFor}. Together they cost less there than you paid on average.`, figure: money(best.savingPerBasket), unit: 'less per basket', action: { label: 'Compare prices', kind: 'prices' } });
   if (bills.length) {
     const top = [...bills].sort((a, b) => b.monthlyCents - a.monthlyCents)[0];
     const total = bills.reduce((s, i) => s + yearly(i), 0);
@@ -239,39 +252,42 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const lastTwo = fullList.length >= 2 && fullList[fullList.length - 1] === addMonths(fullList[fullList.length - 2], 1) ? fullList.slice(-2) : null;
   if (lastTwo) {
     const [a, b] = lastTwo;
-    const byCat = (m: string) => { const r = new Map<string, number>(); for (const t of pSpendAll) if (monthOf(t.date) === m && !isOneOff(t)) r.set(t.category ?? 'uncategorized', (r.get(t.category ?? 'uncategorized') ?? 0) + out(t)); return r; };
+    const byCat = (m: string) => { const r = new Map<string, number>(); for (const t of inMonth(m)) if (!isOneOff(t)) r.set(t.category ?? 'uncategorized', (r.get(t.category ?? 'uncategorized') ?? 0) + out(t)); return r; };
     const pa = byCat(a), pb = byCat(b);
     let rise: { cat: string; from: number; to: number } | null = null;
     for (const [cat, v] of pb) { const p = pa.get(cat) ?? 0; if (p > 0 && v > p && (!rise || v - p > rise.to - rise.from)) rise = { cat, from: p, to: v }; }
     if (rise) {
-      const inB = pSpendAll.filter((t) => monthOf(t.date) === b && (t.category ?? 'uncategorized') === rise.cat && !isOneOff(t));
+      const inB = inMonth(b).filter((t) => (t.category ?? 'uncategorized') === rise.cat && !isOneOff(t));
       const topM = topMerchant(inB);
       const label = categoryLabel(rise.cat);
       ideas.push({ kind: 'rise', title: `${label} rose in ${monthName(b)}`, text: `${money(rise.to)} against ${money(rise.from)} in ${monthName(a)}.${topM ? ` ${topM.merchant} took ${Math.round(topM.share * 100)}%.` : ''}`, figure: `+${Math.round(((rise.to - rise.from) / rise.from) * 100)}%`, unit: `vs ${monthName(a)}`, action: { label: 'Open in Explore', kind: 'explore' } });
     }
   }
+  // a basket with no receipt is a question in the Inbox: while the unsplit idea is shown, its receipts are what would change it
   const itemsQs = qOf('items');
+  const unsplitQs = touching(itemsQs, new Set(unsplitTxns.map((t) => t.id)));
   const cutIdeas: CutIdeasData = {
     ...(!ideas.length ? locked('No saving can be worked out yet: it needs the same item at two stores, a repeating bill, or two complete months.', anyData ? RECEIPTS : IMPORT)
-      : ideas.every((i) => i.kind === 'unsplit') && itemsQs.length ? { readiness: 'answers', ask: { text: 'Receipts for these stores would show where the money went.', questionIds: itemsQs.map((q) => q.id) } } : ready()),
+      : unsplit > 0 && unsplitQs.length ? { readiness: 'answers', ask: { text: 'Receipts for the big-box stores would show what that spending was, and where it could be less.', questionIds: unsplitQs.map((q) => q.id) } } : ready()),
     ideas: ideas.slice(0, 4),
   };
 
-  const seriesIds = new Set(bills.flatMap((i) => i.txnIds));
-  const manualPayees = new Set(bills.filter((i) => i.source === 'manual').map((i) => normKey(i.merchant)));
   const fixed = bills.reduce((s, i) => s + i.monthlyCents, 0);
   const everydayMonths = fullList;
-  const everyday = everydayMonths.length ? Math.round(everydayMonths.reduce((s, m) => s + sum(pSpendAll.filter((t) => monthOf(t.date) === m && !isOneOff(t) && !seriesIds.has(t.id) && !manualPayees.has(normKey(t.merchant)))), 0) / everydayMonths.length) : 0;
+  const everyday = everydayMonths.length ? Math.round(everydayMonths.reduce((s, m) => s + sum(inMonth(m).filter(basis.isEveryday)), 0) / everydayMonths.length) : 0;
   const noHousing = !bills.some((i) => i.category === 'housing' || i.category === 'utilities');
   const fixedFlex: FixedFlexData = {
     ...(!everydayMonths.length ? locked('No complete month yet: a month counts once every account\'s statement covers all of it.')
-      : askIf(touching(qOf('one_off'), new Set(pSpendAll.map((t) => t.id))), (n) => `${plural(n, 'large charge')} may be one-time, which changes the everyday average.`)),
+      : askIf(oneOffQsIn(complete), (n) => `${plural(n, 'large charge')} may be one-time, which changes the everyday average.`)),
     fixed, everyday, share: fixed + everyday > 0 ? fixed / (fixed + everyday) : 0, noHousing, months: everydayMonths.length,
   };
 
   const subRows: SubscriptionRow[] = [...bills].sort((a, b) => b.monthlyCents - a.monthlyCents).map((i) => ({ key: i.key, merchant: i.merchant, monthly: i.monthlyCents, yearly: yearly(i), confirmed: i.source !== 'detected' }));
+  const unconfirmedBills = subRows.filter((r) => !r.confirmed);
+  // bills found by the app but not confirmed are answered on the Recurring screen, not in the Inbox
   const subscriptions: SubscriptionsData = {
-    ...(!anyData && !bills.length ? locked(NO_STATEMENT) : ready()),
+    ...(!anyData && !bills.length ? locked(NO_STATEMENT)
+      : unconfirmedBills.length ? { readiness: 'answers', ask: { text: `${plural(unconfirmedBills.length, 'bill')} found in your statements ${unconfirmedBills.length === 1 ? 'is' : 'are'} not confirmed yet.`, questionIds: [] } } : ready()),
     rows: subRows, monthly: fixed, yearly: fixed * 12,
   };
 
@@ -302,20 +318,19 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     months: months.map((m) => ({ month: m, cents: sum(fuelTxns.filter((t) => monthOf(t.date) === m)), partial: !complete.has(m) })), top: fuelTop,
   };
 
-  // ---- Plan ahead (personal: business spending is planned separately) ------------------------------------------------------------------
-  const pctx: Ctx = { ...ctx, txns: personal };
+  // ---- Plan ahead ------------------------------------------------------------------------------------------------------------------------
   const target = addMonths(monthOf(dataTo), 1);
-  const fc = anyData ? forecastMonth(pctx, target, dataTo) : null;
+  const fc = anyData ? forecastMonth(sctx, target, dataTo, 'given') : null;
   const hasBasis = !!fc && fc.basisMonths.length > 0;
-  const oneOffQs = touching(qOf('one_off'), new Set(personal.map((t) => t.id)));
-  const fcState: State = !hasBasis ? locked('No complete month yet, so there is nothing to base a forecast on.') : askIf(oneOffQs, (n) => `${plural(n, 'large charge')} may be one-time, which changes the forecast.`);
+  const fcState: State = !hasBasis ? locked('No complete month yet, so there is nothing to base a forecast on.')
+    : askIf(oneOffQsIn(new Set(fc!.basisMonths)), (n) => `${plural(n, 'large charge')} may be one-time, which changes the forecast.`);
   const forecast: ForecastData = { ...fcState, forecast: hasBasis ? fc : null, target, max: hasBasis ? niceCeil(Math.max(fc!.high, fc!.total)) : 0 };
 
   // bills seen once: a bill-like charge from a payee seen only once, that nobody has decided about
   const payeeCount = new Map<string, number>();
-  for (const t of personal) if (isSpend(t) && t.cents < 0) payeeCount.set(normKey(t.merchant), (payeeCount.get(normKey(t.merchant)) ?? 0) + 1);
+  for (const t of scoped) if (isSpend(t) && t.cents < 0) payeeCount.set(normKey(t.merchant), (payeeCount.get(normKey(t.merchant)) ?? 0) + 1);
   const knownPayees = new Set([...(ctx.recurring?.manual ?? []).map((m) => normKey(m.merchant)), ...bills.map((i) => normKey(i.merchant))]);
-  const once: BillOnce[] = personal.filter((t) => t.kind === 'spend' && t.cents < 0 && BILL_CATEGORIES.has(t.category ?? '') && t.oneOff === undefined
+  const once: BillOnce[] = scoped.filter((t) => t.kind === 'spend' && t.cents < 0 && BILL_CATEGORIES.has(t.category ?? '') && t.oneOff === undefined
     && payeeCount.get(normKey(t.merchant)) === 1 && !knownPayees.has(normKey(t.merchant)) && inRange(t, addMonths(monthOf(dataTo), -12) + '-01', dataTo))
     .map((t) => ({ txnId: t.id, merchant: t.merchant, date: t.date, cents: out(t), category: t.category })).sort((a, b) => b.date.localeCompare(a.date));
   const billsOnceCents = once.reduce((s, b) => s + b.cents, 0);
@@ -328,22 +343,25 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const forecastBuild: ForecastBuildData = {
     ...(fcState.readiness !== 'ready' ? fcState : once.length ? { readiness: 'answers', ask: { text: `${plural(once.length, 'bill')} seen once may repeat.`, questionIds: [] } } : ready()),
     forecast: hasBasis ? fc : null, target, oneOffs: fc ? fc.oneOffsExcluded.reduce((s, o) => s + o.cents, 0) : 0,
-    ifBillsRepeat: hasBasis && once.length ? fc!.total + billsOnceCents : null, billsOnceCents,
+    // what next month would be if every bill seen once were a monthly bill: the same forecast, with each added as one (so a bill already in the
+    // everyday average is not counted twice)
+    ifBillsRepeat: hasBasis && once.length
+      ? forecastMonth({ ...sctx, recurring: once.reduce((r, b) => addManual(r, { merchant: b.merchant, cents: b.cents, cadence: 'monthly', anchor: b.date, category: b.category }), ctx.recurring) }, target, dataTo, 'given').total
+      : null,
+    billsOnceCents,
   };
 
   // the month in progress: the latest month with statements, unless it is already complete (then the next one, with no days yet)
   const paceMonth = !anyData ? monthOf(dataTo) : complete.has(monthOf(dataTo)) ? addMonths(monthOf(dataTo), 1) : monthOf(dataTo);
   const paceDays = anyData ? coveredDays(ctx, paceMonth) : 0;
-  const paceFc = anyData ? forecastMonth(pctx, paceMonth, dataTo) : null;
+  const paceFc = anyData ? forecastMonth(sctx, paceMonth, dataTo, 'given') : null;
   const paceBase = paceFc && paceFc.basisMonths.length ? paceFc.recurringTotal + paceFc.variableTotal : null;
+  const perDay = new Array<number>(paceDays + 1).fill(0);
+  for (const t of inMonth(paceMonth)) { const d = Number(t.date.slice(8)); if (d <= paceDays && !isOneOff(t)) perDay[d] += out(t); }
   const daily: number[] = [];
   let run = 0;
-  for (let d = 1; d <= paceDays; d++) {
-    const day = `${paceMonth}-${String(d).padStart(2, '0')}`;
-    run += sum(personal.filter((t) => isSpend(t) && t.date === day && !isOneOff(t)));
-    daily.push(run);
-  }
-  const paceQs = qOf('one_off').filter((q) => q.txnIds.some((id) => personal.find((t) => t.id === id && monthOf(t.date) === paceMonth)));
+  for (let d = 1; d <= paceDays; d++) { run += perDay[d]; daily.push(run); }
+  const paceQs = qOf('one_off').filter((q) => q.txnIds.some((id) => { const t = byId.get(id); return !!t && monthOf(t.date) === paceMonth && inScope(scope)(t); }));
   const pace: PaceData = {
     ...(paceDays < 7 ? locked(`${paceDays} of 7 days of ${monthName(paceMonth)} are on statements so far. The pace starts after a week.`)
       : paceBase == null ? locked('No complete month yet, so there is no forecast line to compare with.')
@@ -354,9 +372,8 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   // ---- Business ----------------------------------------------------------------------------------------------------------------------
   const bpQs = qOf('business_or_personal');
   const bizSpend = ctx.txns.filter((t) => isSpend(t) && t.business === true && inRange(t, dataFrom, dataTo));
-  const waiting = uniqueCents(bpQs, ctx.txns);
-  const allBills = activeBills(ctx.txns, ctx, dataTo);
-  const byId = new Map(ctx.txns.map((t) => [t.id, t]));
+  const waiting = uniq(bpQs);
+  const allBills = recurringBasis(ctx.txns, ctx.recurring, dataTo).on;
   const toolRows: ToolRow[] = allBills.filter((i) => TOOL_CATEGORIES.has(i.category ?? '') || i.txnIds.some((id) => byId.get(id)?.hints?.includes('business_or_personal')))
     .map((i) => {
       const ts = i.txnIds.map((id) => byId.get(id)).filter((t): t is Txn => !!t);
@@ -376,14 +393,14 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     rows: toolRows, undecided, monthly: toolRows.filter((r) => !r.confirmed).reduce((s, r) => s + r.monthly, 0),
   };
 
-  const bizIncomeTxns = ctx.txns.filter((t) => t.kind === 'income' && businessSources.has(sourceOf.get(t.id) ?? ''));
+  const bizIncomeTxns = ctx.txns.filter((t) => t.kind === 'income' && isBizIncome(t));
   const hasSource = bizIncomeTxns.length > 0;
   const bizAsk = (lead: string) => askIf(bpQs, (n) => `${plural(n, 'merchant')} ${n === 1 ? 'is' : 'are'} waiting for Business or Personal. ${lead}`);
   const bizSummary: BizSummaryData = {
     ...(!anyData ? locked(NO_STATEMENT) : !bizSpend.length && !bpQs.length ? locked('Nothing is tagged as business yet, and nothing is waiting for an answer.', { label: 'Open the Inbox', kind: 'inbox' }) : bizAsk('Your answers decide what counts.')),
     tagged: sum(bizSpend), waiting, toolsMonthly: bizTools.monthly, income: hasSource ? bizIncomeTxns.reduce((s, t) => s + t.cents, 0) : null, hasSource: businessSources.size > 0 && hasSource,
   };
-  const pendingRows: BizPendingRow[] = bpQs.map((q) => ({ question: q, merchant: q.merchant, cents: uniqueCents([q], ctx.txns), charges: q.txnIds.length })).sort((a, b) => b.cents - a.cents);
+  const pendingRows: BizPendingRow[] = bpQs.map((q) => ({ question: q, merchant: q.merchant, cents: uniq([q]), charges: q.txnIds.length })).sort((a, b) => b.cents - a.cents);
   const everHinted = ctx.txns.some((t) => t.hints?.includes('business_or_personal') || t.business !== undefined);
   const bizPending: BizPendingData = {
     ...(!anyData ? locked(NO_STATEMENT) : !everHinted ? locked('No charge has looked like a business expense yet.', { label: 'Open the Inbox', kind: 'inbox' }) : bizAsk('Each answer applies to every charge from that merchant.')),
@@ -401,17 +418,19 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     return { month: m, income: inc, spend: sp, net: inc - sp };
   });
   const spendMonth = plMonths.some((m) => m.spend > 0);
+  // only questions about charges in the months shown can change them
+  const plQs = bpQs.filter((q) => q.txnIds.some((id) => { const t = byId.get(id); return !!t && complete.has(monthOf(t.date)); }));
   const bizPL: BizPLData = {
     ...(!hasSource ? locked('Business income is not connected: add a business income source, so its deposits are counted.', { label: 'Set up business income', kind: 'income' })
       : !spendMonth ? locked('No complete month has spending tagged as business yet.', { label: 'Answer business questions', kind: 'inbox' })
-      : askIf(bpQs, (n) => `${plural(n, 'merchant')} still ${n === 1 ? 'needs' : 'need'} Business or Personal, which changes these months.`)),
+      : askIf(plQs, (n) => `${plural(n, 'merchant')} still ${n === 1 ? 'needs' : 'need'} Business or Personal, which changes these months.`)),
     months: plMonths,
   };
 
   // ---- Keep it accurate -------------------------------------------------------------------------------------------------------------
   const attention: AttentionData = {
     ...(!hasAccounts ? locked(NO_STATEMENT) : ready()),
-    count: questions.length, atStake: uniqueCents(questions, ctx.txns),
+    count: questions.length, atStake: uniq(questions),
     top: [...questions].sort((a, b) => b.cents - a.cents).slice(0, 3).map((q) => ({ id: q.id, text: shortPrompt(q), cents: q.cents })),
   };
   const { cardSide, bankSide, cardTotal } = unmatchedCardPayments(ctx.txns, ctx.accounts);

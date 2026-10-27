@@ -77,6 +77,8 @@ export function useWidgetPrefs(): WidgetPrefsApi {
   const [loadError, setLoadError] = useState<string | null>(null);
   const storeRef = useRef(store);
   const unsaved = useRef(new Set<ViewId>());
+  // how many times each view changed here: a save only clears a view if it did not change again while that save was on its way
+  const versions = useRef(new Map<ViewId, number>());
   const queue = useRef<Promise<void>>(Promise.resolve());
 
   const persist = useCallback((prefs: Prefs) => {
@@ -89,9 +91,13 @@ export function useWidgetPrefs(): WidgetPrefsApi {
     if (!userId || !supabase) return;
     queue.current = queue.current.then(async () => {
       try {
-        for (const v of [...unsaved.current]) {
-          await pushView(userId, v, storeRef.current.prefs[v] ?? null);
-          unsaved.current.delete(v);
+        // keep going until nothing changed during the last round of saves
+        for (let round = 0; unsaved.current.size && round < 5; round++) {
+          for (const v of [...unsaved.current]) {
+            const version = versions.current.get(v) ?? 0;
+            await pushView(userId, v, storeRef.current.prefs[v] ?? null);
+            if ((versions.current.get(v) ?? 0) === version) unsaved.current.delete(v);
+          }
         }
         setSaveError(null);
       } catch (e) { setSaveError((e as Error).message); }
@@ -129,6 +135,7 @@ export function useWidgetPrefs(): WidgetPrefsApi {
     const next: Prefs = { ...(storeRef.current.key === cacheKey ? storeRef.current.prefs : {}) };
     if (rows) next[view] = rows; else delete next[view];
     unsaved.current.add(view);
+    versions.current.set(view, (versions.current.get(view) ?? 0) + 1);
     persist(next);
     flush();
   }, [cacheKey, persist, flush]);
