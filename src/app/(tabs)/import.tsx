@@ -14,7 +14,8 @@ import { autoTagsFor } from '@/core/tags';
 import type { RedactBox } from '@/core/redact';
 import { burnRedactions, discardScan, redactionSupported, scanForRedaction } from '@/data/redact';
 import { useRedactSettings } from '@/data/redactSettings';
-import { meId } from '@/data/scope';
+import { contributorOwner, meId } from '@/data/scope';
+import { fetchContributorSnapshot } from '@/data/contributor';
 import type { Scan } from '@/data/redact';
 import { discardShot, finishScan, loadShot, scanSupported } from '@/data/scan';
 import type { Shot } from '@/data/scan';
@@ -91,6 +92,8 @@ const STATEMENT_FIELDS: [string, string][] = [['institution', 'Bank or issuer'],
 
 async function loadStored(owner?: string): Promise<Stored[]> {
   if (!supabase) return [];
+  // a Contributor: the periods of the owner's cards that are already in, with no balances (migration 0009)
+  if (contributorOwner()) return fetchContributorSnapshot().then((s) => s.statements.map((x) => ({ id: x.id, accountId: x.accountId, periodFrom: x.from, periodTo: x.to })), () => []);
   const q = await supabase.from('statements').select('id, account_id, period_from, period_to').eq('user_id', owner ?? meId());
   return q.error ? [] : (q.data ?? []).map((r) => ({ id: r.id as string, accountId: r.account_id as string | null, periodFrom: r.period_from as string | null, periodTo: r.period_to as string | null }));
 }
@@ -110,7 +113,11 @@ interface Ctx {
   /** store-name pairs and per-card link counts learned from what was confirmed before */
   aliases: ReadonlySet<string>;
   trust: ReadonlyMap<string, number>;
+  /** a Contributor: credit card statements only, and no cash purchases (those are kept in the owner's own books) */
+  cardsOnly?: boolean;
 }
+
+const CARDS_ONLY = 'Only credit card statements can be added here. Checking statements are added by the person who runs this workspace.';
 
 /** Everything the card and the Save buttons need to agree on. `before` = receipts earlier in this batch, so of two copies of one purchase the first is the original. */
 function evaluate(item: Item, ctx: Ctx, before: ReceiptKey[]) {
@@ -155,8 +162,9 @@ function evaluate(item: Item, ctx: Ctx, before: ReceiptKey[]) {
   } else {
     analysis = analyseStatement(item.statement!, { accounts: statementAccounts(item, ctx.accounts), statements: ctx.stored, existing: ctx.txns }, item.answers, today);
   }
-  const canSave = analysis.ok && !linkPending && !waitingFor && cashClash.length === 0 && (!cash || !!cashCat);
-  return { analysis, linkTxn, candidates, linkPending, cash, cashCat, second, same, extra, waitingFor, cashClash, refundCredits, matchWhy, likelyWhy, canSave };
+  const notCard = !!ctx.cardsOnly && item.kind === 'statement' && !!item.statement?.accountType && item.statement.accountType !== 'credit';
+  const canSave = analysis.ok && !linkPending && !waitingFor && cashClash.length === 0 && (!cash || !!cashCat) && !notCard && !(ctx.cardsOnly && cash);
+  return { analysis, linkTxn, candidates, linkPending, cash, cashCat, second, same, extra, waitingFor, cashClash, refundCredits, matchWhy, likelyWhy, notCard, canSave };
 }
 type Ev = ReturnType<typeof evaluate>;
 
@@ -175,7 +183,7 @@ const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export default function Import() {
   const C = useColors();
   const repo = useRepo();
-  const { hasData, sync, addCash, reloadLinks, team } = repo;
+  const { hasData, sync, addCash, reloadLinks, team, spendingOnly } = repo;
   // whose data a document is added to: the signed-in person's, or (for an admin viewing one member) that member's. Everyone is treated as me.
   const target = team.active && team.viewing !== 'all' && team.viewing !== 'me' ? team.viewing : null;
   const targetRef = useRef<string | null>(null);
@@ -224,9 +232,9 @@ export default function Import() {
   // The async work below must see the newest list and ledger, not the ones from the render that started it.
   const itemsRef = useRef<Item[]>([]);
   const learned = useMemo(() => ({ aliases: learnAliases(receipts, txns), trust: linkTrust(receipts, txns, accounts) }), [receipts, txns, accounts]);
-  const ctx: Ctx = { accounts, txns, stored, receipts, claimed: NONE, ...learned };
+  const ctx: Ctx = { accounts, txns, stored, receipts, claimed: NONE, ...learned, cardsOnly: spendingOnly };
   const ctxRef = useRef<Ctx>(ctx);
-  useEffect(() => { ctxRef.current = { accounts, txns, stored, receipts, claimed: NONE, ...learned }; });
+  useEffect(() => { ctxRef.current = { accounts, txns, stored, receipts, claimed: NONE, ...learned, cardsOnly: spendingOnly }; });
   const savedKeysRef = useRef<ReceiptKey[]>([]);
   const claimedRef = useRef<Set<string>>(new Set());
   const stopRef = useRef(false);
@@ -464,6 +472,7 @@ export default function Import() {
           }
         } else if (ev.cash) {
           if (owner) throw new Error('A cash purchase is kept in your own books. Switch the view to Me to add one.');
+          if (spendingOnly) throw new Error('A cash purchase is added by the person who runs this workspace. Mark it as paid another way instead.');
           const t = addCash({ amount: (rec.totalCents ?? 0) / 100, merchant: rec.merchant ?? 'Receipt', what: 'Receipt', category: ev.cashCat!, date: rec.date!, business: false, oneOff: false, splitAsked: true, receiptId: rid, lines: receiptToLines(rec, rec.totalCents ?? 0).map((l) => ({ item: l.item, amount: l.cents / 100 })) });
           savedTxnId = t.id;
           toSave.push({ receiptId: rid, txnId: t.id, role: 'primary', method: 'manual', reason: 'entered as a cash purchase', confirmed: true });
@@ -476,14 +485,16 @@ export default function Import() {
         await reloadLinks();
       } else {
         const plan = planStatement(item.statement!, { accounts: statementAccounts(item, cx.accounts), statements: cx.stored, existing: cx.txns }, { name: item.file?.name ?? 'statement', sha256: item.file?.sha256 });
-        await saveStatementPlan(plan, item.file, owner);
+        const helped = await saveStatementPlan(plan, item.file, owner);
         await sync.now();
         setStored(await loadStored(owner));
         await settle(cx.txns);
         // receipts saved earlier may now have their charge: link the clear ones, leave the likely ones for the person to confirm
         let swept: Awaited<ReturnType<typeof sweepLinks>> = null;
         try { swept = await sweepLinks(ctxRef.current.txns, ctxRef.current.accounts, owner); if (swept) await reloadLinks(); } catch { /* the statement is saved; links can be found later from the Links screen */ }
-        message = plan.txns.length === 0 && plan.skipped.length
+        message = helped
+          ? (helped.spendingAdded === 0 ? `Nothing new: the spending on this statement was already in the books.${helped.statement === 'added' ? ' The statement itself was recorded.' : ''}` : `Saved ${helped.spendingAdded} purchase${helped.spendingAdded === 1 ? '' : 's'} to ${plan.account.name}${plan.isNewAccount ? ' (new card)' : ''}.${helped.spendingAlready ? ` ${helped.spendingAlready} ${helped.spendingAlready === 1 ? 'was' : 'were'} already in the books and not added again.` : ''}`)
+          : plan.txns.length === 0 && plan.skipped.length
           ? `Nothing new: all ${plan.skipped.length} rows were already in your ledger. The statement itself was recorded.`
           : `Saved ${plan.txns.length} transactions to ${plan.account.name}${plan.isNewAccount ? ' (new account)' : ''}${plan.pairUpdates.length ? `, linked ${plan.pairUpdates.length} card payment${plan.pairUpdates.length > 1 ? 's' : ''}` : ''}.${plan.skipped.length ? ` ${plan.skipped.length} ${plan.skipped.length === 1 ? 'row was' : 'rows were'} already in your ledger and not added again.` : ''}`;
         if (swept?.saved) message += ` Linked ${swept.saved} receipt${swept.saved > 1 ? 's' : ''} you had saved earlier.`;
@@ -523,12 +534,12 @@ export default function Import() {
 
   return (
     <Screen max={anyPeek && sideBySide ? 1400 : 760}>
-      <ScreenHeader back title="Import" sub="Every receipt and statement is read and checked first. Nothing is saved until every detail is accounted for." right={<View style={{ flexDirection: 'row', gap: S.sm }}><Button small kind="outline" label="Accounts" onPress={() => router.push('/accounts')} /><Button small kind="outline" label="Receipt links" onPress={() => router.push('/links')} /></View>} />
+      <ScreenHeader back title="Import" sub="Every receipt and statement is read and checked first. Nothing is saved until every detail is accounted for." right={<View style={{ flexDirection: 'row', gap: S.sm }}>{spendingOnly ? null : <Button small kind="outline" label="Accounts" onPress={() => router.push('/accounts')} />}<Button small kind="outline" label="Receipt links" onPress={() => router.push('/links')} /></View>} />
       {team.active ? <Banner title={`Adding for ${targetName}`} tone="info">Statements and receipts you add here are saved to {target ? `${targetName}'s` : 'your'} data{target ? ', and they will see them. A cash purchase is kept in your own books' : ''}. Change whose data is on show with the bar at the top.</Banner> : null}
       {!connected ? <Banner title="No database is connected.">Set the Supabase URL and anon key in .env first. Nothing can be saved without it.</Banner> : null}
       <Card title="What are you adding?">
-        <Segmented value={kind} onChange={setKind} options={[{ value: 'statement', label: 'Statements' }, { value: 'receipt', label: 'Receipts' }]} />
-        <T size={13} tone="ink2">{kind === 'statement' ? 'Bank or card statements, one PDF per month, or photos of its pages.' : 'Store receipts or order confirmations, as photos or PDFs.'} {canPickFolder ? 'Choose a whole folder, or select as many files as you like.' : 'Select as many files or photos as you like.'}</T>
+        <Segmented value={kind} onChange={setKind} options={[{ value: 'statement', label: spendingOnly ? 'Card statements' : 'Statements' }, { value: 'receipt', label: 'Receipts' }]} />
+        <T size={13} tone="ink2">{kind === 'statement' ? (spendingOnly ? 'Credit card statements, one PDF per month, or photos of its pages.' : 'Bank or card statements, one PDF per month, or photos of its pages.') : 'Store receipts or order confirmations, as photos or PDFs.'} {canPickFolder ? 'Choose a whole folder, or select as many files as you like.' : 'Select as many files or photos as you like.'}</T>
         {kind === 'statement' && redactionSupported ? (
           <View style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
             <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -675,6 +686,7 @@ function summaryLine(item: Item, accounts: Account[]): string {
 
 function needsText(ev: Ev): string {
   const parts: string[] = [];
+  if (ev.notCard) parts.push(CARDS_ONLY);
   if (ev.analysis.gaps.length) parts.push(`Missing: ${ev.analysis.gaps.slice(0, 4).map((g) => g.label).join(', ')}${ev.analysis.gaps.length > 4 ? ` and ${ev.analysis.gaps.length - 4} more` : ''}.`);
   if (ev.analysis.problems.length) parts.push(`${ev.analysis.problems.length} ${ev.analysis.problems.length === 1 ? 'number does' : 'numbers do'} not add up.`);
   if (ev.waitingFor) parts.push(`Waiting for ${ev.waitingFor} to be saved first: this is another document for the same purchase.`);
@@ -711,6 +723,7 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
   const C = useColors();
   const title = item.file?.name ?? 'Receipt typed by hand';
   const tag = item.kind === 'statement' ? 'Statement' : 'Receipt';
+  const cardsOnly = useRepo().spendingOnly;
   if (item.status === 'queued') return <Card title={title} right={<T size={12} tone="ink3">Waiting</T>}><T size={13} tone="ink2">In line to be read.</T><View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Discard" onPress={onRemove} /></View></Card>;
   if (item.status === 'reading') return <Card title={title} right={<T size={12} tone="ink3">Reading</T>}><T size={13} tone="ink2">{item.message ?? `Reading the ${tag.toLowerCase()} and checking it. This can take a minute for a long statement.`}</T></Card>;
   if (item.status === 'duplicate') return <Card title={title}><T size={13} tone="ink2">{item.message}</T><View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Dismiss" onPress={onRemove} /></View></Card>;
@@ -763,6 +776,7 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
         </>
       ) : null}
 
+      {ev.notCard ? <Banner title="This is not a credit card statement">{CARDS_ONLY}</Banner> : null}
       <Findings analysis={ev.analysis} errors={item.errors}
         onAnswer={(g, text) => onAnswer(g.field, g.id, text)} onSkip={onSkip} onAcknowledge={onAcknowledge} />
 
@@ -807,7 +821,7 @@ function ItemCard({ item, ev, accounts, onAnswer, onSkip, onAcknowledge, onState
           <T size={13} tone="ink2">{ev.cash ? 'Will be added as a cash purchase. Pick its category.' : item.link === 'flag' ? 'Saved as paid another way: no charge is expected, and it will not be listed as unlinked.' : 'No charge in your ledger matches this receipt, so it is flagged as not linked. If its statement is not imported yet it will be linked when it is. If you paid cash, add it as a cash purchase; if it was paid some other way, say so.'}</T>
           <View style={{ flexDirection: 'row', gap: S.xs, flexWrap: 'wrap' }}>
             <Chip label="Keep as evidence, link later" on={!ev.cash && item.link !== 'flag'} onPress={() => onSet({ link: 'none' })} />
-            <Chip label="Cash purchase (add to ledger)" on={ev.cash} onPress={() => onSet({ link: 'cash' })} />
+            {cardsOnly ? null : <Chip label="Cash purchase (add to ledger)" on={ev.cash} onPress={() => onSet({ link: 'cash' })} />}
             <Chip label="Paid another way (no charge expected)" on={item.link === 'flag'} onPress={() => onSet({ link: 'flag', noLink: item.noLink ?? 'cash' })} />
           </View>
           {item.link === 'flag' ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{RECEIPT_NO_LINK.map((r) => <Chip key={r} label={NO_LINK_LABEL[r]} on={(item.noLink ?? 'cash') === r} onPress={() => onSet({ noLink: r })} />)}</View> : null}

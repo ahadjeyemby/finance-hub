@@ -46,6 +46,7 @@ export function CustomizeButton({ onPress, compact }: { onPress: () => void; com
 
 /** Overview, Household, Business and Plan ahead, plus "New view" (not in this release), and the line that says what the chosen view is for. */
 export function ViewTabs({ view, onChange }: { view: ViewId; onChange: (v: ViewId) => void }) {
+  const { spendingOnly } = useRepo();
   const { c } = useTheme();
   const wide = useWide();
   const tabs = VIEW_IDS.map((id) => {
@@ -74,7 +75,7 @@ export function ViewTabs({ view, onChange }: { view: ViewId; onChange: (v: ViewI
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }} accessibilityRole="tablist" accessibilityLabel="Dashboard view">{tabs}{newView}</ScrollView>
       )}
-      <Text style={{ fontFamily: F.body, fontSize: wide ? 15 : 14, lineHeight: wide ? 21 : 20, color: c.ink2 }}>{VIEWS[view].blurb}</Text>
+      <Text style={{ fontFamily: F.body, fontSize: wide ? 15 : 14, lineHeight: wide ? 21 : 20, color: c.ink2 }}>{(spendingOnly && VIEWS[view].spendingBlurb) || VIEWS[view].blurb}</Text>
     </View>
   );
 }

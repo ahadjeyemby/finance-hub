@@ -7,7 +7,12 @@
 //   sparse eight days of one card, so most widgets are in their "needs more data" state
 //   empty  accounts with statements but no charges at all
 //   none   no accounts: what a new person sees before importing anything
+//   contributor  the full ledger as a Contributor sees it (migration 0009): spending only, see contributorFixture
+import type { CategoryConfig } from '@/core/categories';
+import { spendingView } from '@/core/contributor';
 import { summarizeRecurring } from '@/core/recurring';
+import { tagEditTxnId } from '@/core/tags';
+import type { TagState } from '@/core/tags';
 import { emptyOverlay } from '@/core/types';
 import type { Account, Hint, Overlay, StatementPeriod, Txn } from '@/core/types';
 
@@ -189,3 +194,15 @@ export function fixture(kind: FixtureKind = 'full'): Fixture {
 }
 
 export const isFixtureKind = (v: unknown): v is FixtureKind => v === 'full' || v === 'gapped' || v === 'sparse' || v === 'empty' || v === 'none';
+
+/** The full ledger as a Contributor's device receives it: only spending, with the owner's categories and tags. Mirrors contributor_spending(). */
+export function contributorFixture(): Fixture & { owner: { categories: CategoryConfig | undefined; tags: TagState } } {
+  const f = fixture('full');
+  const txns = spendingView(f.txns, f.overlay);
+  const used = new Set(txns.map((t) => t.accountId));
+  const accounts = f.accounts.filter((a) => used.has(a.id) || a.type === 'credit').map(({ incomeComplete: _i, ...a }) => a);
+  const cards = new Set(accounts.filter((a) => a.type === 'credit').map((a) => a.id));
+  const ids = new Set(txns.map((t) => t.id));
+  const edits = Object.fromEntries(Object.entries(f.overlay.tags?.edits ?? {}).filter(([k]) => ids.has(tagEditTxnId(k) ?? '')));
+  return { accounts, txns, statements: f.statements.filter((x) => cards.has(x.accountId)), overlay: emptyOverlay(), owner: { categories: f.overlay.categories, tags: { defs: f.overlay.tags?.defs ?? [], edits } } };
+}

@@ -6,7 +6,8 @@ import { useTheme } from '@/theme/theme';
 import { F, MIN_TOUCH, R } from '@/theme/tokens';
 import { useWide } from '@/theme/ui';
 import { ReadinessBadge } from './badge';
-import { CATALOG, GROUPS } from './catalog';
+import { GROUPS, widgetsFor } from './catalog';
+import { useRepo } from '@/data/repo';
 import type { Readiness, WidgetId } from './catalog';
 import { VIEWS } from './views';
 import type { ViewId } from './views';
@@ -36,6 +37,7 @@ function Switch({ value, label, onChange }: { value: boolean; label: string; onC
 
 function Contents({ view, on, readiness, onToggle, onReset, onClose, footerPad }: Omit<Props, 'visible'> & { footerPad: number }) {
   const { c } = useTheme();
+  const catalog = widgetsFor(useRepo().spendingOnly);
   return (
     <>
       <View style={{ paddingTop: 24, paddingHorizontal: 24, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: c.line, gap: 10 }}>
@@ -46,13 +48,13 @@ function Contents({ view, on, readiness, onToggle, onReset, onClose, footerPad }
             <Icon name="close" color={c.ink2} size={18} strokeWidth={2.2} />
           </Pressable>
         </View>
-        <Text style={{ fontFamily: F.body, fontSize: 14, lineHeight: 20, color: c.ink2 }}>Turn widgets on or off for this view. Each view keeps its own set. {on.size} of {CATALOG.length} on.</Text>
+        <Text style={{ fontFamily: F.body, fontSize: 14, lineHeight: 20, color: c.ink2 }}>Turn widgets on or off for this view. Each view keeps its own set. {on.size} of {catalog.length} on.</Text>
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 24, gap: 18 }}>
         {GROUPS.map((g) => (
           <View key={g}>
             <Text accessibilityRole="header" style={{ fontFamily: F.bodyBold, fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: c.ink3, paddingTop: 14, paddingBottom: 6 }}>{g}</Text>
-            {CATALOG.filter((w) => w.group === g).map((w) => (
+            {catalog.filter((w) => w.group === g).map((w) => (
               <View key={w.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, borderTopWidth: 1, borderTopColor: c.line }}>
                 <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: c.seg, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name={w.icon} color={c.ink2} size={18} strokeWidth={1.9} />

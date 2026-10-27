@@ -59,6 +59,8 @@ export function autoTagsFor(text: string, category: string | undefined, business
 export const txnKey = (id: string) => `t:${id}`;
 /** An item is told apart by its charge, its words and its price; the nth of identical lines (three Green Onions at 0.89) gets its own number. */
 export const itemKey = (txnId: string, item: string, cents: number, nth = 0) => `i:${txnId}:${cents}:${slug(item)}:${nth}`;
+/** The charge a tag change belongs to, from either kind of key (the same rule as tag_edit_txn_id in migration 0009). */
+export const tagEditTxnId = (key: string): string | null => (key.startsWith('t:') ? key.slice(2) : /^i:(.*):-?[0-9]+:[^:]*:[0-9]+$/.exec(key)?.[1] ?? null);
 
 const set = (xs?: string[]) => new Set(xs ?? []);
 

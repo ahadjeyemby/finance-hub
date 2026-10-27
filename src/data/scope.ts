@@ -17,6 +17,15 @@ export function dbAccount(a: { id: string; owner?: string }): { owner: string; i
   return { owner: me, id: a.id };
 }
 
+let contributingTo: string | null = null;
+
+/**
+ * Set when the signed-in person is a Contributor (migration 0009): the owner whose books they add to. A Contributor reads and writes nothing
+ * directly; every data call checks this and goes through the contributor functions instead.
+ */
+export const setContributingTo = (owner: string | null) => { contributingTo = owner; };
+export const contributorOwner = (): string | null => contributingTo;
+
 /** The signed-in person's id. Throws when nobody is signed in, so a query never runs unscoped. */
 export const meId = (): string => {
   if (!current) throw new Error('Signed out. Sign in again.');

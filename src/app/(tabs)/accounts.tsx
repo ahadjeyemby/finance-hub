@@ -13,6 +13,7 @@ import { useRepo } from '@/data/repo';
 import { F, R, S } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Banner, Button, Card, Chip, Row, Screen, T } from '@/theme/ui';
+import { ownerOnly } from '@/components/owneronly';
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 
@@ -135,7 +136,9 @@ function Numbers({ account, onSaved }: { account: Account; onSaved: () => void }
   );
 }
 
-export default function Accounts() {
+export default ownerOnly(Accounts);
+
+function Accounts() {
   const C = useColors();
   const { accounts, txns, dataFrom, dataTo, auth, sync, source } = useRepo();
   const span = Math.max(1, daysBetween(dataFrom, dataTo));

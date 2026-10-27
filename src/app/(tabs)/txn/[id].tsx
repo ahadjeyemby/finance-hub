@@ -20,7 +20,7 @@ import { Button, Card, Chip, Row, Screen, Segmented, T } from '@/theme/ui';
 export default function TxnDetail() {
   const C = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { txns, accounts, patchTxn, links, reloadLinks, tagState, saveTagState } = useRepo();
+  const { txns, accounts, patchTxn, links, reloadLinks, tagState, saveTagState, spendingOnly } = useRepo();
   const [flagging, setFlagging] = useState(false);
   const [linkError, setLinkError] = useState('');
   const t = txns.find((x) => x.id === id);
@@ -53,7 +53,7 @@ export default function TxnDetail() {
           </Card>
           <Card title="Tags">
             <TagsEditor txn={t} tagState={tagState} onChange={saveTagState} />
-            <View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Manage categories and tags" onPress={() => router.push('/categories')} /></View>
+            {spendingOnly ? null : <View style={{ flexDirection: 'row' }}><Button small kind="ghost" label="Manage categories and tags" onPress={() => router.push('/categories')} /></View>}
           </Card>
           <Card title="Repeats?">
             <Segmented value={t.oneOff ? 'one' : 'rep'} onChange={(v) => patchTxn(t.id, { oneOff: v === 'one' })} options={[{ value: 'rep', label: 'Normal' }, { value: 'one', label: 'One-time' }]} />

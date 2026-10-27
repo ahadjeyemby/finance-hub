@@ -20,7 +20,10 @@ import type { LedgerKind } from '@/core/sync';
 import { emptyOverlay } from '@/core/types';
 import type { Account, CategoryId, Overlay, Question, StatementPeriod, Txn } from '@/core/types';
 import { useTheme } from '@/theme/theme';
-import { setCurrentUser } from './scope';
+import { setContributingTo, setCurrentUser } from './scope';
+import { fetchContributorSnapshot, fetchEditsForOwner, periodsOf, pushContributorEdits, savePairs } from './contributor';
+import { layerContributorEdits, newCardPairs } from '@/core/contributor';
+import type { StoredEdit } from '@/core/contributor';
 import { fetchStatementPeriods } from './accounts';
 import { fetchLedger, fetchOverlay, pushOverlay } from './sync';
 import { fetchTeamData } from './team';
@@ -37,16 +40,20 @@ import type { CategoryConfig } from '@/core/categories';
 import { DEFAULT_TAGS, applyTags } from '@/core/tags';
 import type { TagState } from '@/core/tags';
 import { projectRef, supabase } from './supabase';
-import { fixture, isFixtureKind } from '@/dev/fixture';
+import { contributorFixture, fixture, isFixtureKind } from '@/dev/fixture';
 
 const FIXTURE_ENV = process.env.EXPO_PUBLIC_FIXTURE;
+/** Development only, and never with a backend: a fictional ledger as a Contributor sees it (spending only), to check the narrower app. */
+const CONTRIBUTOR_FIXTURE = !supabase && __DEV__ && FIXTURE_ENV === 'contributor' ? contributorFixture() : null;
 /** Development only, and never with a backend: a fictional ledger (src/dev/fixture.ts) so the screens can be seen without anyone's real data. */
-const FIXTURE = !supabase && __DEV__ && isFixtureKind(FIXTURE_ENV) ? FIXTURE_ENV : null;
+const FIXTURE = !supabase && __DEV__ && isFixtureKind(FIXTURE_ENV) ? FIXTURE_ENV : CONTRIBUTOR_FIXTURE ? 'contributor' : null;
 const KEY = FIXTURE ? `audit.overlay.fixture.${FIXTURE}` : 'audit.overlay.v1';
 const LEDGER_KEY = 'audit.ledger.v1';
 const DIRTY_KEY = 'audit.dirty.v1';
 const SYNCED_KEY = 'audit.synced.v1';
 const OWNER_KEY = 'audit.owner.v1';
+/** 'contributor:<owner id>' when the person signed in here was a Contributor at the last sync, so the narrower app shows from the first moment */
+const ROLE_KEY = 'audit.role.v1';
 export type Scope = 'all' | 'personal' | 'business';
 
 interface Seed { accounts: Account[]; txns: Txn[]; statements?: StatementPeriod[] }
@@ -95,6 +102,11 @@ export interface SyncApi { state: SyncState; lastAt: string | null; error: strin
 
 export interface Repo {
   ready: boolean;
+  /**
+   * true for a Contributor (migration 0009): the data is the owner's spending only, and the app shows nothing about pay, savings, balances or
+   * income settings. The database decides what arrives; this only shapes the screens.
+   */
+  spendingOnly: boolean;
   /** true once the database has returned at least one account; the app shows "data is not available" until then */
   hasData: boolean;
   auth: AuthApi;
@@ -167,7 +179,12 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   const { cat } = useTheme();
   const configured = !!supabase;
   const [overlay, setOverlay] = useState<Overlay>(emptyOverlay());
-  const [ledger, setLedger] = useState<Seed>(FIXTURE ? fixture(FIXTURE) : EMPTY);
+  const [ledger, setLedger] = useState<Seed>(CONTRIBUTOR_FIXTURE ?? (FIXTURE && FIXTURE !== 'contributor' ? fixture(FIXTURE) : EMPTY));
+  // a Contributor: the owner's categories and tags, which their screens show and they do not change
+  const [ownerCfg, setOwnerCfg] = useState<{ categories: CategoryConfig | undefined; tags: TagState } | null>(CONTRIBUTOR_FIXTURE?.owner ?? null);
+  // the owner: what their Contributors changed, laid under their own decisions on screen
+  const [contribEdits, setContribEdits] = useState<StoredEdit[]>([]);
+  const [roleHint, setRoleHint] = useState(false);
   const [linkData, setLinkData] = useState<LinkData | null>(null);
   const [team, setTeam] = useState<{ access: Access | null; members: Member[]; data: PersonData[] }>({ access: null, members: [], data: [] });
   const [viewingState, setViewingState] = useState<Viewing>('me');
@@ -192,7 +209,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
       try {
         const raw = await AsyncStorage.getItem(KEY);
         if (raw) { const o = { ...emptyOverlay(), ...JSON.parse(raw) } as Overlay; overlayRef.current = o; setOverlay(o); }
-        else if (FIXTURE) { const o = fixture(FIXTURE).overlay; overlayRef.current = o; setOverlay(o); }
+        else if (FIXTURE && FIXTURE !== 'contributor') { const o = fixture(FIXTURE).overlay; overlayRef.current = o; setOverlay(o); }
         if (configured) {
           const dirty = await AsyncStorage.getItem(DIRTY_KEY);
           const synced = await AsyncStorage.getItem(SYNCED_KEY);
@@ -217,6 +234,8 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   const pushStamped = useCallback(async (o: Overlay): Promise<Overlay> => {
     const stamped = stampUploads(o, new Date().toISOString());
     await pushOverlay(stamped);
+    // a Contributor's decisions also go to the owner, as rows the database checks (only spending, only the allowed fields)
+    await pushContributorEdits(stamped);
     const adopted = adoptUploadStamps(overlayRef.current, stamped);
     if (adopted !== overlayRef.current) { overlayRef.current = adopted; setOverlay(adopted); store(adopted); }
     return stamped;
@@ -248,22 +267,51 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     if (!supabase || !userIdRef.current) return;
     setSyncInfo((x) => ({ ...x, state: 'syncing', error: null }));
     try {
-      const remoteLedger = (await fetchLedger()) ?? EMPTY;
       const at = new Date().toISOString();
-      // which days each saved statement covers; without them (migration 0002 not run) each account counts from its first to its last day
-      const statements = await fetchStatementPeriods().catch(() => [] as StatementPeriod[]);
-      setLedger({ ...remoteLedger, statements });
-      setLedgerFrom({ kind: 'database', at });
-      if (remoteLedger.accounts.length && projectRef && userIdRef.current) AsyncStorage.setItem(LEDGER_KEY, JSON.stringify(makeLedgerCache(projectRef, userIdRef.current, at, remoteLedger))).catch(() => {});
-      else AsyncStorage.removeItem(LEDGER_KEY).catch(() => {});
+      // who this is decides what is loaded: a Contributor gets the owner's spending and nothing else (what comes back is decided by the database)
+      const access = await myAccess().catch(() => null);
+      const helping = access?.role === 'contributor' && access.active ? access.owner : null;
+      setContributingTo(helping);
+      setRoleHint(access?.role === 'contributor');
+      if (access?.role === 'contributor') AsyncStorage.setItem(ROLE_KEY, `contributor:${helping ?? ''}`).catch(() => {}); else AsyncStorage.removeItem(ROLE_KEY).catch(() => {});
+      if (access?.role === 'contributor') {
+        const snap = helping ? await fetchContributorSnapshot() : null;
+        const seed: Seed = snap ? { accounts: snap.accounts, txns: snap.txns, statements: periodsOf(snap) } : EMPTY;
+        setLedger(seed);
+        setLedgerFrom({ kind: 'database', at });
+        if (seed.accounts.length && projectRef && userIdRef.current) AsyncStorage.setItem(LEDGER_KEY, JSON.stringify(makeLedgerCache(projectRef, userIdRef.current, at, seed))).catch(() => {});
+        else AsyncStorage.removeItem(LEDGER_KEY).catch(() => {});
+        setLinkData(snap?.links ?? null);
+        setOwnerCfg(snap ? { categories: snap.categories, tags: snap.tags } : null);
+        setTeam({ access, members: [], data: [] });
+        setContribEdits([]);
+      } else {
+        const remoteLedger = (await fetchLedger()) ?? EMPTY;
+        // card payments a Contributor added have no partner yet: their checking side is here, so they are paired here
+        const pairs = newCardPairs(remoteLedger.txns);
+        if (pairs.length) {
+          await savePairs(pairs).catch(() => {});
+          const by = new Map(pairs.map((p) => [p.id, p.pairId]));
+          remoteLedger.txns = remoteLedger.txns.map((t) => (by.has(t.id) ? { ...t, pairId: by.get(t.id) } : t));
+        }
+        // which days each saved statement covers; without them (migration 0002 not run) each account counts from its first to its last day
+        const statements = await fetchStatementPeriods().catch(() => [] as StatementPeriod[]);
+        setLedger({ ...remoteLedger, statements });
+        setLedgerFrom({ kind: 'database', at });
+        if (remoteLedger.accounts.length && projectRef && userIdRef.current) AsyncStorage.setItem(LEDGER_KEY, JSON.stringify(makeLedgerCache(projectRef, userIdRef.current, at, remoteLedger))).catch(() => {});
+        else AsyncStorage.removeItem(LEDGER_KEY).catch(() => {});
 
-      setLinkData(await fetchLinkData());
-      // a person who manages a workspace also loads their members' data (what comes back is decided by the database, not by this code)
-      try {
-        const access = await myAccess();
-        const members = canManage(access) ? (await listMembers()).filter((m) => m.active) : [];
-        setTeam({ access, members, data: members.length ? await fetchTeamData(members.map((m) => m.member)) : [] });
-      } catch { setTeam({ access: null, members: [], data: [] }); }
+        setLinkData(await fetchLinkData());
+        setOwnerCfg(null);
+        // a person who manages a workspace also loads their members' data (what comes back is decided by the database, not by this code).
+        // A Contributor keeps no books of their own: what they change arrives as contributor_edits instead.
+        try {
+          const all = canManage(access) ? (await listMembers()).filter((m) => m.active) : [];
+          const members = all.filter((m) => m.role === 'member');
+          setTeam({ access, members, data: members.length ? await fetchTeamData(members.map((m) => m.member)) : [] });
+          setContribEdits(all.some((m) => m.role === 'contributor') ? await fetchEditsForOwner() : []);
+        } catch { setTeam({ access: null, members: [], data: [] }); setContribEdits([]); }
+      }
       const remote = await fetchOverlay();
       const local = overlayRef.current;
       let next = remote ? (dirtyRef.current ? mergeOverlays(local, remote) : remote) : local;
@@ -288,11 +336,13 @@ export function RepoProvider({ children }: { children: ReactNode }) {
         if (verdict === 'other') {
           // another project or person was signed in here: none of its data or unsent edits may appear under this account
           if (pushTimer.current) clearTimeout(pushTimer.current);
-          await AsyncStorage.multiRemove([KEY, LEDGER_KEY, DIRTY_KEY, SYNCED_KEY]).catch(() => {});
+          await AsyncStorage.multiRemove([KEY, LEDGER_KEY, DIRTY_KEY, SYNCED_KEY, ROLE_KEY]).catch(() => {});
           dirtyRef.current = false; overlayRef.current = emptyOverlay();
           if (live) { setOverlay(emptyOverlay()); setLedger(EMPTY); setLinkData(null); setTeam({ access: null, members: [], data: [] }); setViewingState('me'); setLedgerFrom({ kind: 'none', at: null }); }
         }
         await AsyncStorage.setItem(OWNER_KEY, tag).catch(() => {});
+        const role = await AsyncStorage.getItem(ROLE_KEY);
+        if (live && role?.startsWith('contributor:')) { setRoleHint(true); setContributingTo(role.slice('contributor:'.length) || null); }
         const copy = parseLedgerCache(await AsyncStorage.getItem(LEDGER_KEY), projectRef, userId);
         if (copy && live) { setLedger((cur) => (cur.accounts.length ? cur : copy.ledger)); setLedgerFrom((cur) => (cur.kind === 'database' ? cur : { kind: 'saved', at: copy.at })); }
         else if (!copy) AsyncStorage.removeItem(LEDGER_KEY).catch(() => {});
@@ -318,8 +368,9 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     signOut: async () => {
       if (pushTimer.current) clearTimeout(pushTimer.current);
       await supabase?.auth.signOut();
-      await AsyncStorage.multiRemove([KEY, LEDGER_KEY, DIRTY_KEY, SYNCED_KEY, OWNER_KEY]).catch(() => {});
-      dirtyRef.current = false; overlayRef.current = emptyOverlay();
+      await AsyncStorage.multiRemove([KEY, LEDGER_KEY, DIRTY_KEY, SYNCED_KEY, OWNER_KEY, ROLE_KEY]).catch(() => {});
+      setRoleHint(false);
+      dirtyRef.current = false; overlayRef.current = emptyOverlay(); setContributingTo(null); setOwnerCfg(null); setContribEdits([]);
       setOverlay(emptyOverlay()); setLedger(EMPTY); setLedgerFrom({ kind: 'none', at: null }); setSyncInfo({ state: 'local', lastAt: null, error: null });
       setTeam({ access: null, members: [], data: [] }); setViewingState('me');
     },
@@ -328,7 +379,12 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   const ready = loaded && authReady;
   const source = useMemo<SourceInfo>(() => ({ kind: FIXTURE ? 'fixture' : ledgerFrom.kind, project: projectRef, at: ledgerFrom.at, accounts: ledger.accounts.length, rows: ledger.txns.length }), [ledgerFrom, ledger]);
 
-  const ownTagState_ = useMemo<TagState>(() => ({ defs: overlay.tags?.defs?.length ? overlay.tags.defs : DEFAULT_TAGS, edits: overlay.tags?.edits ?? {} }), [overlay.tags]);
+  const spendingOnly = !!CONTRIBUTOR_FIXTURE || (team.access ? team.access.role === 'contributor' : roleHint);
+  // what is shown: the person's own decisions, over what their Contributors changed (the owner) or over the owner's tags (a Contributor)
+  const shown = useMemo(() => layerContributorEdits(overlay, contribEdits), [overlay, contribEdits]);
+  const ownTagState_ = useMemo<TagState>(() => (ownerCfg
+    ? { defs: ownerCfg.tags.defs.length ? ownerCfg.tags.defs : DEFAULT_TAGS, edits: { ...ownerCfg.tags.edits, ...(overlay.tags?.edits ?? {}) } }
+    : { defs: shown.tags?.defs?.length ? shown.tags.defs : DEFAULT_TAGS, edits: shown.tags?.edits ?? {} }), [shown.tags, ownerCfg, overlay.tags]);
   // with members, "my data plus theirs" is put side by side (see core/team.ts); with none, this is exactly the single-person data it always was
   const combined = useMemo(() => (team.data.length && userId
     ? combineTeam({ id: userId, accounts: ledger.accounts, txns: ledger.txns, overlay, links: linkData, tags: ownTagState_, income: overlay.income ?? emptyIncome() }, team.data)
@@ -336,7 +392,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   const baseAccounts = combined?.accounts ?? ledger.accounts;
   const baseLinks = combined?.links ?? linkData;
   const tagState = combined?.tags ?? ownTagState_;
-  const categories = combined?.categories ?? overlay.categories;
+  const categories = ownerCfg ? ownerCfg.categories : combined?.categories ?? overlay.categories;
   const incomeAll = combined?.income ?? overlay.income ?? emptyIncome();
   const receiptsById = useMemo(() => new Map((baseLinks ?? NO_LINKS).receipts.map((r) => [r.id, r])), [baseLinks]);
   const reloadLinks = useCallback(async () => { setLinkData(await fetchLinkData()); }, []);
@@ -344,14 +400,14 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   // the category list is registered before anything is derived from it, so every screen below sees the person's own categories
   const everyone = useMemo(() => {
     setCategoryConfig(categories);
-    return applyTags(applyLinks(applyOverlay(combined?.txns ?? ledger.txns, overlay), baseLinks?.links ?? [], receiptsById, baseLinks?.flags ?? []), tagState);
-  }, [combined, ledger, overlay, baseLinks, receiptsById, tagState, categories]);
+    return applyTags(applyLinks(applyOverlay(combined?.txns ?? ledger.txns, shown), baseLinks?.links ?? [], receiptsById, baseLinks?.flags ?? []), tagState);
+  }, [combined, ledger, shown, baseLinks, receiptsById, tagState, categories]);
   // the switcher: everything the screens use is already limited to whose data is on show
   const txns = useMemo(() => (combined && userId && viewing !== 'all' ? everyone.filter((t) => inView(t.owner, viewing, userId)) : everyone), [everyone, combined, userId, viewing]);
   const accounts = useMemo(() => (combined && userId && viewing !== 'all' ? baseAccounts.filter((a) => inView(a.owner, viewing, userId)) : baseAccounts), [baseAccounts, combined, userId, viewing]);
   // the statements' days and the recurring decisions travel with the rows, so every screen's forecast and month counts agree
   const ctx = useMemo<Ctx>(() => ({ txns, accounts, statements: ledger.statements, recurring: overlay.recurring }), [txns, accounts, ledger.statements, overlay.recurring]);
-  const questions = useMemo(() => buildQuestions(txns, overlay), [txns, overlay]);
+  const questions = useMemo(() => buildQuestions(txns, shown), [txns, shown]);
 
   const hasData = accounts.length > 0;
   // with no accounts these fall back to today so the derived values below stay well-formed; the UI shows the empty state instead
@@ -374,7 +430,7 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   }), [team, userId, viewing, ledger, linkData]);
 
   const value = useMemo<Repo>(() => ({
-    ready, hasData, auth, sync, source, accounts, txns, ctx, scope, setScope, overlay, questions, dataTo, dataFrom, completeTo, months, period, setPeriod, range,
+    ready, spendingOnly, hasData, auth, sync, source, accounts, txns, ctx, scope, setScope, overlay, questions, dataTo, dataFrom, completeTo, months, period, setPeriod, range,
     scoped: (f) => ({ ...(f ?? {}), scope }),
     forecastMonth: addMonths(monthOf(dataTo), 1),
     answer: (q, choice, toMerchant) => { const r = applyAnswer(q, choice, toMerchant, overlayRef.current); commit(r.overlay); return { goto: r.goto }; },
@@ -406,14 +462,15 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     links: baseLinks, reloadLinks,
     team: teamApi,
     // what is saved is only the admin's own part: members' tags, categories and income sources stay theirs (see ownTagState and friends in core/team.ts)
-    tagState, saveTagState: (next) => commit({ ...overlayRef.current, tags: team.data.length ? ownTagState(next, mergeTagStates({ defs: [], edits: {} }, team.data.map((m) => ({ id: m.id, tags: m.overlay.tags }))), overlayRef.current.tags) : next }),
+    // a Contributor keeps only their own tag changes: the owner's are not copied back
+    tagState, saveTagState: (next) => commit({ ...overlayRef.current, tags: ownerCfg ? { defs: overlayRef.current.tags?.defs ?? [], edits: Object.fromEntries(Object.entries(next.edits).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(ownerCfg.tags.edits[k]))) } : team.data.length ? ownTagState(next, mergeTagStates({ defs: [], edits: {} }, team.data.map((m) => ({ id: m.id, tags: m.overlay.tags }))), overlayRef.current.tags) : next }),
     income: incomeAll, saveIncome: (next) => commit({ ...overlayRef.current, income: team.data.length ? ownIncomeState(next, mergeIncomes(emptyIncome(), team.data.map((m) => ({ id: m.id, income: m.overlay.income }))), overlayRef.current.income) : next }),
     recurring: overlay.recurring ?? emptyRecurring(), saveRecurring: (next) => commit({ ...overlayRef.current, recurring: next }),
-    categoryConfig: categories, saveCategoryConfig: (next) => commit({ ...overlayRef.current, categories: team.data.length ? ownCategoryConfig(next, mergeCategoryConfigs(undefined, team.data.map((m) => m.overlay.categories)), overlayRef.current.categories) : next }),
+    categoryConfig: categories, saveCategoryConfig: (next) => ownerCfg ? undefined : commit({ ...overlayRef.current, categories: team.data.length ? ownCategoryConfig(next, mergeCategoryConfigs(undefined, team.data.map((m) => m.overlay.categories)), overlayRef.current.categories) : next }),
     attachReceipt: (txnId, lines, uri) => { const o = overlayRef.current; commit({ ...o, patches: { ...o.patches, [txnId]: { ...o.patches[txnId], lines, receiptId: uri } } }); },
     colorOf: (category) => cat[colorGroupOf(category)],
     reset: () => commit(emptyOverlay()),
-  }), [ready, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, cat, commit, ledger.statements, baseLinks, reloadLinks, tagState, incomeAll, categories, team, teamApi]);
+  }), [ready, spendingOnly, ownerCfg, hasData, auth, sync, source, accounts, txns, ctx, scope, overlay, questions, dataTo, dataFrom, completeTo, months, period, range, cat, commit, ledger.statements, baseLinks, reloadLinks, tagState, incomeAll, categories, team, teamApi]);
 
   return <Ctx_.Provider value={value}>{children}</Ctx_.Provider>;
 }

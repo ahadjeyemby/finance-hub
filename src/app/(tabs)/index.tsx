@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { PoweredBy } from '@/components/poweredby';
 import { AskField } from '@/components/shell/parts';
-import { WIDGET_IDS } from '@/dashboard/catalog';
+import { OWNER_ONLY_WIDGETS, WIDGET_IDS } from '@/dashboard/catalog';
 import type { Readiness, WidgetId } from '@/dashboard/catalog';
 import { CustomizePanel } from '@/dashboard/customize';
 import { WidgetGrid } from '@/dashboard/grid';
@@ -14,6 +14,7 @@ import { REGISTRY } from '@/dashboard/registry';
 import { useDashboardData } from '@/dashboard/useDashboardData';
 import { VIEWS, isViewId } from '@/dashboard/views';
 import { useWidgetPrefs } from '@/data/dashboardPrefs';
+import { useRepo } from '@/data/repo';
 import { Banner, Card, Screen, T, useWide } from '@/theme/ui';
 
 export default function Dashboard() {
@@ -23,7 +24,9 @@ export default function Dashboard() {
   const prefs = useWidgetPrefs();
   const [customizing, setCustomizing] = useState(false);
   const rows = prefs.prefs[view];
-  const placed = resolveView(view, rows);
+  const { spendingOnly } = useRepo();
+  // a Contributor's data holds no money coming in, and their dashboard has no widget about it
+  const placed = resolveView(view, rows).filter((p) => !spendingOnly || !OWNER_ONLY_WIDGETS.has(p.id));
   // every widget in a view counts that view's spending: Overview everything, Household and Plan ahead personal, Business business
   const data = useDashboardData(VIEWS[view].scope);
   const readiness = Object.fromEntries(WIDGET_IDS.map((id) => [id, REGISTRY[id].readiness(data)])) as Record<WidgetId, Readiness>;

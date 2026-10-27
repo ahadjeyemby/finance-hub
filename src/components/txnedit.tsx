@@ -19,7 +19,7 @@ const REST = 'Other (not itemised)';
 export function EditEntry({ txn }: { txn: Txn }) {
   const C = useColors();
   const input = useInputStyle();
-  const { overlay, patchTxn, clearPatch, auth } = useRepo();
+  const { overlay, patchTxn, clearPatch, auth, spendingOnly } = useRepo();
   const mine = !txn.owner || txn.owner === auth.userId;
   const patch = overlay.patches[txn.id];
   const renamed = patch?.merchant != null;
@@ -31,7 +31,8 @@ export function EditEntry({ txn }: { txn: Txn }) {
   const total = Math.abs(txn.cents);
 
   if (txn.manual) {
-    if (!mine) return null;
+    // a cash entry a Contributor sees is the owner's: theirs to change
+    if (!mine || spendingOnly) return null;
     return (
       <Card title="Edit this entry">
         <T size={13} tone="ink2">You entered this one, so everything about it can be changed: the amount, who was paid, the date, the category and the items.</T>
@@ -62,7 +63,7 @@ export function EditEntry({ txn }: { txn: Txn }) {
   return (
     <Card title="Edit details">
       <T size={12} tone="ink3">The date and amount come from the statement and are not changed here. If the statement was read wrongly, import it again.</T>
-      <View style={{ gap: 4 }}>
+      {spendingOnly ? null : <View style={{ gap: 4 }}>
         <T size={13} bold>Name</T>
         <TextInput value={name} onChangeText={(v) => { setName(v); setDone(''); }} placeholder="Name" placeholderTextColor={C.ink3} accessibilityLabel="Name" style={input} />
         <T size={12} tone="ink3">The bank wrote: {txn.description}</T>
@@ -70,7 +71,7 @@ export function EditEntry({ txn }: { txn: Txn }) {
           <Button small kind="outline" label="Save name" disabled={name.trim() === txn.merchant} onPress={saveName} />
           {renamed ? <Button small kind="ghost" label="Use the bank's name again" onPress={() => { clearPatch(txn.id, ['merchant']); setDone('Back to the name from the statement.'); }} /> : null}
         </View>
-      </View>
+      </View>}
       {spendLike && !txn.receiptId ? (
         <View style={{ gap: 4, borderTopWidth: 1, borderTopColor: C.line, paddingTop: S.sm }}>
           <T size={13} bold>Items, one per line as “item price”</T>

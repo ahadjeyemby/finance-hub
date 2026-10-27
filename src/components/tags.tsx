@@ -9,6 +9,7 @@ import type { Txn } from '@/core/types';
 import { F, R, S } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Button, Chip, T } from '@/theme/ui';
+import { useRepo } from '@/data/repo';
 
 /** Every tag as a chip: on when the thing carries it. Press to add or take away; one the rules found says "auto" until it is taken away. */
 export function TagPicker({ defs, on, auto, onToggle, onCreate }: { defs: TagDef[]; on: string[]; auto: string[]; onToggle: (id: string, on: boolean) => void; onCreate?: (label: string) => void }) {
@@ -46,6 +47,8 @@ export function TagsEditor({ txn, tagState, onChange }: { txn: Txn; tagState: Ta
   for (const r of e?.remove ?? []) own.delete(r);
   const keys = lineKeys(txn.id, txn.lines);
 
+  // a Contributor uses the owner's tags: a tag they made up would mean nothing in the owner's books
+  const canCreate = !useRepo().spendingOnly;
   const create = (key: string, auto: string[]) => (label: string) => {
     const next = saveTag(tagState, { label, keywords: [], auto: true });
     const id = next.defs[next.defs.length - 1].id;
@@ -55,7 +58,7 @@ export function TagsEditor({ txn, tagState, onChange }: { txn: Txn; tagState: Ta
   return (
     <View style={{ gap: S.sm }}>
       <T size={12} tone="ink3">Tags can overlap, so a charge can be Health and Household at once. They never change the category or the totals; they give the extra views.</T>
-      <TagPicker defs={defs} on={[...own]} auto={txn.autoTags ?? []} onToggle={(id, on) => onChange(setTag(tagState, txnKey(txn.id), id, on, (txn.autoTags ?? []).includes(id)))} onCreate={create(txnKey(txn.id), txn.autoTags ?? [])} />
+      <TagPicker defs={defs} on={[...own]} auto={txn.autoTags ?? []} onToggle={(id, on) => onChange(setTag(tagState, txnKey(txn.id), id, on, (txn.autoTags ?? []).includes(id)))} onCreate={canCreate ? create(txnKey(txn.id), txn.autoTags ?? []) : undefined} />
       {txn.lines?.length ? (
         <View style={{ gap: S.xs, borderTopWidth: 1, borderTopColor: C.line, paddingTop: S.sm }}>
           <T size={13} bold>Items</T>
@@ -70,7 +73,7 @@ export function TagsEditor({ txn, tagState, onChange }: { txn: Txn; tagState: Ta
                 <Button small kind="ghost" label={open === i ? 'Done' : 'Edit tags'} onPress={() => { setOpen(open === i ? null : i); setPickCat(null); }} />
                 <Button small kind="ghost" label={pickCat === i ? 'Done' : 'Change category'} onPress={() => { setPickCat(pickCat === i ? null : i); setOpen(null); }} />
               </View>
-              {open === i ? <TagPicker defs={defs} on={l.tags ?? []} auto={l.autoTags ?? []} onToggle={(id, on) => onChange(setTag(tagState, keys[i], id, on, (l.autoTags ?? []).includes(id)))} onCreate={create(keys[i], l.autoTags ?? [])} /> : null}
+              {open === i ? <TagPicker defs={defs} on={l.tags ?? []} auto={l.autoTags ?? []} onToggle={(id, on) => onChange(setTag(tagState, keys[i], id, on, (l.autoTags ?? []).includes(id)))} onCreate={canCreate ? create(keys[i], l.autoTags ?? []) : undefined} /> : null}
               {pickCat === i ? (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
                   {allCategories().filter((c) => c.id !== 'uncategorized').map((c) => <Chip key={c.id} label={c.label} on={(l.category ?? txn.category) === c.id} onPress={() => onChange(setItemCategory(tagState, keys[i], c.id))} />)}

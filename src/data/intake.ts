@@ -5,14 +5,17 @@ import { Platform } from 'react-native';
 
 import type { ReceiptKey } from '@/core/dedupe';
 import type { ReceiptRecord } from '@/core/evidence';
-import { receiptToRow, receiptUpdate } from '@/core/evidence';
+import { rawToRow, receiptToRow, receiptUpdate, statementToRow } from '@/core/evidence';
 import { MAX_HINT, readingAsText, receiptAsText, receiptFromRead, receiptMisfits, settleReads, settleReceiptReads, statementFromRead, statementGap } from '@/core/intake';
 import type { ReadReceipt, ReadStatement, StatementDraft, StatementPlan } from '@/core/intake';
-import { uploadEvidence, uploadLedger } from '@/core/ledgerio';
+import { statementTxns, uploadEvidence, uploadLedger } from '@/core/ledgerio';
+import { accountToRow, txnToRow } from '@/core/sync';
 import { selectReadable, withRetry } from '@/core/bulk';
 import { digestHex, sniffMime, toBase64 } from '@/core/sha256';
 import { scanSupported } from './scan';
-import { meId } from './scope';
+import { contributorFileSeen, contributorReceiptRaw, contributorSaveReceipt, contributorSaveStatement, contributorUpdateReceipt } from './contributor';
+import type { StatementSaved } from './contributor';
+import { contributorOwner, meId } from './scope';
 import { callFunction, supabase } from './supabase';
 
 export interface PickedFile { name: string; type: string; bytes: Uint8Array; sha256: string }
@@ -89,6 +92,7 @@ export type Found = { duplicateOf: string | null };
 /** Has this exact file been stored before? Same bytes = same fingerprint, whatever the file is called. */
 export async function findDuplicate(kind: 'receipt' | 'statement', sha256: string, owner: string = meId()): Promise<Found> {
   if (!supabase) return { duplicateOf: null };
+  if (contributorOwner()) return { duplicateOf: (await contributorFileSeen(kind, sha256)) ? `this ${kind} is already in the books` : null };
   const q = kind === 'receipt'
     ? await supabase.from('receipts').select('id, merchant, date').eq('user_id', owner).eq('sha256', sha256).limit(1)
     : await supabase.from('statements').select('id, label').eq('user_id', owner).eq('sha256', sha256).limit(1);
@@ -146,7 +150,8 @@ const userId = async () => { const { data } = await supabase!.auth.getSession();
 /** Store the original file and every field of the receipt. Returns the receipt id. Throws with a readable message on failure. */
 export async function saveReceiptRecord(rec: ReceiptRecord, file: PickedFile | null, txnId: string | null, owner?: string): Promise<string> {
   if (!supabase) throw new Error('No database is connected, so nothing can be saved.');
-  const uid = owner ?? await userId();
+  const helping = contributorOwner();
+  const uid = helping ?? owner ?? await userId();
   let path: string | null = null;
   if (file) {
     path = `${uid}/${file.sha256.slice(0, 12)}-${safe(file.name)}`;
@@ -154,6 +159,8 @@ export async function saveReceiptRecord(rec: ReceiptRecord, file: PickedFile | n
     if (up.error) throw new Error(`Could not store the original file: ${up.error.message}`);
   }
   const row = { ...receiptToRow({ ...rec, sha256: file?.sha256 ?? rec.sha256, sourceFile: file?.name ?? rec.sourceFile, origin: file ? 'app_upload' : 'typed' }, path, txnId), ...(owner ? { user_id: owner } : {}) };
+  // a Contributor's receipt goes into the owner's books through the database's own check (migration 0009)
+  if (helping) return contributorSaveReceipt(row);
   const q = file
     ? await supabase.from('receipts').upsert(row, { onConflict: 'user_id,sha256' }).select('id').single()
     : await supabase.from('receipts').insert(row).select('id').single();
@@ -164,6 +171,7 @@ export async function saveReceiptRecord(rec: ReceiptRecord, file: PickedFile | n
 /** Save the edits made to a receipt that is already stored. Only its own details change: the file, its link and the rest of what was read stay. */
 export async function updateReceiptRecord(id: string, rec: ReceiptRecord, owner?: string): Promise<void> {
   if (!supabase) throw new Error('No database is connected, so nothing can be saved.');
+  if (contributorOwner()) return contributorUpdateReceipt(id, receiptUpdate(rec, await contributorReceiptRaw(id)));
   const uid = owner ?? meId();
   const cur = await supabase.from('receipts').select('raw').eq('user_id', uid).eq('id', id).maybeSingle();
   if (cur.error) throw new Error(`Could not read the receipt: ${cur.error.message}`);
@@ -173,9 +181,14 @@ export async function updateReceiptRecord(id: string, rec: ReceiptRecord, owner?
   if (!r.data?.length) throw new Error('The receipt was not changed. You may not be allowed to edit it.');
 }
 
-/** Save an approved statement: account, rows, the statement record, each source line and the original PDF. */
-export async function saveStatementPlan(plan: StatementPlan, file: PickedFile | null, owner?: string): Promise<void> {
+/**
+ * Save an approved statement: account, rows, the statement record, each source line and the original PDF. For a Contributor it goes through
+ * the database's check (credit cards only, nothing the owner holds is changed) and the answer counts the spending; otherwise it returns null.
+ */
+export async function saveStatementPlan(plan: StatementPlan, file: PickedFile | null, owner?: string): Promise<StatementSaved | null> {
   if (!supabase) throw new Error('No database is connected, so nothing can be saved.');
+  const helping = contributorOwner();
+  if (helping) return saveForOwner(plan, file, helping);
   const uid = owner ?? await userId();
   const ledger = { accounts: [plan.account], txns: plan.txns };
   await uploadLedger(supabase, ledger, undefined, owner);
@@ -187,11 +200,28 @@ export async function saveStatementPlan(plan: StatementPlan, file: PickedFile | 
     const r = await supabase.from('txns').update({ pair_id: u.pairId }).eq('user_id', uid).eq('id', u.id);
     if (r.error) throw new Error(`Saved, but could not link a card payment: ${r.error.message}`);
   }
+  return null;
+}
+
+/** A Contributor's credit card statement. The file can be added to the owner's folder but never read back, so a repeat upload is not an error. */
+async function saveForOwner(plan: StatementPlan, file: PickedFile | null, owner: string): Promise<StatementSaved> {
+  if (plan.account.type !== 'credit') throw new Error('Only credit card statements can be added here. Checking statements are added by the person who runs this workspace.');
+  let path: string | null = null;
+  if (file) {
+    path = `${owner}/${file.sha256.slice(0, 12)}-${safe(file.name)}`;
+    const up = await supabase!.storage.from('statements').upload(path, file.bytes, { contentType: file.type, upsert: false });
+    if (up.error && !/exist|duplicate/i.test(up.error.message)) throw new Error(`Could not store the original file: ${up.error.message}`);
+  }
+  const statement = statementToRow({ ...plan.statement, sha256: file?.sha256 ?? plan.statement.sha256 }, path);
+  const txns = statementTxns(plan.txns).map(txnToRow);
+  const known = new Set(txns.map((t) => t.id));
+  return contributorSaveStatement(accountToRow(plan.account), statement, txns, plan.raw.filter((r) => known.has(r.txnId)).map(rawToRow));
 }
 
 /** What is already stored, in the small form the duplicate check needs. Empty when offline or on error: the check then only sees the current batch. */
 export async function loadStoredReceipts(owner: string = meId()): Promise<ReceiptKey[]> {
-  if (!supabase) return [];
+  // a Contributor has the owner's receipts with the rest of the snapshot (the links), and no direct access
+  if (!supabase || contributorOwner()) return [];
   const q = await supabase.from('receipts').select('id, merchant, date, time, total_cents, order_ref, card_last4, store_ref, source_file, txn_id, payment_method').eq('user_id', owner).limit(5000);
   if (q.error) return [];
   return (q.data ?? []).map((r) => ({

@@ -25,6 +25,7 @@ function Tile({ label, children, foot, hero, dashed }: { label: string; children
 /** 16. Business at a glance: tagged as business, waiting for an answer, likely tools per month, and business income. */
 export function BizSummary({ d }: P) {
   const { c } = useTheme();
+  const { spendingOnly } = useRepo();
   const w = d.bizSummary;
   if (w.readiness === 'data') return <Widget title="Business at a glance" state={w} ghost="numbers" />;
   const merchants = d.bizPending.rows.length;
@@ -43,7 +44,7 @@ export function BizSummary({ d }: P) {
         <Tile label="Likely business tools" foot={foot(tools.length ? tools.slice(0, 3).join(', ') + (tools.length > 3 ? ` and ${tools.length - 3} more` : '') : 'None undecided')}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}><BigMoney cents={w.toolsMonthly} /><Text style={{ fontFamily: F.display, fontSize: 18, color: c.ink3 }}>/mo</Text></View>
         </Tile>
-        {w.income != null ? (
+        {spendingOnly ? null : w.income != null ? (
           <Tile label="Business income" foot={foot(`Deposits from your business income sources, ${monthSpan(d.donut.from, d.donut.to)}`)}><BigMoney cents={w.income} /></Tile>
         ) : (
           <Tile dashed label="Business income" foot={<LinkButton label="Add the account clients pay into" onPress={() => go('income')} />}>

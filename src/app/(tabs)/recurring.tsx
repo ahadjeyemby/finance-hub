@@ -21,7 +21,7 @@ const CADENCES = Object.keys(CADENCE_LABEL) as Cadence[];
 export default function Recurring() {
   const C = useColors();
   const input = useInputStyle();
-  const { txns, ctx, dataTo, recurring, saveRecurring } = useRepo();
+  const { txns, ctx, dataTo, recurring, saveRecurring, spendingOnly } = useRepo();
   const today = todayISO();
   // business-marked charges are excluded from personal totals everywhere else, so they are here too
   const sum = useMemo(() => summarizeRecurring(txns.filter((t) => !t.business), recurring, dataTo, today), [txns, recurring, dataTo, today]);
@@ -48,6 +48,7 @@ export default function Recurring() {
         <T size={12} tone="ink3">Based on statements up to {dataTo > '0000' ? dayLabel(dataTo) : 'none yet'}. A variable bill such as electricity is planned at its middle amount, so the real month can be higher or lower.</T>
       </Card>
 
+      {spendingOnly ? null : (
       <Card title="Against your income">
         {cover ? (
           <>
@@ -58,6 +59,7 @@ export default function Recurring() {
           </>
         ) : <T size={13} tone="ink2">No month is fully covered by every account&apos;s statements yet, so income cannot be averaged.</T>}
       </Card>
+      )}
 
       {alerts.length ? (
         <Banner title={`${alerts.length} thing${alerts.length === 1 ? '' : 's'} to look at`}>
