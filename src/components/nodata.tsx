@@ -9,7 +9,9 @@ import { Button, H, T } from '@/theme/ui';
 /** What the person sees whenever the database has no ledger for them. The app never substitutes bundled or sample data. */
 export function NoData() {
   const C = useColors();
-  const { auth, sync } = useRepo();
+  const { auth, sync, source } = useRepo();
+  // the ledger loaded and is simply empty: the dashboard is open, with every widget saying what unlocks it
+  const loadedEmpty = (auth.configured && sync.state === 'synced') || source.kind === 'fixture';
   const missingTables = !!sync.error && /schema cache|does not exist|relation .* does not exist/i.test(sync.error);
   const loading = auth.configured && !!auth.email && (sync.state === 'syncing' || sync.state === 'local');
 
@@ -49,6 +51,7 @@ export function NoData() {
             <Button kind="outline" label="Sign out" onPress={() => { auth.signOut(); }} />
           </View>
         ) : null}
+        {loadedEmpty ? <Button kind="outline" label="Back to the dashboard" onPress={() => router.replace('/')} style={{ alignSelf: 'flex-start' }} /> : null}
         {auth.email ? <T size={12} tone="ink3">Signed in as {auth.email}.</T> : null}
       </View>
     </View>

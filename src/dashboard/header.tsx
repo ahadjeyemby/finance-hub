@@ -9,13 +9,15 @@ import { useWide } from '@/theme/ui';
 import { VIEWS, VIEW_IDS } from './views';
 import type { ViewId } from './views';
 
-/** Months that have statements (the latest six) and All. */
+/** Every month that has statements, and All. It scrolls sideways when there are many. */
 export function MonthPicker() {
   const { c } = useTheme();
   const { months, period, setPeriod } = useRepo();
-  const shown = [...months.slice(-6).map((m) => ({ value: m, label: monthLabel(m, true), long: monthLabel(m) })), { value: 'all', label: 'All', long: 'All months' }];
+  // months from more than one year carry the year, so two Junes are never confused
+  const years = new Set(months.map((m) => m.slice(0, 4))).size > 1;
+  const shown = [...months.map((m) => ({ value: m, label: years ? `${monthLabel(m, true)} ’${m.slice(2, 4)}` : monthLabel(m, true), long: monthLabel(m) })), { value: 'all', label: 'All', long: 'All months' }];
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ flexGrow: 0 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, maxWidth: '100%' }} contentContainerStyle={{ flexGrow: 0 }}>
       <View accessibilityRole="radiogroup" accessibilityLabel="Month" style={{ flexDirection: 'row', gap: 2, padding: 4, borderRadius: R.lg, backgroundColor: c.paper, borderWidth: 1, borderColor: c.line }}>
         {shown.map((m) => {
           const on = period === m.value;

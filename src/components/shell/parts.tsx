@@ -57,14 +57,14 @@ export function AskField({ compact }: { compact?: boolean }) {
   const [q, setQ] = useState('');
   const send = () => { const text = q.trim(); if (!text) { router.navigate('/ask'); return; } setQ(''); router.navigate({ pathname: '/ask', params: { q: text } }); };
   return (
-    <View accessibilityRole="search" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingLeft: compact ? 14 : 16, paddingRight: 6, borderRadius: 14, backgroundColor: c.field, borderWidth: 1, borderColor: c.line }}>
+    <View accessibilityRole="search" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingLeft: compact ? 14 : 16, paddingRight: 4, borderRadius: 14, backgroundColor: c.field, borderWidth: 1, borderColor: c.line }}>
       <Icon name="search" color={c.ink3} size={20} />
       <TextInput value={q} onChangeText={setQ} onSubmitEditing={send} returnKeyType="search" accessibilityLabel="Ask about your money"
         placeholder={compact ? 'Ask: “fuel in August”' : 'Ask about your money: “fuel in August”, “what changed since July”'} placeholderTextColor={c.ink3}
         style={{ flex: 1, minWidth: 0, minHeight: MIN_TOUCH, fontFamily: F.body, fontSize: 15, color: c.ink }} />
       {compact ? null : (
         <Pressable accessibilityRole="button" accessibilityLabel="Ask" onPress={send}
-          style={({ pressed }) => ({ minHeight: 36, minWidth: 44, paddingHorizontal: 14, borderRadius: 10, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
+          style={({ pressed }) => ({ minHeight: MIN_TOUCH, minWidth: 52, paddingHorizontal: 14, borderRadius: 10, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
           <Text style={{ fontFamily: F.bodyBold, fontSize: 14, color: c.accentInk }}>Ask</Text>
         </Pressable>
       )}
