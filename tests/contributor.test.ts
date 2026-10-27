@@ -251,9 +251,9 @@ test('a contributor cannot add a checking statement, pay, or rows to another acc
   assert.equal((await w.d.admin(`select 1 from public.txns where id in ('oct1', 'x')`)).length, 0, 'nothing was saved by any of these');
 });
 
-test('0009 refuses to run over contributors of the old kind, and runs twice without harm', async () => {
+test('0010 refuses to run over contributors of the old kind, and runs twice without harm', async () => {
   const w = await world();
-  const sql = readFileSync(join(__dirname, '..', 'supabase', 'migrations', '0009_contributor_spending.sql'), 'utf8');
+  const sql = readFileSync(join(__dirname, '..', 'supabase', 'migrations', '0010_contributor_spending.sql'), 'utf8');
   await w.d.db.exec(sql);
   assert.equal((await spending(w)).txns.length, 6, 'a second run changes nothing');
   await w.d.db.exec('drop table public.contributor_edits');

@@ -22,7 +22,7 @@ begin
   if to_regclass('public.contributor_edits') is null then
     select count(*) into n from public.members where role = 'contributor';
     if n > 0 then
-      raise exception 'Migration 0009 changes what a Contributor can see: they will see the admin''s spending. % membership(s) have the Contributor role today. Change them to Member on the People screen first, then run this again.', n;
+      raise exception 'Migration 0010 changes what a Contributor can see: they will see the admin''s spending. % membership(s) have the Contributor role today. Change them to Member on the People screen first, then run this again.', n;
     end if;
   end if;
 end $$;

@@ -29,7 +29,7 @@ They are still told that you can see everything they add, as the invite says tod
 - **Two people never write the same row**, as in 0006. A Contributor's changes go to their own table. Your app lays them under your own decisions, so yours win.
 - **A Contributor's uploads never overwrite your rows.** New transactions are inserted with `on conflict do nothing`.
 
-## Phase 1: database (`supabase/migrations/0009_contributor_spending.sql`) (done)
+## Phase 1: database (`supabase/migrations/0010_contributor_spending.sql`) (done)
 
 Tested in `tests/contributor.test.ts` (PGlite, the project's own migrations).
 
