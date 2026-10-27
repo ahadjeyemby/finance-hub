@@ -1,10 +1,11 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/header';
 import { dayLabel } from '@/core/dates';
 import { dollars } from '@/core/queries';
+import { uniqueCents } from '@/core/questions';
 import type { Question } from '@/core/types';
 import { useRepo } from '@/data/repo';
 import { F, R, S } from '@/theme/tokens';
@@ -65,14 +66,24 @@ function QuestionCard({ q, onDone }: { q: Question; onDone: (q: Question) => voi
 
 export default function Inbox() {
   const C = useColors();
-  const { questions, undo, txns } = useRepo();
+  const { questions: all, undo, txns } = useRepo();
+  // a dashboard widget opens the Inbox with only the questions behind it (?only=id,id)
+  const { only } = useLocalSearchParams<{ only?: string }>();
+  const wanted = only ? new Set(only.split(',')) : null;
+  const questions = wanted ? all.filter((q) => wanted.has(q.id)) : all;
   const [last, setLast] = useState<Question | null>(null);
   const [shown, setShown] = useState(8);
-  const stake = questions.reduce((s, q) => s + q.cents, 0);
+  const stake = uniqueCents(questions, txns);
   const biz = txns.filter((t) => t.business && !t.manual && t.kind === 'spend');
   return (
     <Screen max={760}>
-      <ScreenHeader title="Inbox" sub={questions.length ? `${questions.length} questions, ${dollars(stake, { decimals: false })} at stake. Biggest first.` : 'Nothing is waiting.'} />
+      <ScreenHeader title="Inbox" sub={questions.length ? `${questions.length} questions, ${dollars(stake, { decimals: false })} at stake, each charge counted once. Biggest first.` : 'Nothing is waiting.'} />
+      {wanted ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: S.sm }}>
+          <T size={13} tone="ink2" style={{ flex: 1 }}>Showing the {questions.length} question{questions.length === 1 ? '' : 's'} behind a dashboard widget.</T>
+          <Button small kind="outline" label={`Show all ${all.length}`} onPress={() => router.setParams({ only: undefined })} />
+        </View>
+      ) : null}
       {last ? (
         <View style={{ backgroundColor: C.accent, borderRadius: R.md, padding: S.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: S.sm }}>
           <T size={13} style={{ flex: 1, color: C.onAccent }}>Saved: {last.merchant}</T>
