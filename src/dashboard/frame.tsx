@@ -119,12 +119,12 @@ function Locked({ lock, ghost }: { lock: Lock; ghost: GhostKind }) {
   const { c } = useTheme();
   return (
     <>
-      <View aria-hidden style={{ height: ghost === 'numbers' ? 252 : 200, justifyContent: 'center' }}>
-        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}><Ghost kind={ghost} /></View>
-      </View>
-      <View style={{ marginTop: -150, marginBottom: 40, alignSelf: 'center', width: '90%', maxWidth: 340, backgroundColor: c.paper, borderWidth: 1, borderColor: c.line, borderRadius: R.lg, padding: 16, flexDirection: 'row', gap: 10 }}>
-        <Icon name="lock" color={c.ink3} size={18} />
-        <Text style={{ flex: 1, fontFamily: F.body, fontSize: 14, lineHeight: 21, color: c.ink2 }}><Text style={{ fontFamily: F.bodyBold, color: c.ink }}>Needs more data. </Text>{lock.missing}</Text>
+      <View style={{ minHeight: ghost === 'numbers' ? 252 : 200, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 }}>
+        <View aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}><Ghost kind={ghost} /></View>
+        <View style={{ width: '90%', maxWidth: 340, backgroundColor: c.paper, borderWidth: 1, borderColor: c.line, borderRadius: R.lg, padding: 16, flexDirection: 'row', gap: 10 }}>
+          <Icon name="lock" color={c.ink3} size={18} />
+          <Text style={{ flex: 1, fontFamily: F.body, fontSize: 14, lineHeight: 21, color: c.ink2 }}><Text style={{ fontFamily: F.bodyBold, color: c.ink }}>Needs more data. </Text>{lock.missing}</Text>
+        </View>
       </View>
       <Pressable accessibilityRole="button" onPress={() => go(lock.action.kind)}
         style={({ pressed }) => ({ alignSelf: 'flex-start', minHeight: MIN_TOUCH, paddingHorizontal: 16, borderRadius: R.md, borderWidth: 1, borderColor: c.line2, justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>

@@ -6,7 +6,7 @@ export interface Palette {
   ground: string; side: string; paper: string; field: string; seg: string;
   ink: string; ink2: string; ink3: string; line: string; line2: string;
   accent: string; onAccent: string; accentInk: string; accentSoft: string;
-  hero: string; heroSoft: string; heroChip: string; cta: string; ctaInk: string;
+  hero: string; onHero: string; heroSoft: string; heroChip: string; cta: string; ctaInk: string;
   warnBg: string; warnInk: string; good: string; goodInk: string; goodSoft: string;
   inn: string; out: string; flexC: string; bar: string; track: string; range: string; scrim: string;
   /** negative amounts and errors */
@@ -19,7 +19,7 @@ export const LIGHT: Palette = {
   ground: '#F4F5FA', side: '#FFFFFF', paper: '#FFFFFF', field: '#FFFFFF', seg: '#EEF0F5',
   ink: '#172031', ink2: '#464E5D', ink3: '#5E6676', line: '#E4E7EF', line2: '#CDD3DF',
   accent: '#5264E6', onAccent: '#FFFFFF', accentInk: '#3B4BC8', accentSoft: '#ECEEFD',
-  hero: '#5264E6', heroSoft: '#DCE0FB', heroChip: 'rgba(255,255,255,0.18)', cta: '#172031', ctaInk: '#FFFFFF',
+  hero: '#5264E6', onHero: '#FFFFFF', heroSoft: '#DCE0FB', heroChip: 'rgba(255,255,255,0.18)', cta: '#172031', ctaInk: '#FFFFFF',
   warnBg: '#FFF1CC', warnInk: '#6B4A00', good: '#1A9C6C', goodInk: '#137A54', goodSoft: '#DDF3EA',
   inn: '#1A9C6C', out: '#E8743B', flexC: '#C9CFDD', bar: '#2E3A5C', track: '#EDF0F5', range: '#C3CAF7', scrim: 'rgba(23,32,49,0.35)',
   bad: '#A3263A', badSoft: '#FBE7EA',
@@ -30,7 +30,7 @@ export const DARK: Palette = {
   ground: '#0D1320', side: '#111827', paper: '#151D2D', field: '#1B2538', seg: '#1E2738',
   ink: '#EEF1F7', ink2: '#B8C0CF', ink3: '#97A1B3', line: '#253048', line2: '#3A4762',
   accent: '#8A97FF', onAccent: '#0D1320', accentInk: '#AEB7FF', accentSoft: '#232D52',
-  hero: '#4C5BD8', heroSoft: '#D6DAFA', heroChip: 'rgba(255,255,255,0.16)', cta: '#EEF1F7', ctaInk: '#0D1320',
+  hero: '#4C5BD8', onHero: '#FFFFFF', heroSoft: '#D6DAFA', heroChip: 'rgba(255,255,255,0.16)', cta: '#EEF1F7', ctaInk: '#0D1320',
   warnBg: '#3A2F10', warnInk: '#F5D88A', good: '#4FD1A1', goodInk: '#6FE0B5', goodSoft: '#173A30',
   inn: '#3FBF8C', out: '#F08A55', flexC: '#3B4A6B', bar: '#AAB4CC', track: '#232D42', range: '#4A5BD0', scrim: 'rgba(5,8,15,0.6)',
   bad: '#F2939F', badSoft: '#3A1A22',
@@ -49,6 +49,12 @@ export const CATEGORY_GROUP_LABEL: Record<CategoryGroup, string> = {
 export const CATEGORY_COLORS: Record<Scheme, Record<CategoryGroup, string>> = {
   light: { travel: '#E8743B', bigbox: '#0F8F79', groceries: '#7DB83A', fuel: '#E0A800', medical: '#D9578A', other: '#8A93A6' },
   dark: { travel: '#F08A55', bigbox: '#2BBBA2', groceries: '#93CC52', fuel: '#F2C23A', medical: '#E9779F', other: '#6F7A8E' },
+};
+
+/** Shades of the big-box colour, for the stores inside that group (the brief's design). A fourth store and later fold into Everything else. */
+export const BIGBOX_SHADES: Record<Scheme, readonly string[]> = {
+  light: ['#0F8F79', '#5CC2AE', '#0A5C50'],
+  dark: ['#2BBBA2', '#7FD8C6', '#1C6E62'],
 };
 
 /** Categorical order for charts that are not split by category (merchants, stores). Never cycled: the 6th and later entities fold into Other. */

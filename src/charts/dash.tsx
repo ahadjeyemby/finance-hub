@@ -84,7 +84,7 @@ export function RangeBand({ low, high, mark, max, label }: { low: number; high: 
 export function Waterfall({ earned, spent, label, money }: { earned: number; spent: number; label: string; money: (v: number, sign?: boolean) => string }) {
   const { c } = useTheme();
   const left = earned - spent;
-  const top = Math.max(earned, 1), bottom = Math.min(0, left);
+  const top = Math.max(earned, left, 1), bottom = Math.min(0, left);
   const H = 250, labelRoom = 26, plot = H - labelRoom;
   const y = (v: number) => labelRoom + ((top - v) / (top - bottom)) * plot;
   const bars = [

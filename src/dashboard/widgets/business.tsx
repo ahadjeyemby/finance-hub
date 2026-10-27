@@ -15,7 +15,7 @@ function Tile({ label, children, foot, hero, dashed }: { label: string; children
   const { c } = useTheme();
   return (
     <View style={{ flexGrow: 1, flexBasis: 220, minHeight: 150, borderRadius: R.card, paddingVertical: 20, paddingHorizontal: 22, gap: 6, backgroundColor: hero ? c.hero : c.paper, borderWidth: hero ? 0 : 1, borderStyle: dashed ? 'dashed' : 'solid', borderColor: dashed ? c.line2 : c.line }}>
-      <Text style={{ fontFamily: F.bodySemi, fontSize: 14, color: hero ? '#FFFFFF' : c.ink2 }}>{label}</Text>
+      <Text style={{ fontFamily: F.bodySemi, fontSize: 14, color: hero ? c.onHero : c.ink2 }}>{label}</Text>
       {children}
       {foot ? <View style={{ marginTop: 'auto' }}>{foot}</View> : null}
     </View>
@@ -35,7 +35,7 @@ export function BizSummary({ d }: P) {
       {w.readiness === 'answers' && w.ask ? <AskStrip ask={w.ask} /> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
         <Tile hero label="Tagged as business" foot={<Text style={{ fontFamily: F.body, fontSize: 13, color: c.heroSoft }}>{w.tagged > 0 ? monthSpan(d.donut.from, d.donut.to) : merchants ? `Answer ${merchants} question${merchants === 1 ? '' : 's'} to start` : 'Nothing tagged yet'}</Text>}>
-          <BigMoney cents={w.tagged} color="#FFFFFF" centsColor={c.heroSoft} />
+          <BigMoney cents={w.tagged} color={c.onHero} centsColor={c.heroSoft} />
         </Tile>
         <Tile label="Waiting for your answer" foot={foot(merchants ? `${merchants} merchant${merchants === 1 ? '' : 's'}, each charge counted once` : 'Nothing is waiting')}>
           <BigMoney cents={w.waiting} />
@@ -91,7 +91,7 @@ export function BizDonut({ d }: P) {
   const w = d.bizDonut;
   const colorAt = (i: number, name: string) => (name === 'Everything else' ? c.other : series[i % series.length]);
   return (
-    <Widget title="Waiting, by merchant" sub="Not yet business or personal" state={w} ghost="ring" gap={16} askAction={<View />}>
+    <Widget title="Waiting, by merchant" sub="Not yet business or personal" state={w} ghost="ring" gap={16}>
       <View style={{ alignItems: 'center' }}>
         <Ring size={168} thickness={25} gapPct={0.8} parts={w.slices.map((s, i) => ({ value: s.cents, color: colorAt(i, s.merchant) }))} track={w.total > 0 ? undefined : c.track}
           label={`Donut: ${w.slices.map((s) => `${s.merchant} ${pct0(s.share)}`).join(', ') || 'nothing waiting'}`}>
@@ -118,7 +118,6 @@ export function BizTools({ d }: P) {
   const { answerMany } = useRepo();
   const w = d.bizTools;
   const undecided = w.rows.filter((r) => !r.confirmed);
-  const yearly = w.rows.reduce((s, r) => s + r.yearly, 0);
   return (
     <Widget title="Software and tools" sub="Repeat monthly, likely business" state={w} ghost="list" gap={12} askAction={<View />}>
       <View>
@@ -130,7 +129,7 @@ export function BizTools({ d }: P) {
         ))}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', borderTopWidth: 2, borderTopColor: c.ink, paddingTop: 10 }}>
           <Text style={{ fontFamily: F.bodyBold, fontSize: 14, color: c.ink }}>Per year</Text>
-          <Text style={[{ fontFamily: F.display, fontSize: 18, color: c.ink }, TABULAR]}>{exact(yearly)}</Text>
+          <Text style={[{ fontFamily: F.display, fontSize: 18, color: c.ink }, TABULAR]}>{exact(w.yearly)}</Text>
         </View>
       </View>
       {w.undecided.length ? <WideButton solid label={`Mark ${undecided.length === 1 ? undecided[0].merchant : `all ${undecided.length}`} as business`} onPress={() => answerMany(w.undecided, 'business', true)} />
@@ -143,15 +142,14 @@ export function BizTools({ d }: P) {
 export function BizPL({ d }: P) {
   const { c } = useTheme();
   const w = d.bizPL;
-  const total = w.months.reduce((s, m) => s + m.net, 0);
   return (
     <Widget title="Business profit and loss" sub="Income minus business spending, by complete month" state={w} ghost="bars">
       <Columns height={170} color={c.inn} negColor={c.out}
         bars={w.months.map((m) => ({ key: m.month, label: shortMonth(m.month), value: m.net, text: signed(m.net).replace('.00', '') }))}
         label={`Business profit and loss: ${w.months.map((m) => `${longMonth(m.month)} ${signed(m.net)}`).join(', ')}`} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', borderTopWidth: 1, borderTopColor: c.line, paddingTop: 12 }}>
-        <Text style={{ fontFamily: F.body, fontSize: 14, color: c.ink2 }}>Over {w.months.length} month{w.months.length === 1 ? '' : 's'}: {whole(w.months.reduce((s, m) => s + m.income, 0))} in, {whole(w.months.reduce((s, m) => s + m.spend, 0))} out</Text>
-        <Text style={[{ fontFamily: F.bodyBold, fontSize: 16, color: total >= 0 ? c.goodInk : c.bad }, TABULAR]}>{signed(total)}</Text>
+        <Text style={{ fontFamily: F.body, fontSize: 14, color: c.ink2 }}>Over {w.months.length} month{w.months.length === 1 ? '' : 's'}: {whole(w.income)} in, {whole(w.spend)} out</Text>
+        <Text style={[{ fontFamily: F.bodyBold, fontSize: 16, color: w.net >= 0 ? c.goodInk : c.bad }, TABULAR]}>{signed(w.net)}</Text>
       </View>
     </Widget>
   );

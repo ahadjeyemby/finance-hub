@@ -79,7 +79,7 @@ export interface KpisData extends State {
 }
 export interface CashflowData extends State { earned: number; spent: number; left: number; transfers: number; unconfirmed: number; label: string }
 export interface GroupSlice { group: ColorGroup; cents: number; share: number }
-export interface DonutData extends State { slices: GroupSlice[]; total: number; from: string; to: string }
+export interface DonutData extends State { slices: GroupSlice[]; total: number; from: string; to: string; /** refunds larger than the purchases in their group, left out of the slices (0 almost always) */ netCredit: number }
 export interface TrendMonth { month: string; partial: boolean; total: number; byGroup: Record<ColorGroup, number> }
 export interface TrendData extends State { months: TrendMonth[]; average: number | null; averageOf: number; selected: string | null }
 export interface OneTimeData extends State { total: number; oneOffs: number; share: number; withoutOneOffs: number; largest: { merchant: string; cents: number; date: string } | null; pending: number }
@@ -96,7 +96,7 @@ export interface FuelMonth { month: string; cents: number; partial: boolean }
 export interface FuelData extends State { spent: number; fillUps: number; average: number; months: FuelMonth[]; top: { merchant: string; share: number } | null }
 export interface ForecastData extends State { forecast: Forecast | null; target: string; max: number }
 export interface ForecastBuildData extends State { forecast: Forecast | null; target: string; oneOffs: number; ifBillsRepeat: number | null; billsOnceCents: number }
-export interface PaceData extends State { month: string; days: number; daysInMonth: number; daily: number[]; forecast: number | null; spent: number }
+export interface PaceData extends State { month: string; days: number; daysInMonth: number; daily: number[]; forecast: number | null; spent: number; /** where a straight line to the forecast would be today */ expectedByNow: number | null }
 export interface BillOnce { txnId: string; merchant: string; date: string; cents: number; category?: string }
 export interface BillsOnceData extends State { bills: BillOnce[] }
 export interface BizSummaryData extends State { tagged: number; waiting: number; toolsMonthly: number; income: number | null; hasSource: boolean }
@@ -104,10 +104,10 @@ export interface BizPendingRow { question: Question; merchant: string; cents: nu
 export interface BizPendingData extends State { rows: BizPendingRow[]; total: number }
 export interface BizDonutData extends State { slices: { merchant: string; cents: number; share: number }[]; total: number }
 export interface ToolRow { key: string; merchant: string; monthly: number; yearly: number; confirmed: boolean; questions: Question[] }
-export interface BizToolsData extends State { rows: ToolRow[]; undecided: Question[]; monthly: number }
+export interface BizToolsData extends State { rows: ToolRow[]; undecided: Question[]; /** undecided tools per month */ monthly: number; /** every tool listed, per year */ yearly: number }
 export interface PLMonth { month: string; income: number; spend: number; net: number }
-export interface BizPLData extends State { months: PLMonth[] }
-export interface AttentionData extends State { count: number; atStake: number; top: { id: string; text: string; cents: number }[] }
+export interface BizPLData extends State { months: PLMonth[]; income: number; spend: number; net: number }
+export interface AttentionData extends State { count: number; atStake: number; top: { id: string; text: string; cents: number }[]; /** the top three together, each charge once */ topCents: number }
 export interface CoverageRow { accountId: string; name: string; from: string; to: string; coverage: Interval[]; gaps: Interval[]; share: number }
 export interface DataHealthData extends State { from: string; to: string; accounts: CoverageRow[]; unseenFunding: number; unseenCount: number; missingCardStatements: number; receiptsWaiting: number }
 
@@ -136,7 +136,9 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const { ctx, questions, period, dataFrom, dataTo, income } = input;
   const hasAccounts = spendAccounts(ctx.accounts).length > 0;
   const scoped = ctx.txns.filter(inScope(scope));
-  const sctx: Ctx = { ...ctx, txns: scoped };
+  // bills added by hand carry no business flag: they are household bills, so a Business view leaves them out
+  const recurring = scope === 'business' && ctx.recurring ? { ...ctx.recurring, manual: [] } : ctx.recurring;
+  const sctx: Ctx = { ...ctx, txns: scoped, recurring };
   const byId = new Map(ctx.txns.map((t) => [t.id, t]));
   const uniq = (qs: Question[]) => uniqueCents(qs, byId);
   const months = hasAccounts ? statementMonths(dataFrom, dataTo) : [];
@@ -145,7 +147,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const qOf = (type: Question['type']) => questions.filter((q) => q.type === type);
   const NO_STATEMENT = 'No statement covers any month yet.';
   // the bills and one-offs every average and forecast in this view is built from (the same rules as the forecast and the Recurring screen)
-  const basis = recurringBasis(scoped, ctx.recurring, dataTo);
+  const basis = recurringBasis(scoped, recurring, dataTo);
   const isOneOff = basis.isOneOff;
   /** questions about large charges that would change a complete-month average: open one-off candidates in complete months */
   const oneOffQsIn = (monthsSet: Set<string>) => touching(qOf('one_off'), new Set(scoped.filter((t) => isSpend(t) && monthsSet.has(monthOf(t.date)) && isOneOff(t) && t.oneOff !== true).map((t) => t.id)));
@@ -197,9 +199,12 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const groups = emptyGroups();
   for (const t of allSpend) groups[colorGroupOf(t.category)] += out(t);
   const donutTotal = Object.values(groups).reduce((a, b) => a + b, 0);
+  // a group whose refunds outweigh its purchases has no slice; the shares are of the slices drawn, and the credit is stated beside them
+  const positive = (Object.keys(groups) as ColorGroup[]).filter((g) => groups[g] > 0);
+  const drawn = positive.reduce((s, g) => s + groups[g], 0);
   const donut: DonutData = {
-    ...catState(), from: dataFrom, to: dataTo, total: donutTotal,
-    slices: (Object.keys(groups) as ColorGroup[]).map((g) => ({ group: g, cents: groups[g], share: donutTotal > 0 ? groups[g] / donutTotal : 0 })).filter((s) => s.cents > 0).sort((a, b) => b.cents - a.cents),
+    ...catState(), from: dataFrom, to: dataTo, total: donutTotal, netCredit: drawn - donutTotal,
+    slices: positive.map((g) => ({ group: g, cents: groups[g], share: drawn > 0 ? groups[g] / drawn : 0 })).sort((a, b) => b.cents - a.cents),
   };
 
   const spendByMonth = new Map<string, Txn[]>();
@@ -276,18 +281,19 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const everydayMonths = fullList;
   const everyday = everydayMonths.length ? Math.round(everydayMonths.reduce((s, m) => s + sum(inMonth(m).filter(basis.isEveryday)), 0) / everydayMonths.length) : 0;
   const noHousing = !bills.some((i) => i.category === 'housing' || i.category === 'utilities');
+  // bills found by the app but not confirmed are answered on the Recurring screen, not in the Inbox; they decide the fixed part
+  const detected = bills.filter((i) => i.source === 'detected');
+  const confirmBills = (lead: string): State => (detected.length ? { readiness: 'answers', ask: { text: `${plural(detected.length, 'bill')} found in your statements ${detected.length === 1 ? 'is' : 'are'} not confirmed${lead}`, questionIds: [] } } : ready());
+  const ffOneOff = askIf(oneOffQsIn(complete), (n) => `${plural(n, 'large charge')} may be one-time, which changes the everyday average.`);
   const fixedFlex: FixedFlexData = {
     ...(!everydayMonths.length ? locked('No complete month yet: a month counts once every account\'s statement covers all of it.')
-      : askIf(oneOffQsIn(complete), (n) => `${plural(n, 'large charge')} may be one-time, which changes the everyday average.`)),
+      : ffOneOff.readiness === 'answers' ? ffOneOff : confirmBills(', so the fixed part may change.')),
     fixed, everyday, share: fixed + everyday > 0 ? fixed / (fixed + everyday) : 0, noHousing, months: everydayMonths.length,
   };
 
   const subRows: SubscriptionRow[] = [...bills].sort((a, b) => b.monthlyCents - a.monthlyCents).map((i) => ({ key: i.key, merchant: i.merchant, monthly: i.monthlyCents, yearly: yearly(i), confirmed: i.source !== 'detected' }));
-  const unconfirmedBills = subRows.filter((r) => !r.confirmed);
-  // bills found by the app but not confirmed are answered on the Recurring screen, not in the Inbox
   const subscriptions: SubscriptionsData = {
-    ...(!anyData && !bills.length ? locked(NO_STATEMENT)
-      : unconfirmedBills.length ? { readiness: 'answers', ask: { text: `${plural(unconfirmedBills.length, 'bill')} found in your statements ${unconfirmedBills.length === 1 ? 'is' : 'are'} not confirmed yet.`, questionIds: [] } } : ready()),
+    ...(!anyData && !bills.length ? locked(NO_STATEMENT) : confirmBills(' yet.')),
     rows: subRows, monthly: fixed, yearly: fixed * 12,
   };
 
@@ -346,7 +352,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     // what next month would be if every bill seen once were a monthly bill: the same forecast, with each added as one (so a bill already in the
     // everyday average is not counted twice)
     ifBillsRepeat: hasBasis && once.length
-      ? forecastMonth({ ...sctx, recurring: once.reduce((r, b) => addManual(r, { merchant: b.merchant, cents: b.cents, cadence: 'monthly', anchor: b.date, category: b.category }), ctx.recurring) }, target, dataTo, 'given').total
+      ? forecastMonth({ ...sctx, recurring: once.reduce((r, b) => addManual(r, { merchant: b.merchant, cents: b.cents, cadence: 'monthly', anchor: b.date, category: b.category }), recurring) }, target, dataTo, 'given').total
       : null,
     billsOnceCents,
   };
@@ -367,6 +373,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
       : paceBase == null ? locked('No complete month yet, so there is no forecast line to compare with.')
       : askIf(paceQs, (n) => `${plural(n, 'large charge')} this month may be one-time.`)),
     month: paceMonth, days: paceDays, daysInMonth: daysInMonth(paceMonth), daily, forecast: paceBase, spent: run,
+    expectedByNow: paceBase != null ? Math.round((paceBase * paceDays) / daysInMonth(paceMonth)) : null,
   };
 
   // ---- Business ----------------------------------------------------------------------------------------------------------------------
@@ -390,7 +397,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const bizTools: BizToolsData = {
     ...(!anyData ? locked(NO_STATEMENT) : !toolRows.length ? locked('No repeating software or service charge looks like a business tool yet.', IMPORT)
       : undecided.length ? { readiness: 'answers', ask: { text: `${plural(toolRows.filter((r) => !r.confirmed).length, 'tool')} may be business. Mark them, or answer one by one in the Inbox.`, questionIds: undecided.map((q) => q.id) } } : ready()),
-    rows: toolRows, undecided, monthly: toolRows.filter((r) => !r.confirmed).reduce((s, r) => s + r.monthly, 0),
+    rows: toolRows, undecided, monthly: toolRows.filter((r) => !r.confirmed).reduce((s, r) => s + r.monthly, 0), yearly: toolRows.reduce((s, r) => s + r.yearly, 0),
   };
 
   const bizIncomeTxns = ctx.txns.filter((t) => t.kind === 'income' && isBizIncome(t));
@@ -424,7 +431,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     ...(!hasSource ? locked('Business income is not connected: add a business income source, so its deposits are counted.', { label: 'Set up business income', kind: 'income' })
       : !spendMonth ? locked('No complete month has spending tagged as business yet.', { label: 'Answer business questions', kind: 'inbox' })
       : askIf(plQs, (n) => `${plural(n, 'merchant')} still ${n === 1 ? 'needs' : 'need'} Business or Personal, which changes these months.`)),
-    months: plMonths,
+    months: plMonths, income: plMonths.reduce((s, m) => s + m.income, 0), spend: plMonths.reduce((s, m) => s + m.spend, 0), net: plMonths.reduce((s, m) => s + m.net, 0),
   };
 
   // ---- Keep it accurate -------------------------------------------------------------------------------------------------------------
@@ -432,6 +439,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     ...(!hasAccounts ? locked(NO_STATEMENT) : ready()),
     count: questions.length, atStake: uniq(questions),
     top: [...questions].sort((a, b) => b.cents - a.cents).slice(0, 3).map((q) => ({ id: q.id, text: shortPrompt(q), cents: q.cents })),
+    topCents: uniq([...questions].sort((a, b) => b.cents - a.cents).slice(0, 3)),
   };
   const { cardSide, bankSide, cardTotal } = unmatchedCardPayments(ctx.txns, ctx.accounts);
   const rangeDays = Math.max(1, (Date.parse(dataTo) - Date.parse(dataFrom)) / 86400000 + 1);

@@ -28,7 +28,7 @@ function Switch({ value, label, onChange }: { value: boolean; label: string; onC
     <Pressable accessibilityRole="switch" aria-checked={value} accessibilityLabel={label} onPress={() => onChange(!value)}
       style={{ width: 52, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: value ? c.accent : c.line2 }}>
-        <View style={{ position: 'absolute', top: 3, left: value ? 21 : 3, width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 }} />
+        <View style={{ position: 'absolute', top: 3, left: value ? 21 : 3, width: 20, height: 20, borderRadius: 10, backgroundColor: c.onHero, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 }} />
       </View>
     </Pressable>
   );
