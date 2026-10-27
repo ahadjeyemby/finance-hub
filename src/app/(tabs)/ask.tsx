@@ -20,14 +20,19 @@ const SUGGEST = ['How much did I spend on fuel in August?', 'What did I earn in 
 export default function Ask() {
   const C = useColors();
   const { ctx, scope, dataTo, dataFrom, colorOf, completeTo } = useRepo();
-  const [log, setLog] = useState<{ q: string; a?: AgentResult; open?: boolean }[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [log, setLog] = useState<{ id: number; q: string; a?: AgentResult; open?: boolean }[]>([]);
+  const [pending, setPending] = useState(0);
+  const busy = pending > 0;
+  const nextId = useRef(0);
+  // each question keeps its own entry, so a second one sent before the first is answered never takes the first one's reply
   const send = async (q: string) => {
-    setBusy(true);
-    setLog((l) => [...l, { q }]);
-    const a = await askAgent(q, ctx, { today: todayISO(), dataFrom, dataTo, scope }, makePost());
-    setLog((l) => l.map((x, i) => (i === l.length - 1 ? { q, a } : x)));
-    setBusy(false);
+    const id = ++nextId.current;
+    setPending((n) => n + 1);
+    setLog((l) => [...l, { id, q }]);
+    try {
+      const a = await askAgent(q, ctx, { today: todayISO(), dataFrom, dataTo, scope }, makePost());
+      setLog((l) => l.map((x) => (x.id === id ? { ...x, a } : x)));
+    } finally { setPending((n) => n - 1); }
   };
   // a question typed in the Ask field of the top bar arrives as ?q=; it is sent once
   const { q: asked } = useLocalSearchParams<{ q?: string }>();
@@ -41,8 +46,8 @@ export default function Ask() {
     <Screen max={760}>
       <ScreenHeader back title="Ask" sub={makePost() ? 'Answered by the assistant, using your ledger.' : 'Answered by the built-in planner. Connect the assistant for open-ended questions.'} />
       {log.map((m, i) => (
-        <View key={i} style={{ gap: S.sm }}>
-          <View style={{ alignSelf: 'flex-end', backgroundColor: C.accent, borderRadius: R.md, padding: S.md, maxWidth: '85%' }}><T tone="paper">{m.q}</T></View>
+        <View key={m.id} style={{ gap: S.sm }}>
+          <View style={{ alignSelf: 'flex-end', backgroundColor: C.accent, borderRadius: R.md, padding: S.md, maxWidth: '85%' }}><T style={{ color: C.onAccent }}>{m.q}</T></View>
           {m.a ? (
             <View style={{ gap: S.sm }}>
               <View style={{ backgroundColor: C.paper, borderRadius: R.md, padding: S.md, gap: S.sm }}>

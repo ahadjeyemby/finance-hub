@@ -29,7 +29,7 @@ function Gate() {
   // Add and Import are the way out of an empty database, and People is where an invited person joins a workspace. Anything else, and every
   // case where loading has not finished or failed, shows the explanation instead. Nothing is ever filled in with sample data.
   const loadedEmpty = !hasData && ((auth.configured && sync.state === 'synced') || source.kind === 'fixture');
-  const open = ['/import', '/people'].concat(loadedEmpty ? ['/', '/add'] : []);
+  const open = ['/import', '/people'].concat(loadedEmpty ? ['/', '/add', '/cash', '/accounts'] : []);
   if (!hasData && !open.includes(pathname)) return <NoData />;
   return (
     <View style={{ flex: 1, backgroundColor: C.ground }}>

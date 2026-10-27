@@ -8,7 +8,8 @@ import { LEVEL_NAMES, graphChildren, graphFilter, graphRoots, isLeaf } from '@/c
 import type { GNode, Seg } from '@/core/graph';
 import { dollars } from '@/core/queries';
 import type { Ctx, Filter } from '@/core/queries';
-import { F, LIGHT, R, S } from '@/theme/tokens';
+import { readableOn } from '@/theme/contrast';
+import { F, R, S } from '@/theme/tokens';
 import type { Palette } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Button, T, useWide } from '@/theme/ui';
@@ -16,12 +17,6 @@ import { Button, T, useWide } from '@/theme/ui';
 interface Props { ctx: Ctx; scope: Filter['scope']; colorOf: (category: string) => string; onOpen?: (f: Filter) => void }
 
 const GAP = 44, MIN_H = 30, SEP = 4, MAX_H = 440, ITEM_H = 34;
-
-/** labels on a coloured block: a fixed dark or white, chosen by the fill, never by the theme's own ink */
-const darkText = (hex: string) => {
-  const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
-  return 0.299 * r + 0.587 * g + 0.114 * b > 150;
-};
 
 function colorFor(n: GNode, colorOf: Props['colorOf'], C: Palette): string {
   const cat = n.path.find((s) => s.level === 'category');
@@ -109,7 +104,7 @@ function Columns({ ctx, scope, colorOf, onOpen }: Props) {
               const picked = sel[k]?.key === n.key;
               const dim = sel[k] && !picked;
               const col = colorFor(n, colorOf, C);
-              const fg = n.hatch ? C.ink : darkText(col) ? LIGHT.ink : '#FFFFFF';
+              const fg = n.hatch ? C.ink : readableOn(col);
               return (
                 <Pressable key={n.id} accessibilityRole="button" aria-selected={picked} accessibilityLabel={`${n.label}, ${dollars(n.cents)}${n.hatch ? ', no item detail' : ''}`}
                   onPress={() => (isLeaf(n) ? undefined : select(n, k))}
