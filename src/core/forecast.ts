@@ -3,6 +3,7 @@ import { completeMonths, coveredDays } from './coverage';
 import { addMonths, daysInMonth, monthOf } from './dates';
 import type { Ctx } from './queries';
 import { normKey, summarizeRecurring } from './recurring';
+import type { RecurringItem as Bill, RecurringState } from './recurring';
 import type { CategoryId, Txn } from './types';
 
 export { completeMonths } from './coverage';
@@ -14,7 +15,7 @@ export interface Forecast {
   recurringTotal: number; variableTotal: number;
   recurring: RecurringItem[];
   variableByCategory: { category: CategoryId; label: string; estimate: number }[];
-  /** left out of the forecast: confirmed one-offs, and single charges of $1,000 or more nobody has answered for yet (confirmed false) */
+  /** left out of the forecast: confirmed one-offs, and large charges nobody has answered for yet (confirmed false) */
   oneOffsExcluded: { merchant: string; date: string; cents: number; confirmed: boolean }[];
   basisMonths: string[];
   confidence: 'low' | 'medium' | 'high';
@@ -26,36 +27,61 @@ export interface Forecast {
 
 const isSpend = (t: Txn) => t.kind === 'spend' || t.kind === 'fee' || t.kind === 'refund';
 
-/** A one-off is left out of averages and forecasts: one the person marked, or a single charge of $1,000 or more they have not said repeats. */
-export const isOneOff = (t: Txn) => t.oneOff === true || (t.cents <= -100000 && t.oneOff !== false);
+/** A one-off on the charge itself: marked by the person, or a large charge (the large_one_off hint) nobody has answered for. */
+export const isOneOff = (t: Txn) => t.oneOff === true || (t.oneOff === undefined && !!t.hints?.includes('large_one_off'));
 
-export function forecastMonth(ctx: Ctx, target: string, asOf: string): Forecast {
+export interface RecurringBasis {
+  /** the bills still expected: switched on, and not stopped */
+  on: Bill[];
+  /** every charge that belongs to a bill the person did not set aside: it is repeating spending, never everyday or a one-off */
+  seriesIds: Set<string>;
+  /** payees of bills added by hand (they have no series of their own) */
+  manualPayees: Set<string>;
+  /** a one-off for averages and forecasts: one the person marked, or a large unanswered charge that is not part of a repeating bill */
+  isOneOff: (t: Txn) => boolean;
+  /** everyday spending: not a bill, not a one-off */
+  isEveryday: (t: Txn) => boolean;
+}
+
+/**
+ * The bills and the one-offs every average and forecast is built from, so the Recurring screen, the forecast and the dashboard agree.
+ * Charges marked one-time never make a bill. A bill the person cancelled, or one that stopped, still owns its past charges (they are not
+ * everyday spending); one they set aside as "not recurring" gives its charges back to everyday spending.
+ */
+export function recurringBasis(txns: Txn[], recurring: RecurringState | undefined, asOf: string): RecurringBasis {
+  const items = summarizeRecurring(txns.filter((t) => t.oneOff !== true), recurring, asOf).items;
+  const kept = items.filter((i) => i.status !== 'ignored');
+  const seriesIds = new Set(kept.flatMap((i) => i.txnIds));
+  const manualPayees = new Set(kept.filter((i) => i.source === 'manual').map((i) => normKey(i.merchant)));
+  const oneOff = (t: Txn) => t.oneOff === true || (t.oneOff === undefined && !!t.hints?.includes('large_one_off') && !seriesIds.has(t.id));
+  return {
+    on: items.filter((i) => i.status === 'on' && i.health !== 'stopped'), seriesIds, manualPayees, isOneOff: oneOff,
+    isEveryday: (t) => !oneOff(t) && !seriesIds.has(t.id) && !manualPayees.has(normKey(t.merchant)),
+  };
+}
+
+/**
+ * Next month (or any month), from complete months only. `scope` 'personal' (the default) leaves business spending out; 'given' uses the
+ * charges in ctx as they are, for a dashboard view that has already chosen whose spending it counts.
+ */
+export function forecastMonth(ctx: Ctx, target: string, asOf: string, scope: 'personal' | 'given' = 'personal'): Forecast {
   const basis = completeMonths(ctx, '2000-01-01', addMonths(target, -1)).filter((m) => m < target);
-  const personal = ctx.txns.filter((t) => !t.business);
-  const spend = personal.filter((t) => isSpend(t) && basis.includes(monthOf(t.date)));
+  const pool = scope === 'personal' ? ctx.txns.filter((t) => !t.business) : ctx.txns;
+  const spend = pool.filter((t) => isSpend(t) && basis.includes(monthOf(t.date)));
+  const b = recurringBasis(pool, ctx.recurring, asOf);
 
-  const oneOffs = spend.filter(isOneOff);
-  const oneOffIds = new Set(oneOffs.map((t) => t.id));
-  const regular = spend.filter((t) => !oneOffIds.has(t.id));
+  const oneOffs = spend.filter(b.isOneOff);
+  const recurring: RecurringItem[] = b.on.map((i) => ({ merchant: i.merchant, category: i.category as CategoryId | undefined, typical: i.monthlyCents, months: i.count }));
+  recurring.sort((x, y) => y.typical - x.typical);
 
-  // repeating: the same bills the Recurring screen shows, including what the person confirmed, cancelled or added by hand. A bill set aside
-  // as "not recurring" counts as everyday spending again; a cancelled or stopped one is no longer expected and its past charges leave the average.
-  const rec = summarizeRecurring(personal, ctx.recurring, asOf);
-  const on = rec.items.filter((i) => i.status === 'on' && i.health !== 'stopped');
-  const recurring: RecurringItem[] = on.map((i) => ({ merchant: i.merchant, category: i.category as CategoryId | undefined, typical: i.monthlyCents, months: i.count }));
-  const seriesIds = new Set(rec.items.filter((i) => i.status !== 'ignored').flatMap((i) => i.txnIds));
-  // a bill added by hand (say, one seen once and answered "repeats monthly") has no series of its own: its charges leave the average too
-  const manualPayees = new Set(on.filter((i) => i.source === 'manual').map((i) => normKey(i.merchant)));
-  recurring.sort((a, b) => b.typical - a.typical);
-
-  // everyday: everything else, averaged per complete month
-  const variable = regular.filter((t) => !seriesIds.has(t.id) && !manualPayees.has(normKey(t.merchant)));
+  // everyday: everything that is neither a bill nor a one-off, averaged per complete month
+  const variable = spend.filter(b.isEveryday);
   const perMonth = basis.map((m) => variable.filter((t) => monthOf(t.date) === m).reduce((s, t) => s - t.cents, 0));
   const n = Math.max(basis.length, 1);
-  const variableTotal = Math.round(perMonth.reduce((a, b) => a + b, 0) / n);
+  const variableTotal = Math.round(perMonth.reduce((x, y) => x + y, 0) / n);
   const catTotals = new Map<CategoryId, number>();
   for (const t of variable) catTotals.set(t.category ?? 'uncategorized', (catTotals.get(t.category ?? 'uncategorized') ?? 0) - t.cents);
-  const variableByCategory = [...catTotals.entries()].map(([category, v]) => ({ category, label: categoryLabel(category), estimate: Math.round(v / n) })).sort((a, b) => b.estimate - a.estimate);
+  const variableByCategory = [...catTotals.entries()].map(([category, v]) => ({ category, label: categoryLabel(category), estimate: Math.round(v / n) })).sort((x, y) => y.estimate - x.estimate);
 
   const recurringTotal = recurring.reduce((s, r) => s + r.typical, 0);
   let total = recurringTotal + variableTotal;
@@ -68,7 +94,7 @@ export function forecastMonth(ctx: Ctx, target: string, asOf: string): Forecast 
   let pace: Forecast['pace'];
   const dim = daysInMonth(target);
   const daysElapsed = coveredDays(ctx, target);
-  const tm = personal.filter((t) => isSpend(t) && monthOf(t.date) === target && Number(t.date.slice(8)) <= daysElapsed && !isOneOff(t));
+  const tm = pool.filter((t) => isSpend(t) && monthOf(t.date) === target && Number(t.date.slice(8)) <= daysElapsed && !b.isOneOff(t));
   if (basis.length && daysElapsed >= 7 && daysElapsed < dim) {
     const spentSoFar = tm.reduce((s, t) => s - t.cents, 0);
     const paceTotal = Math.round((spentSoFar / daysElapsed) * dim);

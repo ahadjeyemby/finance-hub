@@ -44,7 +44,8 @@ test('with no accounts at all, every widget is locked and says what unlocks it',
 
 test('the full fixture: widgets are ready, or need answers that come from real open questions', () => {
   const d = data('full');
-  for (const id of ['donut', 'trend', 'grocery', 'fuel', 'pace', 'subscriptions', 'attention'] as const) assert.equal(d[id].readiness, 'ready', id);
+  for (const id of ['donut', 'trend', 'grocery', 'fuel', 'pace', 'attention'] as const) assert.equal(d[id].readiness, 'ready', id);
+  assert.equal(d.subscriptions.readiness, 'answers', 'bills the app found but nobody confirmed (answered on the Recurring screen)');
   assert.equal(d.kpis.readiness, 'answers', 'an unconfirmed deposit in September');
   assert.ok(d.kpis.ask!.questionIds.every((id) => id.startsWith('income:')));
   assert.equal(d.bizPending.readiness, 'answers');
@@ -262,6 +263,77 @@ test('answering several questions in one change keeps every answer', () => {
   const after = qs.reduce((o, q) => applyAnswer(q, 'business', true, o).overlay, f.overlay);
   const left = buildQuestions(applyOverlay(f.txns, after), after).filter((q) => q.type === 'business_or_personal');
   assert.equal(left.length, 0);
+});
+
+// ---- fixes from the phase 4 review ---------------------------------------------------------------------------------------------------
+
+test('a charge marked one-time never makes a repeating bill', () => {
+  const f = fixture('full');
+  const marked = f.txns.map((t) => (t.merchant === 'Northpeak Mobile' ? { ...t, oneOff: true } : t));
+  const fc = data('full', 'personal', { txns: marked }).forecast.forecast!;
+  assert.ok(!fc.recurring.some((r) => r.merchant === 'Northpeak Mobile'));
+});
+
+test('a large monthly bill (rent) is a repeating bill, not a one-off waiting for an answer', () => {
+  const f = fixture('full');
+  const hinted = f.txns.map((t) => (t.merchant === 'Maple Court Apartments' ? { ...t, hints: ['large_one_off' as const] } : t));
+  const d = data('full', 'personal', { txns: hinted });
+  assert.ok(d.forecast.forecast!.recurring.some((r) => r.merchant === 'Maple Court Apartments'));
+  assert.ok(!d.forecast.forecast!.oneOffsExcluded.some((o) => o.merchant === 'Maple Court Apartments'));
+});
+
+test('a cancelled bill leaves the everyday average the same way in the forecast and in Fixed bills vs everyday', () => {
+  const i = inputFor('full');
+  const rec = summarizeRecurring(i.ctx.txns.filter((t) => !t.business), i.ctx.recurring, i.dataTo).items.find((x) => x.merchant === 'Northpeak Mobile')!;
+  const recurring = { ...i.ctx.recurring!, edits: { ...i.ctx.recurring!.edits, [rec.key]: { status: 'cancelled' as const } } };
+  const d = dashboardData({ ...i, ctx: { ...i.ctx, recurring } }, 'personal');
+  assert.equal(d.fixedFlex.everyday, d.forecast.forecast!.variableTotal);
+  assert.equal(data('full', 'personal').fixedFlex.everyday, d.fixedFlex.everyday, 'cancelling a bill does not move its old charges into everyday spending');
+});
+
+test('"if the bills seen once repeat" is the forecast with them added as monthly bills, not counted twice', () => {
+  const i = inputFor('full');
+  const d = dashboardData(i, 'personal');
+  const recurring = d.billsOnce.bills.reduce((r, b) => addManual(r, { merchant: b.merchant, cents: b.cents, cadence: 'monthly', anchor: b.date, category: b.category }), i.ctx.recurring);
+  const expected = forecastMonth({ ...i.ctx, txns: i.ctx.txns.filter((t) => !t.business), recurring }, d.forecast.target, i.dataTo, 'given').total;
+  assert.equal(d.forecastBuild.ifBillsRepeat, expected);
+});
+
+test('Household and Plan ahead leave business income out of Earned; Overview counts it; Business counts only it', () => {
+  const all = data('full', 'all').kpis.earned, personal = data('full', 'personal').kpis.earned, business = data('full', 'business').kpis.earned;
+  assert.ok(business > 0);
+  assert.equal(all, personal + business);
+});
+
+test('a widget follows the view it is shown in: a forecast in Business is a business forecast', () => {
+  const biz = data('full', 'business').forecast.forecast!;
+  const personal = data('full', 'personal').forecast.forecast!;
+  assert.ok(biz.total < personal.total);
+  assert.ok(data('full', 'business').subscriptions.rows.every((r) => !/Maple Court|Northpeak/.test(r.merchant)), 'no household bills in Business');
+});
+
+test('a statement covering only the middle of a month still gives that month numbers', () => {
+  const i = inputFor('full');
+  const accounts = i.ctx.accounts.map((a) => (a.type === 'cash' ? a : { ...a, coverage: { from: '2026-10-10', to: '2026-10-18' } }));
+  const d = dashboardData({ ...i, period: '2026-10', ctx: { ...i.ctx, accounts, statements: [] }, dataFrom: '2026-10-10', dataTo: '2026-10-18' }, 'all');
+  assert.notEqual(d.kpis.readiness, 'data');
+});
+
+test('a reversed card payment is not counted as money from an account Finora cannot see', () => {
+  const accounts: Account[] = [{ id: 'c', name: 'C', institution: '', type: 'credit', last4: '9', coverage: { from: '2026-01-01', to: '2026-01-31' } }];
+  const tx = (cents: number, id: string): Txn => ({ id, accountId: 'c', date: '2026-01-05', description: 'P', merchant: 'Payment', cents, kind: 'transfer', subtype: 'card_payment', source: 't' });
+  const r = unmatchedCardPayments([tx(50000, 'in'), tx(-50000, 'reversal')], accounts);
+  assert.equal(r.cardTotal, 50000);
+  assert.equal(r.cardSide.length, 1);
+});
+
+test('the basket recommendation counts items that cost more at a store against it', () => {
+  const t = (merchant: string, item: string, cents: number): Txn => ({ id: `${merchant}${item}`, accountId: 'a', date: '2026-09-01', description: merchant, merchant, cents: -cents, kind: 'spend', source: 't', lines: [{ item, cents }] });
+  // A is $1 cheaper for milk and bread, but $100 dearer for a big item; B is the better basket
+  const { compare } = compareItems([t('A', 'Milk', 300), t('B', 'Milk', 400), t('A', 'Bread', 200), t('B', 'Bread', 300), t('A', 'Grill', 30000), t('B', 'Grill', 20000)]);
+  const best = bestStore(usualBasket(compare))!;
+  assert.equal(best.store, 'B');
+  assert.equal(best.savingPerBasket, (350 - 400) + (250 - 300) + (25000 - 20000));
 });
 
 // ---- views -------------------------------------------------------------------------------------------------------------------------------

@@ -57,6 +57,11 @@ export function gaps(xs: Interval[], from: string, to: string): Interval[] {
   return out;
 }
 
+/** Does any spending account's statement cover any day from `from` to `to`? */
+export function coversAny(ctx: Pick<Ctx, 'accounts' | 'statements'>, from: string, to: string): boolean {
+  return spendAccounts(ctx.accounts).some((a) => intervalsFor(a, ctx.statements).some((x) => x.from <= to && x.to >= from));
+}
+
 /** A month is complete only if every spending account's statements cover all of it. No spending accounts means no complete month. */
 export function completeMonths(ctx: Pick<Ctx, 'accounts' | 'statements'>, from: string, to: string): string[] {
   const spend = spendAccounts(ctx.accounts);
