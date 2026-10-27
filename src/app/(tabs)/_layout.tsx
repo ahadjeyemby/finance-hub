@@ -23,6 +23,8 @@ export default function TabsLayout() {
     <View style={{ flex: 1, backgroundColor: C.ground }}>
       {wide ? <TopBar /> : <PhoneAppBar />}
       <Tabs
+        // Back returns to the screen the person was on, as a web page does. The default sends every Back to the first tab, the dashboard.
+        backBehavior="fullHistory"
         tabBar={(props) => (wide ? <Sidebar {...props} /> : <PhoneTabBar {...props} />)}
         screenOptions={{ headerShown: false, tabBarPosition: wide ? 'left' : 'bottom', sceneStyle: { backgroundColor: C.ground } }}>
         {SCREENS.map(([name, title]) => <Tabs.Screen key={name} name={name} options={{ title }} />)}
