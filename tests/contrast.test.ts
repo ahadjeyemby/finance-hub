@@ -14,6 +14,14 @@ const PAIRS: [keyof Palette | '#FFFFFF', keyof Palette][] = [
   ['ctaInk', 'cta'], ['#FFFFFF', 'hero'],
 ];
 
+/** A translucent rgba() colour laid over an opaque hex one, as the screen shows it. */
+function over(rgba: string, base: string): string {
+  const [r, g, b, a] = rgba.replace(/rgba\(|\)/g, '').split(',').map(Number);
+  const n = parseInt(base.slice(1), 16);
+  const mix = (top: number, bottom: number) => Math.round(top * a + bottom * (1 - a)).toString(16).padStart(2, '0');
+  return `#${mix(r, (n >> 16) & 255)}${mix(g, (n >> 8) & 255)}${mix(b, n & 255)}`;
+}
+
 for (const [name, p] of [['light', LIGHT], ['dark', DARK]] as const) {
   test(`${name} theme: every text and surface pair reaches 4.5:1`, () => {
     for (const [fg, bg] of PAIRS) {
@@ -21,5 +29,12 @@ for (const [name, p] of [['light', LIGHT], ['dark', DARK]] as const) {
       const ratio = contrast(f, p[bg]);
       assert.ok(ratio >= 4.5, `${fg} on ${bg}: ${ratio.toFixed(2)}`);
     }
+  });
+
+  test(`${name} theme: the hero tile's chip text reads at 4.5:1, and heroSoft is only used for large figures (3:1)`, () => {
+    const chip = over(p.heroChip, p.hero);
+    assert.ok(contrast(p.onHero, chip) >= 4.5, `onHero on the chip: ${contrast(p.onHero, chip).toFixed(2)}`);
+    assert.ok(contrast(p.onHero, p.hero) >= 4.5);
+    assert.ok(contrast(p.heroSoft, p.hero) >= 3, `heroSoft on hero (large text only): ${contrast(p.heroSoft, p.hero).toFixed(2)}`);
   });
 }
