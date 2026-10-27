@@ -358,7 +358,7 @@ Built on branch `dashboard-redesign`, one commit per step of the brief's section
 **Open items**
 - **Sparktrum logo:** not supplied yet. `<PoweredBy />` shows the text.
 - **New view:** disabled with "Coming soon"; there is no `dashboard_views` table yet.
-- **Migration 0008** must be applied (`supabase db push`) before choices sync. Until then they stay on the device and a banner says so.
+- **Migration 0008** was applied to the Supabase project on 2026-10-23, alone: a dry run confirmed it was the only pending one. The signed-in app reads the table (HTTP 200), and widget choices now sync.
 - **Not run on a device:** native iOS and Android were not run here. The build is web-verified, and every component uses only cross-platform APIs.
 - **Review record:** Codex reviewed each step. Its reviews found 37 issues, and all but four were fixed, each fix with a test where it is a number. The four counters, with reasons:
   - **Fuel does not react to every uncategorised question.** Nothing says which unknown charge is fuel. Codex accepted this.
