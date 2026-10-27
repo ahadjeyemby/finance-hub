@@ -8,7 +8,7 @@ import { LEVEL_NAMES, graphChildren, graphFilter, graphRoots, isLeaf } from '@/c
 import type { GNode, Seg } from '@/core/graph';
 import { dollars } from '@/core/queries';
 import type { Ctx, Filter } from '@/core/queries';
-import { F, R, S } from '@/theme/tokens';
+import { F, LIGHT, R, S } from '@/theme/tokens';
 import type { Palette } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
 import { Button, T, useWide } from '@/theme/ui';
@@ -17,6 +17,7 @@ interface Props { ctx: Ctx; scope: Filter['scope']; colorOf: (category: string) 
 
 const GAP = 44, MIN_H = 30, SEP = 4, MAX_H = 440, ITEM_H = 34;
 
+/** labels on a coloured block: a fixed dark or white, chosen by the fill, never by the theme's own ink */
 const darkText = (hex: string) => {
   const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
   return 0.299 * r + 0.587 * g + 0.114 * b > 150;
@@ -108,9 +109,9 @@ function Columns({ ctx, scope, colorOf, onOpen }: Props) {
               const picked = sel[k]?.key === n.key;
               const dim = sel[k] && !picked;
               const col = colorFor(n, colorOf, C);
-              const fg = n.hatch ? C.ink : darkText(col) ? C.ink : C.paper;
+              const fg = n.hatch ? C.ink : darkText(col) ? LIGHT.ink : '#FFFFFF';
               return (
-                <Pressable key={n.id} accessibilityRole="button" accessibilityState={{ selected: picked }} accessibilityLabel={`${n.label}, ${dollars(n.cents)}${n.hatch ? ', no item detail' : ''}`}
+                <Pressable key={n.id} accessibilityRole="button" aria-selected={picked} accessibilityLabel={`${n.label}, ${dollars(n.cents)}${n.hatch ? ', no item detail' : ''}`}
                   onPress={() => (isLeaf(n) ? undefined : select(n, k))}
                   style={{ position: 'absolute', left: k * (colW + GAP), top: y, width: colW, height: h, borderRadius: 6, paddingHorizontal: 8, justifyContent: 'center', backgroundColor: n.hatch ? C.paper : col, borderWidth: picked ? 2 : n.hatch ? 1.5 : 0, borderColor: picked ? C.ink : col, borderStyle: n.hatch && !picked ? 'dashed' : 'solid', opacity: dim ? 0.55 : 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 4 }}>
@@ -178,7 +179,7 @@ function OutlineRow({ n, depth, open, toggle, ctx, scope, colorOf, onOpen }: { n
   const col = colorFor(n, colorOf, C);
   return (
     <View>
-      <Pressable accessibilityRole="button" accessibilityState={{ expanded: leaf ? undefined : isOpen }} accessibilityLabel={`${n.label}, ${dollars(n.cents)}`}
+      <Pressable accessibilityRole="button" aria-expanded={leaf ? undefined : isOpen} accessibilityLabel={`${n.label}, ${dollars(n.cents)}`}
         onPress={() => (leaf ? undefined : toggle(n.id))} onLongPress={() => onOpen?.(graphFilter(n.path, scope))}
         style={{ minHeight: 52, paddingLeft: 4 + depth * 16, paddingRight: 6, flexDirection: 'row', alignItems: 'center', gap: S.sm }}>
         <T size={16} tone="ink3" style={{ width: 16, textAlign: 'center' }}>{leaf ? '' : isOpen ? '−' : '+'}</T>

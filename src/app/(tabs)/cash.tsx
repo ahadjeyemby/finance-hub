@@ -84,7 +84,7 @@ export default function Cash() {
         {CASH_TABS.map((t, i) => {
           const on = t.id === tab; const st = status[t.id];
           return (
-            <Pressable key={t.id} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={`${t.label}, ${STATUS_TEXT[st]}`} onPress={() => setTab(t.id)}
+            <Pressable key={t.id} accessibilityRole="tab" aria-selected={on} accessibilityLabel={`${t.label}, ${STATUS_TEXT[st]}`} onPress={() => setTab(t.id)}
               style={{ flex: 1, minHeight: 52, borderRadius: R.md, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? C.accent : C.soft, borderWidth: st === 'error' ? 2 : 0, borderColor: C.bad }}>
               <T size={13} bold tone={on ? 'paper' : 'ink'}>{i + 1}. {t.label}</T>
               <T size={11} tone={on ? 'paper' : st === 'error' ? 'bad' : st === 'done' ? 'good' : 'ink3'}>{STATUS_TEXT[st]}</T>

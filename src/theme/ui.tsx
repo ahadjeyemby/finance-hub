@@ -19,7 +19,7 @@ export function Screen({ children, scroll = true, pad = true, max = 1120 }: { ch
 
 export function H({ children, size = 20, style }: { children: ReactNode; size?: number; style?: StyleProp<TextStyle> }) {
   const C = useColors();
-  return <Text accessibilityRole="header" style={[{ fontFamily: F.display, fontSize: size, color: C.ink, letterSpacing: -0.02 * size }, style]}>{children}</Text>;
+  return <Text accessibilityRole="header" style={[{ fontFamily: F.display, fontSize: size, color: C.ink, letterSpacing: -0.02 * size }, TABULAR, style]}>{children}</Text>;
 }
 
 export type Tone = 'ink' | 'ink2' | 'ink3' | 'bad' | 'good' | 'paper' | 'accent';
@@ -27,7 +27,7 @@ export type Tone = 'ink' | 'ink2' | 'ink3' | 'bad' | 'good' | 'paper' | 'accent'
 export function T({ children, tone = 'ink', size = 14, bold, style, numberOfLines }: { children: ReactNode; tone?: Tone; size?: number; bold?: boolean; style?: StyleProp<TextStyle>; numberOfLines?: number }) {
   const C = useColors();
   const color = tone === 'paper' ? C.paper : tone === 'bad' ? C.bad : tone === 'good' ? C.goodInk : tone === 'accent' ? C.accentInk : C[tone];
-  return <Text numberOfLines={numberOfLines} style={[{ fontFamily: bold ? F.bodyBold : F.body, fontSize: size, color, lineHeight: size * 1.4 }, style]}>{children}</Text>;
+  return <Text numberOfLines={numberOfLines} style={[{ fontFamily: bold ? F.bodyBold : F.body, fontSize: size, color, lineHeight: size * 1.4 }, TABULAR, style]}>{children}</Text>;
 }
 
 /** An amount of money, always in tabular figures. */
@@ -75,14 +75,14 @@ export function Row({ label, value, strong, tone, onPress }: { label: string; va
   return onPress ? <Pressable accessibilityRole="button" accessibilityLabel={`${label} ${value}, see the transactions behind it`} onPress={onPress} style={{ minHeight: 32, justifyContent: 'center' }}>{body}</Pressable> : body;
 }
 
-export function Button({ label, onPress, kind = 'solid', disabled, small, style, accessibilityLabel }: { label: string; onPress?: () => void; kind?: 'solid' | 'outline' | 'ghost' | 'soft'; disabled?: boolean; small?: boolean; style?: StyleProp<ViewStyle>; accessibilityLabel?: string }) {
+export function Button({ label, onPress, kind = 'solid', disabled, small, style, accessibilityLabel }: { label: string; onPress?: () => void; kind?: 'solid' | 'outline' | 'ghost' | 'soft' | 'onAccent'; disabled?: boolean; small?: boolean; style?: StyleProp<ViewStyle>; accessibilityLabel?: string }) {
   const C = useColors();
   const bg = kind === 'solid' ? C.accent : kind === 'soft' ? C.accentSoft : 'transparent';
-  const fg = kind === 'solid' ? C.onAccent : C.accentInk;
+  const fg = kind === 'solid' || kind === 'onAccent' ? C.onAccent : C.accentInk;
   return (
     <Pressable
-      accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ disabled: !!disabled }} onPress={disabled ? undefined : onPress}
-      style={({ pressed }) => [{ minHeight: small ? 36 : MIN_TOUCH, paddingHorizontal: S.lg, borderRadius: R.md, alignItems: 'center', justifyContent: 'center', backgroundColor: bg, borderWidth: kind === 'outline' ? 1.5 : 0, borderColor: C.accent, opacity: disabled ? 0.45 : pressed ? 0.8 : 1 }, style]}>
+      accessibilityRole="button" accessibilityLabel={accessibilityLabel} aria-disabled={!!disabled} onPress={disabled ? undefined : onPress}
+      style={({ pressed }) => [{ minHeight: small ? 36 : MIN_TOUCH, paddingHorizontal: S.lg, borderRadius: R.md, alignItems: 'center', justifyContent: 'center', backgroundColor: bg, borderWidth: kind === 'outline' || kind === 'onAccent' ? 1.5 : 0, borderColor: kind === 'onAccent' ? C.onAccent : C.accent, opacity: disabled ? 0.45 : pressed ? 0.8 : 1 }, style]}>
       <Text style={{ fontFamily: F.bodyBold, fontSize: small ? 13 : 14, color: fg }}>{label}</Text>
     </Pressable>
   );
@@ -91,7 +91,7 @@ export function Button({ label, onPress, kind = 'solid', disabled, small, style,
 export function Chip({ label, on, onPress, count }: { label: string; on?: boolean; onPress?: () => void; count?: number }) {
   const C = useColors();
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ selected: !!on }} onPress={onPress}
+    <Pressable accessibilityRole="button" aria-selected={!!on} onPress={onPress}
       style={{ minHeight: MIN_TOUCH - 8, minWidth: 48, paddingHorizontal: S.md, borderRadius: R.pill, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: on ? C.accent : 'transparent' }}>
       <Text style={{ fontFamily: on ? F.bodyBold : F.bodyMed, fontSize: 13, color: on ? C.onAccent : C.ink2 }}>{label}</Text>
       {count != null ? <Badge n={count} /> : null}
@@ -119,7 +119,7 @@ export function Segmented<V extends string>({ value, options, onChange, label }:
   return (
     <View accessibilityRole="tablist" accessibilityLabel={label} style={{ flexDirection: 'row', flexWrap: 'wrap', backgroundColor: C.seg, borderRadius: R.md, padding: 3, alignSelf: 'flex-start' }}>
       {options.map((o) => (
-        <Pressable key={o.value} accessibilityRole="tab" accessibilityState={{ selected: o.value === value }} onPress={() => onChange(o.value)}
+        <Pressable key={o.value} accessibilityRole="tab" aria-selected={o.value === value} onPress={() => onChange(o.value)}
           style={{ minHeight: MIN_TOUCH - 4, minWidth: 44, paddingHorizontal: S.md, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: o.value === value ? C.accent : 'transparent' }}>
           <Text style={{ fontFamily: o.value === value ? F.bodyBold : F.bodySemi, fontSize: 13, color: o.value === value ? C.onAccent : C.ink2 }}>{o.label}</Text>
         </Pressable>
