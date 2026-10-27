@@ -52,7 +52,8 @@ export function FixedFlex({ d }: P) {
     </View>
   );
   return (
-    <Widget title="Fixed bills vs everyday" sub={`A typical month, from ${w.months} complete month${w.months === 1 ? '' : 's'}`} state={w} ghost="ring">
+    <Widget title="Fixed bills vs everyday" sub={`A typical month, from ${w.months} complete month${w.months === 1 ? '' : 's'}`} state={w} ghost="ring"
+      askAction={w.ask && !w.ask.questionIds.length ? <Pressable accessibilityRole="link" onPress={() => go('recurring')} style={{ minHeight: MIN_TOUCH, justifyContent: 'center' }}><Text style={{ fontFamily: F.bodyBold, fontSize: 13, color: c.warnInk, textDecorationLine: 'underline' }}>Confirm bills</Text></Pressable> : undefined}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
         <Ring size={128} thickness={18} gapPct={0.8} parts={[{ value: w.fixed, color: c.accent }, { value: w.everyday, color: c.flexC }]} track={w.fixed + w.everyday > 0 ? undefined : c.track}
           label={`Ring: fixed bills ${pct0(w.share)}, everyday spending ${pct0(1 - w.share)}`}>

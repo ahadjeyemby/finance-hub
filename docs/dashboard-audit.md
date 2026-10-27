@@ -365,3 +365,12 @@ Built on branch `dashboard-redesign`, one commit per step of the brief's section
   - **Streaming subscriptions are not listed as likely business tools.** A tool needs business evidence: the business hint, or an answer. Codex accepted this.
   - **Detected but unconfirmed bills do not mark the forecast "Needs your answers".** They prompt on Repeating bills and on Fixed bills vs everyday, where confirming them is the action. Otherwise the forecast would almost never be Ready.
   - **Spending by month: a refund larger than its category's purchases.** The bars show what was bought in each category, and the label shows the month's net total after refunds. In that rare case the bar can be taller than its label; Where it went states such a refund separately.
+
+  Codex accepted the last two in its final pass. That pass found three more problems, which are now fixed:
+  - a preference load that finished after a save could undo it;
+  - the hero tile's chip and small text were below 4.5:1 (the chip is now darker, small text on the hero is white, and the contrast test composites the chip);
+  - Fixed bills vs everyday's prompt had no action.
+
+  Two items in Codex's final checklist could not be closed from the code alone:
+  - **Native rendering on iOS and Android:** not run on a device here, as noted above.
+  - **The privacy scan:** Codex could not repeat it, because the term list and `design-reference/` are outside the worktree on purpose. It is reproducible locally by grepping `git log -p main..dashboard-redesign` for the merchants and figures in `design-reference/`.

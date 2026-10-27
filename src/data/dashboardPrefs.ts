@@ -77,6 +77,7 @@ export function useWidgetPrefs(): WidgetPrefsApi {
   const [loadError, setLoadError] = useState<string | null>(null);
   const storeRef = useRef(store);
   const unsaved = useRef(new Set<ViewId>());
+  const editedSinceLoad = useRef(new Set<ViewId>());
   // how many times each view changed here: a save only clears a view if it did not change again while that save was on its way
   const versions = useRef(new Map<ViewId, number>());
   const queue = useRef<Promise<void>>(Promise.resolve());
@@ -108,6 +109,7 @@ export function useWidgetPrefs(): WidgetPrefsApi {
   useEffect(() => {
     let live = true;
     unsaved.current = new Set();
+    editedSinceLoad.current = new Set();
     (async () => {
       let local: Cache = { prefs: {}, unsaved: [] };
       try { local = readCache(await AsyncStorage.getItem(cacheKey)); } catch { /* no saved copy */ }
@@ -121,7 +123,9 @@ export function useWidgetPrefs(): WidgetPrefsApi {
         const remote = await fetchPrefs(userId);
         if (!live) return;
         setLoadError(null);
-        persist(mergePrefs(remote, storeRef.current.prefs, unsaved.current));
+        // a view switched on this device after this load began keeps the device's version, even if its save already finished: the
+        // database answered with what it had before that save
+        persist(mergePrefs(remote, storeRef.current.prefs, new Set([...unsaved.current, ...editedSinceLoad.current])));
         if (unsaved.current.size) flush();
       } catch (e) {
         // the table may not exist yet (migration 0008), or the network is down: say so, and keep using this device's copy
@@ -135,6 +139,7 @@ export function useWidgetPrefs(): WidgetPrefsApi {
     const next: Prefs = { ...(storeRef.current.key === cacheKey ? storeRef.current.prefs : {}) };
     if (rows) next[view] = rows; else delete next[view];
     unsaved.current.add(view);
+    editedSinceLoad.current.add(view);
     versions.current.set(view, (versions.current.get(view) ?? 0) + 1);
     persist(next);
     flush();

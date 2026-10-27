@@ -34,7 +34,7 @@ export function BizSummary({ d }: P) {
     <View accessibilityRole="summary" accessibilityLabel="Business at a glance" style={{ flex: 1, gap: 12 }}>
       {w.readiness === 'answers' && w.ask ? <AskStrip ask={w.ask} /> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
-        <Tile hero label="Tagged as business" foot={<Text style={{ fontFamily: F.body, fontSize: 13, color: c.heroSoft }}>{w.tagged > 0 ? monthSpan(d.donut.from, d.donut.to) : merchants ? `Answer ${merchants} question${merchants === 1 ? '' : 's'} to start` : 'Nothing tagged yet'}</Text>}>
+        <Tile hero label="Tagged as business" foot={<Text style={{ fontFamily: F.bodySemi, fontSize: 13, color: c.onHero }}>{w.tagged > 0 ? monthSpan(d.donut.from, d.donut.to) : merchants ? `Answer ${merchants} question${merchants === 1 ? '' : 's'} to start` : 'Nothing tagged yet'}</Text>}>
           <BigMoney cents={w.tagged} color={c.onHero} centsColor={c.heroSoft} />
         </Tile>
         <Tile label="Waiting for your answer" foot={foot(merchants ? `${merchants} merchant${merchants === 1 ? '' : 's'}, each charge counted once` : 'Nothing is waiting')}>
