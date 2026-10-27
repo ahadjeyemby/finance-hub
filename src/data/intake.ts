@@ -159,7 +159,7 @@ export async function saveReceiptRecord(rec: ReceiptRecord, file: PickedFile | n
     if (up.error) throw new Error(`Could not store the original file: ${up.error.message}`);
   }
   const row = { ...receiptToRow({ ...rec, sha256: file?.sha256 ?? rec.sha256, sourceFile: file?.name ?? rec.sourceFile, origin: file ? 'app_upload' : 'typed' }, path, txnId), ...(owner ? { user_id: owner } : {}) };
-  // a Contributor's receipt goes into the owner's books through the database's own check (migration 0009)
+  // a Contributor's receipt goes into the owner's books through the database's own check (migration 0010)
   if (helping) return contributorSaveReceipt(row);
   const q = file
     ? await supabase.from('receipts').upsert(row, { onConflict: 'user_id,sha256' }).select('id').single()

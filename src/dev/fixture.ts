@@ -7,7 +7,7 @@
 //   sparse eight days of one card, so most widgets are in their "needs more data" state
 //   empty  accounts with statements but no charges at all
 //   none   no accounts: what a new person sees before importing anything
-//   contributor  the full ledger as a Contributor sees it (migration 0009): spending only, see contributorFixture
+//   contributor  the full ledger as a Contributor sees it (migration 0010): spending only, see contributorFixture
 import type { CategoryConfig } from '@/core/categories';
 import { spendingView } from '@/core/contributor';
 import { summarizeRecurring } from '@/core/recurring';

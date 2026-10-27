@@ -103,7 +103,7 @@ export interface SyncApi { state: SyncState; lastAt: string | null; error: strin
 export interface Repo {
   ready: boolean;
   /**
-   * true for a Contributor (migration 0009): the data is the owner's spending only, and the app shows nothing about pay, savings, balances or
+   * true for a Contributor (migration 0010): the data is the owner's spending only, and the app shows nothing about pay, savings, balances or
    * income settings. The database decides what arrives; this only shapes the screens.
    */
   spendingOnly: boolean;

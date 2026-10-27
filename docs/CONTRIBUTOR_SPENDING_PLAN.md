@@ -19,7 +19,7 @@ They are still told that you can see everything they add, as the invite says tod
 1. **Contributor changes meaning.** Today it means "adds entries and sees only their own" (`src/core/workspace.ts:13`). It becomes "adds to your books and sees your spending". The migration stops with an error if anyone still holds the old role, so nobody's access changes without you knowing.
 2. **Checking statements are yours to upload.** Contributors can upload credit card statements and receipts. A statement that reads as a checking account is refused with "Checking statements are added by the person who runs this workspace."
 3. **They can fix, not delete.** They can change the category, subcategory, note, tags and item lines of a charge, and attach receipts. They can't delete rows, change a row's kind, or overwrite a row you already have.
-4. **Branch.** A new branch `contributor-spending` off `dashboard-redesign`, because the Overview and side bar it changes are the redesigned ones. The migration is therefore `0009`.
+4. **Branch.** A new branch `contributor-spending` off `dashboard-redesign`, because the Overview and side bar it changes are the redesigned ones. The migration is therefore `0010`.
 
 ## Design rules
 

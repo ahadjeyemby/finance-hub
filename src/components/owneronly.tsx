@@ -6,7 +6,7 @@ import { useRepo } from '@/data/repo';
 import { Button, Card, Screen, T } from '@/theme/ui';
 
 /**
- * A page kept for the person who runs the workspace. A Contributor (migration 0009) reaching it by its address sees a plain note that says
+ * A page kept for the person who runs the workspace. A Contributor (migration 0010) reaching it by its address sees a plain note that says
  * nothing about what the page holds; the data behind it never reaches their device anyway.
  */
 export function ownerOnly<P extends object>(Page: ComponentType<P>): ComponentType<P> {

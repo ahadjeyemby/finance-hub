@@ -14,7 +14,7 @@ import type { ReportSpec } from './report';
 export interface AgentResult { text: string; report?: ReportSpec; source: 'model' | 'offline'; note?: string }
 export interface AgentEnv {
   today: string; dataFrom: string; dataTo: string; scope: 'all' | 'personal' | 'business';
-  /** a Contributor (migration 0009): the data is spending only, and the tools, the instructions and every answer speak only of spending */
+  /** a Contributor (migration 0010): the data is spending only, and the tools, the instructions and every answer speak only of spending */
   spendingOnly?: boolean;
 }
 

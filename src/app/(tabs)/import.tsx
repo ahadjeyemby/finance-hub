@@ -92,7 +92,7 @@ const STATEMENT_FIELDS: [string, string][] = [['institution', 'Bank or issuer'],
 
 async function loadStored(owner?: string): Promise<Stored[]> {
   if (!supabase) return [];
-  // a Contributor: the periods of the owner's cards that are already in, with no balances (migration 0009)
+  // a Contributor: the periods of the owner's cards that are already in, with no balances (migration 0010)
   if (contributorOwner()) return fetchContributorSnapshot().then((s) => s.statements.map((x) => ({ id: x.id, accountId: x.accountId, periodFrom: x.from, periodTo: x.to })), () => []);
   const q = await supabase.from('statements').select('id, account_id, period_from, period_to').eq('user_id', owner ?? meId());
   return q.error ? [] : (q.data ?? []).map((r) => ({ id: r.id as string, accountId: r.account_id as string | null, periodFrom: r.period_from as string | null, periodTo: r.period_to as string | null }));

@@ -53,5 +53,5 @@ export function memberNotice(role: Role): string {
     : 'You belong to someone else\'s workspace. You see only what you add.';
 }
 
-/** A Contributor sees the spending of someone else's books (migration 0009). */
+/** A Contributor sees the spending of someone else's books (migration 0010). */
 export const isContributor = (a: Access | null): boolean => a?.role === 'contributor';

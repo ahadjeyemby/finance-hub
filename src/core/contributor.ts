@@ -1,4 +1,4 @@
-// A Contributor (migration 0009) adds receipts and credit card statements to the owner's books and sees only the owner's spending. Pure
+// A Contributor (migration 0010) adds receipts and credit card statements to the owner's books and sees only the owner's spending. Pure
 // TypeScript. The database decides what a Contributor can read and write; this file holds the app's side of the same rules:
 //   * spendingView: the rows a Contributor sees, the same rule as owner_spending() in the migration. Used for the development preview and
 //     tested against the database, so the two never drift apart.

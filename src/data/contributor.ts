@@ -1,4 +1,4 @@
-// The calls a Contributor makes (migration 0009), and the owner's side of them. A Contributor never reads or writes a data table: everything
+// The calls a Contributor makes (migration 0010), and the owner's side of them. A Contributor never reads or writes a data table: everything
 // goes through the contributor functions, which decide in the database what may come back. This file only moves rows; the rules the app
 // keeps are in core/contributor.ts.
 import type { CategoryConfig } from '@/core/categories';
@@ -69,7 +69,7 @@ export async function pushContributorEdits(overlay: Overlay): Promise<void> {
   }
 }
 
-/** The owner's side: what every Contributor in the workspace changed. Empty before migration 0009. */
+/** The owner's side: what every Contributor in the workspace changed. Empty before migration 0010. */
 export async function fetchEditsForOwner(): Promise<StoredEdit[]> {
   if (!supabase) return [];
   const r = await supabase.from('contributor_edits').select('contributor, key, patch, updated_at').eq('owner', meId());

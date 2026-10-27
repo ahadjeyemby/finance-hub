@@ -1,4 +1,4 @@
-// The app's side of a Contributor (migration 0009): the spending rule it keeps for the preview matches the database exactly, a Contributor's
+// The app's side of a Contributor (migration 0010): the spending rule it keeps for the preview matches the database exactly, a Contributor's
 // decisions become rows the database accepts, the owner sees them under their own, and Ask and Reports speak only of spending.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

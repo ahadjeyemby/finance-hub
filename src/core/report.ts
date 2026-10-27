@@ -176,7 +176,7 @@ export function parsePeriod(text: string, today: string, dataFrom: string, dataT
   return { from: dataFrom, to: dataTo, label: `${monthLabel(monthOf(dataFrom), true)} to ${monthLabel(monthOf(dataTo))}` };
 }
 
-/** What a Contributor may ask about (migration 0009): their data holds only spending, and no report of theirs may speak of anything else. */
+/** What a Contributor may ask about (migration 0010): their data holds only spending, and no report of theirs may speak of anything else. */
 export const SPENDING_METRICS: Metric[] = ['spend', 'count', 'average'];
 const NOT_SPENDING = /\b(earn\w*|income|salary|salaries|pay ?check\w*|deposit\w*|saving\w*|savings|net|left after|rewards?|transfers?|balances?)\b/i;
 

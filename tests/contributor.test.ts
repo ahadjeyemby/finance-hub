@@ -1,4 +1,4 @@
-// A Contributor (migration 0009), tested on a real Postgres (PGlite) with the project's own migrations. The owner's books hold pay, a move to
+// A Contributor (migration 0010), tested on a real Postgres (PGlite) with the project's own migrations. The owner's books hold pay, a move to
 // savings, card payments, rewards, balances and income settings next to ordinary spending; a Contributor must get the spending and nothing
 // else, by any route, and must never change what the owner holds.
 import assert from 'node:assert/strict';

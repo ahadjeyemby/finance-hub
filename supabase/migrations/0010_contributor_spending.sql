@@ -27,7 +27,7 @@ begin
   end if;
 end $$;
 
-comment on column public.members.role is 'member: keeps their own books, which the admin can see. contributor: adds receipts and credit card statements to the admin''s books and sees only the admin''s spending (0009).';
+comment on column public.members.role is 'member: keeps their own books, which the admin can see. contributor: adds receipts and credit card statements to the admin''s books and sees only the admin''s spending (0010).';
 
 -- who added a receipt or statement: lets a Contributor change the receipts they added, and only those
 alter table public.receipts add column if not exists uploaded_by uuid default auth.uid() references auth.users on delete set null;

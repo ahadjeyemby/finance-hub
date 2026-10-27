@@ -52,7 +52,7 @@ export const CATALOG: WidgetMeta[] = [
 export const WIDGET_IDS: WidgetId[] = CATALOG.map((w) => w.id);
 export const META: Record<WidgetId, WidgetMeta> = Object.fromEntries(CATALOG.map((w) => [w.id, w])) as Record<WidgetId, WidgetMeta>;
 export const isWidgetId = (v: unknown): v is WidgetId => typeof v === 'string' && v in META;
-/** Widgets that are about money coming in: a Contributor (migration 0009) never has them, in any view or in Customize. */
+/** Widgets that are about money coming in: a Contributor (migration 0010) never has them, in any view or in Customize. */
 export const OWNER_ONLY_WIDGETS: ReadonlySet<WidgetId> = new Set<WidgetId>(['cashflow', 'bizPL']);
 /** The widgets a person can have: all of them, or a Contributor's spending ones. */
 export const widgetsFor = (spendingOnly: boolean): WidgetMeta[] => (spendingOnly ? CATALOG.filter((w) => !OWNER_ONLY_WIDGETS.has(w.id)) : CATALOG);

@@ -20,7 +20,7 @@ export function dbAccount(a: { id: string; owner?: string }): { owner: string; i
 let contributingTo: string | null = null;
 
 /**
- * Set when the signed-in person is a Contributor (migration 0009): the owner whose books they add to. A Contributor reads and writes nothing
+ * Set when the signed-in person is a Contributor (migration 0010): the owner whose books they add to. A Contributor reads and writes nothing
  * directly; every data call checks this and goes through the contributor functions instead.
  */
 export const setContributingTo = (owner: string | null) => { contributingTo = owner; };

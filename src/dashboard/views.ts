@@ -9,7 +9,7 @@ export interface ViewDef {
   icon: IconName;
   /** the line under the tabs that says what the view is for */
   blurb: string;
-  /** what a Contributor reads instead (migration 0009), where the blurb speaks of money coming in */
+  /** what a Contributor reads instead (migration 0010), where the blurb speaks of money coming in */
   spendingBlurb?: string;
   /** whose spending the view counts: Overview everything, Household and Plan ahead personal only, Business business only */
   scope: 'all' | 'personal' | 'business';
