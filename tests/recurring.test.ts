@@ -123,6 +123,44 @@ test('the person can set their own amount and rhythm for an item', () => {
   assert.equal(i.monthlyCents, Math.round(2500 / 3));
 });
 
+test('two matching charges a week apart read as weekly, and the person can say it is a yearly plan', () => {
+  const apple = [t('Apple', '2026-08-28', 99), t('Apple', '2026-09-04', 99)];
+  const found = summarizeRecurring(apple, undefined, '2026-10-20').items[0];
+  assert.equal(found.cadence, 'weekly');
+  assert.equal(found.monthlyCents, 42900);
+  assert.equal(found.health, 'stopped', 'weekly charges that stopped coming');
+  const set = decide(undefined, found.key, 'confirmed', { cadence: 'annual' });
+  const yearly = summarizeRecurring(apple, set, '2026-10-20').items[0];
+  assert.equal(yearly.cadence, 'annual');
+  assert.equal(yearly.cents, 9900, 'the amount stays as found');
+  assert.equal(yearly.monthlyCents, 825);
+  assert.equal(yearly.nextDue, '2027-09-04', 'a year after the last charge');
+  assert.equal(yearly.health, 'active');
+  assert.equal(yearly.source, 'confirmed');
+  assert.deepEqual(yearly.txnIds, found.txnIds, 'still tied to the real charges');
+});
+
+test('two accounts on the same yearly plan: a count and a note, and the monthly cost covers both', () => {
+  const apple = [t('Apple', '2026-08-28', 99), t('Apple', '2026-09-04', 99)];
+  const key = summarizeRecurring(apple, undefined, '2026-10-20').items[0].key;
+  const s = decide(decide(undefined, key, 'confirmed', { cadence: 'annual' }), key, 'confirmed', { quantity: 2, note: '  personal and work accounts ' });
+  const i = summarizeRecurring(apple, s, '2026-10-20').items[0];
+  assert.equal(i.cents, 9900, 'one charge is still $99');
+  assert.equal(i.quantity, 2);
+  assert.equal(i.note, 'personal and work accounts');
+  assert.equal(i.monthlyCents, 1650, '$198 a year is $16.50 a month');
+  assert.equal(summarizeRecurring(apple, s, '2026-10-20').fixedMonthlyCents, 1650);
+  // what leaves in the next 30 days counts both
+  const due = summarizeRecurring(apple, decide(s, key, 'confirmed', { cadence: 'monthly' }), '2026-10-20', '2026-10-20').upcoming;
+  assert.ok(due.length && due.every((u) => u.cents === 19800));
+  // a quantity of 1 and an empty note are the same as none, and the rhythm stays
+  const back = decide(s, key, 'confirmed', { quantity: 1, note: '   ' });
+  assert.deepEqual(back.edits[key], { status: 'confirmed', cadence: 'annual' });
+  // the count is a whole number from 1 to 99
+  const wild = summarizeRecurring(apple, { edits: { [key]: { status: 'confirmed', cadence: 'annual', quantity: 1000 } }, manual: [] }, '2026-10-20').items[0];
+  assert.equal(wild.quantity, 99);
+});
+
 test('rent paid in cash is added by hand, repeats on its day, and gives way once statements show it', () => {
   const s = addManual(undefined, { merchant: 'House rent', cents: 150000, cadence: 'monthly', anchor: '2026-06-01', category: 'rent' });
   const r = summarizeRecurring([], s, '2026-06-20', '2026-06-20');

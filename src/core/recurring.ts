@@ -15,12 +15,24 @@ export type Cadence = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'semiann
 export const CADENCE_LABEL: Record<Cadence, string> = { weekly: 'Weekly', biweekly: 'Every 2 weeks', monthly: 'Monthly', quarterly: 'Every 3 months', semiannual: 'Every 6 months', annual: 'Yearly' };
 /** how many of this cadence fit in a month, for the monthly equivalent */
 const PER_MONTH: Record<Cadence, number> = { weekly: 52 / 12, biweekly: 26 / 12, monthly: 1, quarterly: 1 / 3, semiannual: 1 / 6, annual: 1 / 12 };
+/** how many the person said there are: a whole number from 1 to 99 */
+const quantityOf = (e?: RecurringEdit) => (e?.quantity && Number.isFinite(e.quantity) ? Math.min(99, Math.max(1, Math.round(e.quantity))) : 1);
+const noteOf = (...xs: (string | undefined)[]) => xs.map((x) => x?.trim()).find(Boolean) || undefined;
 const NOMINAL: Record<Cadence, { days: number; tol: number }> = {
   weekly: { days: 7, tol: 2 }, biweekly: { days: 14, tol: 3 }, monthly: { days: 30.4, tol: 5 }, quarterly: { days: 91, tol: 10 }, semiannual: { days: 182, tol: 14 }, annual: { days: 365, tol: 20 },
 };
 
 export interface ManualRecurring { id: string; merchant: string; cents: number; cadence: Cadence; /** a date it was or will be due; later dates follow the cadence */ anchor: string; category?: string; note?: string }
-export interface RecurringEdit { status: 'confirmed' | 'ignored' | 'cancelled'; /** the person's own amount or rhythm for it */ cents?: number; cadence?: Cadence }
+export interface RecurringEdit {
+  status: 'confirmed' | 'ignored' | 'cancelled';
+  /** the person's own amount or rhythm for it */
+  cents?: number;
+  cadence?: Cadence;
+  /** a line of their own about it, such as which account it is on */
+  note?: string;
+  /** how many of them there are: two accounts each renewing at $99 a year is 2. The amount stays what one charge is. */
+  quantity?: number;
+}
 export interface RecurringState { edits: Record<string, RecurringEdit>; manual: ManualRecurring[] }
 export const emptyRecurring = (): RecurringState => ({ edits: {}, manual: [] });
 
@@ -31,7 +43,11 @@ export interface RecurringItem {
   cadence: Cadence;
   /** what one charge usually is, in cents (positive) */
   cents: number;
-  /** what this costs per month on average */
+  /** how many of them the person said there are (1 unless set); the monthly figure counts all of them */
+  quantity: number;
+  /** the person's own line about it */
+  note?: string;
+  /** what this costs per month on average, for all of them */
   monthlyCents: number;
   lastDate?: string;
   lastCents?: number;
@@ -182,10 +198,11 @@ export function summarizeRecurring(txns: Txn[], state: RecurringState | undefine
     const change = !varies && earlier.length >= 1 && Math.abs(amounts[amounts.length - 1] - prev) >= 50 && Math.abs(amounts[amounts.length - 1] - prev) / prev >= 0.03 ? { from: prev, to: amounts[amounts.length - 1] } : undefined;
     const cadence = e?.cadence ?? s.cadence;
     const cents = e?.cents ?? (varies ? median(amounts) : amounts[amounts.length - 1]);
+    const quantity = quantityOf(e);
     const { next, missed } = project(last.date, cadence, asOf);
     const yearAgo = addDays(asOf, -365);
     items.push({
-      key: s.key, merchant: s.merchant, category: cat, cadence, cents, monthlyCents: Math.round(cents * PER_MONTH[cadence]),
+      key: s.key, merchant: s.merchant, category: cat, cadence, cents, quantity, ...(noteOf(e?.note) ? { note: noteOf(e?.note) } : {}), monthlyCents: Math.round(cents * quantity * PER_MONTH[cadence]),
       lastDate: last.date, lastCents: -last.cents, nextDue: next, projected: next > asOf, count: ts.length, varies, ...(change ? { change } : {}),
       health: missed === 0 ? 'active' : missed === 1 ? 'late' : 'stopped',
       source: e?.status === 'confirmed' ? 'confirmed' : 'detected', status: e?.status === 'ignored' ? 'ignored' : e?.status === 'cancelled' ? 'cancelled' : 'on',
@@ -198,11 +215,11 @@ export function summarizeRecurring(txns: Txn[], state: RecurringState | undefine
   for (const m of state?.manual ?? []) {
     if (found.has(normKey(m.merchant))) continue;
     const key = `m:${m.id}`; const e = edits[key];
-    const cadence = e?.cadence ?? m.cadence; const cents = e?.cents ?? m.cents;
+    const cadence = e?.cadence ?? m.cadence; const cents = e?.cents ?? m.cents; const quantity = quantityOf(e); const note = noteOf(e?.note, m.note);
     let next = m.anchor; let guard = 0;
     while (next <= today && guard++ < 400) next = step(next, cadence);
     items.push({
-      key, merchant: m.merchant, category: m.category, cadence, cents, monthlyCents: Math.round(cents * PER_MONTH[cadence]), nextDue: next, projected: next > asOf, count: 0, varies: false,
+      key, merchant: m.merchant, category: m.category, cadence, cents, quantity, ...(note ? { note } : {}), monthlyCents: Math.round(cents * quantity * PER_MONTH[cadence]), nextDue: next, projected: next > asOf, count: 0, varies: false,
       health: 'active', source: 'manual', status: e?.status === 'cancelled' ? 'cancelled' : e?.status === 'ignored' ? 'ignored' : 'on', yearCents: 0, txnIds: [],
     });
   }
@@ -212,7 +229,7 @@ export function summarizeRecurring(txns: Txn[], state: RecurringState | undefine
   const upcoming: RecurringSummary['upcoming'] = [];
   for (const i of on) {
     let d = i.nextDue; let guard = 0;
-    while (d <= horizon && guard++ < 10) { if (d >= today) upcoming.push({ key: i.key, merchant: i.merchant, date: d, cents: i.cents }); d = step(d, i.cadence); }
+    while (d <= horizon && guard++ < 10) { if (d >= today) upcoming.push({ key: i.key, merchant: i.merchant, date: d, cents: i.cents * i.quantity }); d = step(d, i.cadence); }
   }
   upcoming.sort((a, b) => a.date.localeCompare(b.date) || b.cents - a.cents);
 
@@ -266,11 +283,16 @@ export const categoryOf = (i: RecurringItem) => (i.category ? categoryLabel(i.ca
 const base = (s?: RecurringState): RecurringState => ({ edits: { ...(s?.edits ?? {}) }, manual: [...(s?.manual ?? [])] });
 
 /** Confirm, ignore or cancel an item, or clear the decision (back to what the engine found). */
-export function decide(s: RecurringState | undefined, key: string, status: RecurringEdit['status'] | null, over: { cents?: number; cadence?: Cadence } = {}): RecurringState {
+export function decide(s: RecurringState | undefined, key: string, status: RecurringEdit['status'] | null, over: { cents?: number; cadence?: Cadence; note?: string; quantity?: number } = {}): RecurringState {
   const next = base(s);
-  const cur = { ...(next.edits[key] ?? {}), ...over };
+  const cur: Partial<RecurringEdit> = { ...(next.edits[key] ?? {}), ...over };
+  // an empty note, or a quantity of 1, is the same as none: leave it out so the saved decision stays small
+  if (!cur.note?.trim()) delete cur.note; else cur.note = cur.note.trim().slice(0, 200);
+  if (!cur.quantity || cur.quantity <= 1) delete cur.quantity; else cur.quantity = Math.min(99, Math.round(cur.quantity));
+  if (cur.cents == null) delete cur.cents;
+  if (!cur.cadence) delete cur.cadence;
   if (status) next.edits[key] = { ...cur, status } as RecurringEdit;
-  else if (cur.cents != null || cur.cadence) next.edits[key] = { ...cur, status: next.edits[key]?.status ?? 'confirmed' } as RecurringEdit;
+  else if (cur.cents != null || cur.cadence || cur.note || cur.quantity) next.edits[key] = { ...cur, status: next.edits[key]?.status ?? 'confirmed' } as RecurringEdit;
   else delete next.edits[key];
   return next;
 }
