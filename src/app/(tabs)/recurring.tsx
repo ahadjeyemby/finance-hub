@@ -5,7 +5,7 @@ import { ScreenHeader } from '@/components/header';
 import { dayLabel, monthLabel, todayISO } from '@/core/dates';
 import { dollars } from '@/core/queries';
 import { CADENCE_LABEL, addManual, decide, incomeVsFixed, removeManual, summarizeRecurring } from '@/core/recurring';
-import type { Cadence, RecurringItem } from '@/core/recurring';
+import type { Cadence, RecurringItem, RecurringState } from '@/core/recurring';
 import { useRepo } from '@/data/repo';
 import { S } from '@/theme/tokens';
 import { useColors } from '@/theme/theme';
@@ -18,20 +18,94 @@ const CADENCES = Object.keys(CADENCE_LABEL) as Cadence[];
  * Everything that comes round on a rhythm, with the one number to plan around: what has to be there each month. Found from the statements,
  * confirmed or set aside by the person, and topped up by hand for what no statement shows (rent paid in cash).
  */
+/**
+ * The note box. What is typed is kept here, not in the screen: the screen's rows are declared inside it, and a change to the screen's state while
+ * typing would rebuild the row and drop the cursor after every key. The note is saved when the box loses focus or on Done.
+ */
+function NoteField({ label, value, onSave, onDone }: { label: string; value: string; onSave: (note: string) => void; onDone: () => void }) {
+  const C = useColors();
+  const input = useInputStyle();
+  const [draft, setDraft] = useState(value);
+  const save = () => { if (draft.trim() !== value) onSave(draft); };
+  return (
+    <View style={{ gap: 4 }}>
+      <T size={12} tone="ink3">A note for yourself, such as which accounts these are on.</T>
+      <TextInput value={draft} onChangeText={setDraft} onBlur={save} onSubmitEditing={save} maxLength={200}
+        placeholder="For example: personal and work accounts" placeholderTextColor={C.ink3} accessibilityLabel={`Note for ${label}`} style={input} />
+      <View style={{ flexDirection: 'row' }}><Button small kind="outline" label="Done" onPress={() => { save(); onDone(); }} /></View>
+    </View>
+  );
+}
+
+/** One recurring item and what can be done with it. Declared at the top level so the row is not rebuilt, and the cursor lost, whenever the screen changes. */
+function RecurringRow({ item: i, recurring, onSave, editing, onEdit }: { item: RecurringItem; recurring: RecurringState; onSave: (next: RecurringState) => void; editing: boolean; onEdit: (open: boolean) => void }) {
+  const C = useColors();
+  const { openList } = useTxPanel();
+  const set = (status: 'confirmed' | 'ignored' | 'cancelled' | null) => onSave(decide(recurring, i.key, status));
+  const manualId = i.key.startsWith('m:') ? i.key.slice(2) : null;
+  // changing the rhythm, the number or the note confirms the item: the person is saying what it is. The charges and amount stay as found.
+  const change = (over: { cadence?: Cadence; quantity?: number; note?: string }) => onSave(decide(recurring, i.key, 'confirmed', over));
+  const toggleEditor = () => onEdit(!editing);
+  const dimmed = i.status !== 'on' || i.health === 'stopped';
+  return (
+    <View style={{ gap: 2, paddingVertical: S.sm, borderTopWidth: 1, borderTopColor: C.line, opacity: dimmed ? 0.6 : 1 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: S.sm }}>
+        <T size={15} bold style={{ flex: 1 }}>{i.merchant}</T>
+        <T size={15} bold>{dollars(i.monthlyCents)}<T size={12} tone="ink3"> /mo</T></T>
+      </View>
+      <T size={13} tone="ink2">
+        {i.varies ? 'About ' : ''}{dollars(i.cents, { decimals: true })}{i.quantity > 1 ? ` × ${i.quantity}` : ''} · {CADENCE_LABEL[i.cadence]} · {i.health === 'stopped' ? `last charged ${i.lastDate ? dayLabel(i.lastDate) : ''}, no longer charging` : `${i.projected ? 'next expected' : 'next was due'} ${dayLabel(i.nextDue)}`}
+      </T>
+      {i.note ? <T size={12} tone="ink2">{i.note}</T> : null}
+      <T size={12} tone="ink3">
+        {i.source === 'manual' ? 'Added by you' : `${i.count} charge${i.count === 1 ? '' : 's'} on your statements${i.source === 'confirmed' ? ', confirmed by you' : ', not confirmed yet'}`}
+        {i.yearCents > 0 ? ` · ${dollars(i.yearCents)} in the last 12 months` : ''}
+        {i.varies ? ' · amount varies' : ''}
+        {i.change ? ` · price changed from ${dollars(i.change.from, { decimals: true })}` : ''}
+        {i.health === 'late' && i.status === 'on' ? ' · charge is late' : ''}
+      </T>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+        {i.status === 'on' && i.source === 'detected' ? <Button small kind="outline" label="Confirm" onPress={() => set('confirmed')} /> : null}
+        {i.status === 'on' ? <Button small kind="ghost" label="Edit details" onPress={toggleEditor} /> : null}
+        {i.status === 'on' ? <Button small kind="ghost" label="Not recurring" onPress={() => set('ignored')} /> : null}
+        {i.status === 'on' ? <Button small kind="ghost" label="I cancelled it" onPress={() => set('cancelled')} /> : null}
+        {i.status !== 'on' ? <Button small kind="outline" label="Restore" onPress={() => set(null)} /> : null}
+        {i.txnIds.length ? <Button small kind="ghost" label="See charges" onPress={() => openList({ merchant: i.merchant })} /> : null}
+        {manualId ? <Button small kind="ghost" label="Remove" onPress={() => onSave(removeManual(recurring, manualId))} /> : null}
+      </View>
+      {editing && i.status === 'on' ? (
+        <View style={{ gap: S.sm, marginTop: 2 }}>
+          <View style={{ gap: 4 }}>
+            <T size={12} tone="ink3">How often does it charge? The monthly figure follows the rhythm you pick.</T>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{CADENCES.map((c) => <Chip key={c} label={CADENCE_LABEL[c]} on={i.cadence === c} onPress={() => change({ cadence: c })} />)}</View>
+          </View>
+          <View style={{ gap: 4 }}>
+            <T size={12} tone="ink3">How many of them? Two accounts each paying {dollars(i.cents, { decimals: true })} count as {dollars(i.cents * 2, { decimals: true })}.</T>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.sm }}>
+              <Button small kind="outline" label="−" disabled={i.quantity <= 1} onPress={() => change({ quantity: i.quantity - 1 })} />
+              <T size={15} bold style={{ minWidth: 24, textAlign: 'center' }}>{i.quantity}</T>
+              <Button small kind="outline" label="+" disabled={i.quantity >= 99} onPress={() => change({ quantity: i.quantity + 1 })} />
+            </View>
+          </View>
+          <NoteField label={i.merchant} value={i.note ?? ''} onSave={(note) => change({ note })} onDone={() => onEdit(false)} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export default function Recurring() {
   const C = useColors();
   const input = useInputStyle();
   const { txns, ctx, dataTo, recurring, saveRecurring, spendingOnly } = useRepo();
-  const { openList } = useTxPanel();
   const today = todayISO();
   // business-marked charges are excluded from personal totals everywhere else, so they are here too
   const sum = useMemo(() => summarizeRecurring(txns.filter((t) => !t.business), recurring, dataTo, today), [txns, recurring, dataTo, today]);
   const cover = useMemo(() => incomeVsFixed(ctx, sum.fixedMonthlyCents, dataTo), [ctx, sum.fixedMonthlyCents, dataTo]);
   const [asideOpen, setAsideOpen] = useState(false);
   const [name, setName] = useState(''); const [amount, setAmount] = useState(''); const [cadence, setCadence] = useState<Cadence>('monthly'); const [anchor, setAnchor] = useState(today);
-  // the row being edited, and its note as typed; held here because Item below is declared inside this component
+  // the row being edited
   const [editKey, setEditKey] = useState<string | null>(null);
-  const [noteDraft, setNoteDraft] = useState('');
 
   const on = sum.items.filter((i) => i.status === 'on');
   const aside = sum.items.filter((i) => i.status !== 'on');
@@ -81,7 +155,7 @@ export default function Recurring() {
 
       <Card title="Everything recurring" right={<T size={12} tone="ink3">Monthly cost, largest first</T>}>
         {!on.length ? <T size={13} tone="ink2">Nothing found yet. A charge counts once the same payee has billed you at least twice at a steady interval and similar amount. Groceries, fuel and shops are not counted unless you confirm them. Add anything the statements cannot show below.</T> : null}
-        {on.map((i) => <Item key={i.key} item={i} />)}
+        {on.map((i) => <RecurringRow key={i.key} item={i} recurring={recurring} onSave={saveRecurring} editing={editKey === i.key} onEdit={(open) => setEditKey(open ? i.key : null)} />)}
       </Card>
 
       <Card title="Add a recurring charge" right={<T size={12} tone="ink3">For rent in cash, a yearly bill not seen yet</T>}>
@@ -98,69 +172,10 @@ export default function Recurring() {
       {aside.length ? (
         <Card title={`Set aside (${aside.length})`} right={<Button small kind="ghost" label={asideOpen ? 'Hide' : 'Show'} onPress={() => setAsideOpen(!asideOpen)} />}>
           <T size={12} tone="ink3">Not counted in the fixed amount. Restore one if you changed your mind.</T>
-          {asideOpen ? aside.map((i) => <Item key={i.key} item={i} />) : null}
+          {asideOpen ? aside.map((i) => <RecurringRow key={i.key} item={i} recurring={recurring} onSave={saveRecurring} editing={editKey === i.key} onEdit={(open) => setEditKey(open ? i.key : null)} />) : null}
         </Card>
       ) : null}
       <View style={{ height: S.md }} />
     </Screen>
   );
-
-  function Item({ item: i }: { item: RecurringItem }) {
-    const set = (status: 'confirmed' | 'ignored' | 'cancelled' | null) => saveRecurring(decide(recurring, i.key, status));
-    const manualId = i.key.startsWith('m:') ? i.key.slice(2) : null;
-    // changing the rhythm, the number or the note confirms the item: the person is saying what it is. The charges and amount stay as found.
-    const change = (over: { cadence?: Cadence; quantity?: number; note?: string }) => saveRecurring(decide(recurring, i.key, 'confirmed', over));
-    const toggleEditor = () => { if (editKey === i.key) setEditKey(null); else { setEditKey(i.key); setNoteDraft(i.note ?? ''); } };
-    const dimmed = i.status !== 'on' || i.health === 'stopped';
-    return (
-      <View style={{ gap: 2, paddingVertical: S.sm, borderTopWidth: 1, borderTopColor: C.line, opacity: dimmed ? 0.6 : 1 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: S.sm }}>
-          <T size={15} bold style={{ flex: 1 }}>{i.merchant}</T>
-          <T size={15} bold>{dollars(i.monthlyCents)}<T size={12} tone="ink3"> /mo</T></T>
-        </View>
-        <T size={13} tone="ink2">
-          {i.varies ? 'About ' : ''}{dollars(i.cents, { decimals: true })}{i.quantity > 1 ? ` × ${i.quantity}` : ''} · {CADENCE_LABEL[i.cadence]} · {i.health === 'stopped' ? `last charged ${i.lastDate ? dayLabel(i.lastDate) : ''}, no longer charging` : `${i.projected ? 'next expected' : 'next was due'} ${dayLabel(i.nextDue)}`}
-        </T>
-        {i.note ? <T size={12} tone="ink2">{i.note}</T> : null}
-        <T size={12} tone="ink3">
-          {i.source === 'manual' ? 'Added by you' : `${i.count} charge${i.count === 1 ? '' : 's'} on your statements${i.source === 'confirmed' ? ', confirmed by you' : ', not confirmed yet'}`}
-          {i.yearCents > 0 ? ` · ${dollars(i.yearCents)} in the last 12 months` : ''}
-          {i.varies ? ' · amount varies' : ''}
-          {i.change ? ` · price changed from ${dollars(i.change.from, { decimals: true })}` : ''}
-          {i.health === 'late' && i.status === 'on' ? ' · charge is late' : ''}
-        </T>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
-          {i.status === 'on' && i.source === 'detected' ? <Button small kind="outline" label="Confirm" onPress={() => set('confirmed')} /> : null}
-          {i.status === 'on' ? <Button small kind="ghost" label="Edit details" onPress={toggleEditor} /> : null}
-          {i.status === 'on' ? <Button small kind="ghost" label="Not recurring" onPress={() => set('ignored')} /> : null}
-          {i.status === 'on' ? <Button small kind="ghost" label="I cancelled it" onPress={() => set('cancelled')} /> : null}
-          {i.status !== 'on' ? <Button small kind="outline" label="Restore" onPress={() => set(null)} /> : null}
-          {i.txnIds.length ? <Button small kind="ghost" label="See charges" onPress={() => openList({ merchant: i.merchant })} /> : null}
-          {manualId ? <Button small kind="ghost" label="Remove" onPress={() => saveRecurring(removeManual(recurring, manualId))} /> : null}
-        </View>
-        {editKey === i.key && i.status === 'on' ? (
-          <View style={{ gap: S.sm, marginTop: 2 }}>
-            <View style={{ gap: 4 }}>
-              <T size={12} tone="ink3">How often does it charge? The monthly figure follows the rhythm you pick.</T>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{CADENCES.map((c) => <Chip key={c} label={CADENCE_LABEL[c]} on={i.cadence === c} onPress={() => change({ cadence: c })} />)}</View>
-            </View>
-            <View style={{ gap: 4 }}>
-              <T size={12} tone="ink3">How many of them? Two accounts each paying {dollars(i.cents, { decimals: true })} count as {dollars(i.cents * 2, { decimals: true })}.</T>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.sm }}>
-                <Button small kind="outline" label="−" disabled={i.quantity <= 1} onPress={() => change({ quantity: i.quantity - 1 })} />
-                <T size={15} bold style={{ minWidth: 24, textAlign: 'center' }}>{i.quantity}</T>
-                <Button small kind="outline" label="+" disabled={i.quantity >= 99} onPress={() => change({ quantity: i.quantity + 1 })} />
-              </View>
-            </View>
-            <View style={{ gap: 4 }}>
-              <T size={12} tone="ink3">A note for yourself, such as which accounts these are on.</T>
-              <TextInput value={noteDraft} onChangeText={setNoteDraft} onBlur={() => noteDraft.trim() !== (i.note ?? '') && change({ note: noteDraft })} maxLength={200}
-                placeholder="For example: personal and work accounts" placeholderTextColor={C.ink3} accessibilityLabel={`Note for ${i.merchant}`} style={input} />
-            </View>
-            <View style={{ flexDirection: 'row' }}><Button small kind="outline" label="Done" onPress={() => { if (noteDraft.trim() !== (i.note ?? '')) change({ note: noteDraft }); setEditKey(null); }} /></View>
-          </View>
-        ) : null}
-      </View>
-    );
-  }
 }
