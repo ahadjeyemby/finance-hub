@@ -1,4 +1,4 @@
-import { CATEGORIES, allCategories, categoryLabel, isCategoryId } from './categories';
+import { CATEGORIES, PAYROLL_CATEGORIES, allCategories, categoryLabel, isCategoryId } from './categories';
 import { MONTH_NAMES, addMonths, monthEnd, monthLabel, monthOf, monthStart, todayISO } from './dates';
 import { forecastMonth } from './forecast';
 import { dollars, runQuery, summarize } from './queries';
@@ -28,7 +28,7 @@ export interface ReportSpec {
   notes?: string[];
 }
 
-const METRICS: Metric[] = ['spend', 'income', 'rewards', 'net', 'transfers', 'count', 'average'];
+const METRICS: Metric[] = ['spend', 'income', 'rewards', 'net', 'transfers', 'count', 'average', 'gross', 'takehome'];
 const GROUPS: GroupBy[] = ['category', 'subcategory', 'merchant', 'month', 'week', 'day', 'account', 'weekday', 'need_want'];
 const CHARTS: ChartKind[] = ['bars', 'hbars', 'line', 'area', 'stack', 'donut'];
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -157,6 +157,14 @@ const CATEGORY_WORDS: [RegExp, CategoryId][] = [
   [/\bgiving|donations?|charity\b/i, 'giving'], [/\bonline shopping|amazon\b/i, 'online_shopping'], [/\bwalmart|sam'?s|costco|big-box\b/i, 'mixed_retail'],
 ];
 
+/** The categories a request names. Insurance also takes in the insurance taken from pay, so "insurance" is one total however it was paid. */
+const categoriesIn = (text: string): CategoryId[] => {
+  const cats = CATEGORY_WORDS.filter(([re]) => re.test(text)).map(([, c]) => c);
+  return cats.includes('insurance') ? [...cats, 'payroll_insurance'] : cats;
+};
+const PAY_WORDS = /\b(pay ?slips?|pay ?checks?|payroll|withh\w+|take.?home|gross|deductions?|paystubs?|pay stubs?)\b/i;
+const PAY_CATEGORIES = [...PAYROLL_CATEGORIES] as CategoryId[];
+
 export function parsePeriod(text: string, today: string, dataFrom: string, dataTo: string): { from: string; to: string; label: string } {
   const t = text.toLowerCase();
   const cur = monthOf(today);
@@ -201,7 +209,8 @@ export function planReport(text: string, ctx: Ctx, today = todayISO(), opts: { s
   const dataFrom = dates[0] ?? today, dataTo = dates[dates.length - 1] ?? today;
   const period = parsePeriod(text, today, dataFrom, dataTo);
   const filter: Filter = { from: period.from, to: period.to };
-  const cats = CATEGORY_WORDS.filter(([re]) => re.test(text)).map(([, c]) => c);
+  const wantsPay = !opts.spendingOnly && PAY_WORDS.test(text);
+  const cats = wantsPay ? [] : categoriesIn(text);
   const multiMonth = monthOf(period.from) !== monthOf(period.to);
   const wantsIncome = !opts.spendingOnly && /\b(earn|income|salary|paid|net|cash ?flow|save|saved)\b/i.test(text);
   const wantsForecast = /\b(forecast|predict|projection|next month|expect|will i spend)\b/i.test(text);
@@ -210,7 +219,21 @@ export function planReport(text: string, ctx: Ctx, today = todayISO(), opts: { s
   const blocks: Block[] = [];
   const spend = (extra?: Filter): QuerySpec => ({ metric: 'spend', filter: { ...filter, ...extra } });
 
-  if (cats.length) {
+  if (wantsPay) {
+    const pf: Filter = { ...filter, categories: PAY_CATEGORIES };
+    blocks.push({ type: 'kpis', items: [
+      { label: 'Gross pay', query: { metric: 'gross', filter }, note: 'From the pay records you added' },
+      { label: 'Taken from pay', query: { metric: 'spend', filter: pf }, note: 'Taxes, insurance, retirement and other deductions' },
+      { label: 'Take-home pay', query: { metric: 'takehome', filter }, note: 'Net pay on the pay records' },
+    ] });
+    if (multiMonth) {
+      blocks.push({ type: 'chart', chart: 'bars', title: 'Gross pay by month', query: { metric: 'gross', groupBy: 'month', filter } });
+      blocks.push({ type: 'chart', chart: 'stack', title: 'Taken from pay, by month', query: { metric: 'spend', groupBy: 'month', filter: pf }, stackBy: 'category', stackLimit: 5 });
+    }
+    blocks.push({ type: 'chart', chart: 'donut', title: 'Where the gross pay went', subtitle: 'Taxes, insurance, retirement and other deductions.', query: { metric: 'spend', groupBy: 'category', filter: pf } });
+    blocks.push({ type: 'chart', chart: 'hbars', title: 'Each tax and deduction', query: { metric: 'spend', groupBy: 'merchant', filter: pf, limit: 10, foldOther: true } });
+    blocks.push({ type: 'table', title: 'Every line taken from pay', kind: 'transactions', filter: { ...pf, kinds: ['spend'] }, limit: 50, order: 'date_desc' });
+  } else if (cats.length) {
     const cf: Filter = { ...filter, categories: cats };
     const label = cats.map(categoryLabel).join(' and ');
     blocks.push({ type: 'kpis', items: [
@@ -239,8 +262,10 @@ export function planReport(text: string, ctx: Ctx, today = todayISO(), opts: { s
   const s = summarize(ctx, period.from, period.to);
   const notes: string[] = [];
   if (s.partialAccounts.length) notes.push(`Statements for ${s.partialAccounts.map((a) => `${a.name} (through ${a.coveredTo})`).join(', ')} end before ${period.to}. Totals for the last days of this period are incomplete.`);
+  if (wantsPay && !s.pay.records) notes.push('No pay records fall in this period. Add them on the Income screen and this report fills in.');
+  if (!wantsPay && s.pay.records) notes.push(`Spent and Earned include ${dollars(s.pay.takenCents)} taken from ${s.pay.records} recorded paycheck${s.pay.records === 1 ? '' : 's'} (taxes, insurance and other deductions), so Earned is gross pay for those. Left after spending is unchanged.`);
   if (wantsIncome && s.incomeIncomplete) notes.push('Earned only includes deposits into the connected checking account. Add your other accounts to see all income.');
-  return { title: cats.length ? `${cats.map(categoryLabel).join(' and ')}: ${period.label}` : `Spending report: ${period.label}`, subtitle: `Built from your request: "${text.trim().slice(0, 120)}"`, period, blocks, notes };
+  return { title: wantsPay ? `Pay and deductions: ${period.label}` : cats.length ? `${cats.map(categoryLabel).join(' and ')}: ${period.label}` : `Spending report: ${period.label}`, subtitle: `Built from your request: "${text.trim().slice(0, 120)}"`, period, blocks, notes };
 }
 
 export interface Answer { text: string; report?: ReportSpec }
@@ -249,12 +274,21 @@ export interface Answer { text: string; report?: ReportSpec }
 export function answer(text: string, ctx: Ctx, today = todayISO(), opts: { spendingOnly?: boolean } = {}): Answer {
   const report = planReport(text, ctx, today, opts);
   const { from, to, label } = report.period;
-  const cats = CATEGORY_WORDS.filter(([re]) => re.test(text)).map(([, c]) => c);
+  const wantsPay = !opts.spendingOnly && PAY_WORDS.test(text);
+  const cats = wantsPay ? [] : categoriesIn(text);
   const f: Filter = { from, to, ...(cats.length ? { categories: cats } : {}) };
   const spent = runQuery({ metric: 'spend', filter: f }, ctx);
   const s = summarize(ctx, from, to);
   const parts: string[] = [];
-  if (/\b(forecast|predict|next month|expect|will i spend)\b/i.test(text)) {
+  if (wantsPay) {
+    const p = s.pay;
+    if (!p.records) parts.push(`No pay records fall in ${label}. Add them on the Income screen.`);
+    else {
+      const by = runQuery({ metric: 'spend', groupBy: 'category', filter: { from, to, categories: PAY_CATEGORIES } }, ctx).rows;
+      parts.push(`Pay in ${label}, from ${p.records} recorded paycheck${p.records === 1 ? '' : 's'}: gross ${dollars(p.grossCents)}, ${dollars(p.takenCents)} taken out (${by.map((r) => `${r.label.replace(/ taken from pay/i, '').toLowerCase()} ${dollars(r.value)}`).join(', ')}), take-home ${dollars(p.netCents)}.`);
+      parts.push('This covers only the paychecks you recorded.');
+    }
+  } else if (/\b(forecast|predict|next month|expect|will i spend)\b/i.test(text)) {
     const fc = forecastMonth(ctx, monthOf(today), today);
     parts.push(`I expect about ${dollars(fc.total, { decimals: false })} for ${monthLabel(fc.month)} (likely range ${dollars(fc.low, { decimals: false })} to ${dollars(fc.high, { decimals: false })}). ${fc.caveat}`);
   } else if (!opts.spendingOnly && /\b(earn|income|salary)\b/i.test(text)) {

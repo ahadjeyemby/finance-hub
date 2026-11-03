@@ -181,7 +181,7 @@ function project(last: string, cadence: Cadence, asOf: string): { next: string; 
  */
 export function summarizeRecurring(txns: Txn[], state: RecurringState | undefined, asOf: string, today: string = asOf): RecurringSummary {
   const edits = state?.edits ?? {};
-  const spend = txns.filter((t) => (t.kind === 'spend' || t.kind === 'fee') && t.cents < 0);
+  const spend = txns.filter((t) => !t.payroll && (t.kind === 'spend' || t.kind === 'fee') && t.cents < 0);
   const items: RecurringItem[] = [];
 
   for (const s of findSeries(spend)) {
@@ -265,7 +265,7 @@ export interface IncomeVsFixed {
 export function incomeVsFixed(ctx: Ctx, fixedMonthlyCents: number, asOf: string): IncomeVsFixed | null {
   const months = completeMonths(ctx, '2000-01-01', monthOf(asOf)).slice(-3);
   if (!months.length) return null;
-  const inMonths = ctx.txns.filter((t) => t.kind === 'income' && !t.business && months.includes(monthOf(t.date)));
+  const inMonths = ctx.txns.filter((t) => t.kind === 'income' && !t.payroll && !t.business && months.includes(monthOf(t.date)));
   const sum = (ts: Txn[]) => Math.round(ts.reduce((s, t) => s + t.cents, 0) / months.length);
   const incomeCents = sum(inMonths.filter((t) => t.subtype !== 'unconfirmed'));
   return {

@@ -1,5 +1,7 @@
 import { categoryGroup, categoryLabel } from './categories';
 import { dayLabel, monthLabel, monthOf, weekStart } from './dates';
+import { payTotals } from './income';
+import type { PayTotals } from './income';
 import type { RecurringState } from './recurring';
 import type { Account, CategoryId, Kind, Overlay, StatementPeriod, Txn } from './types';
 
@@ -22,7 +24,8 @@ export interface Filter {
   minCents?: number;
 }
 
-export type Metric = 'spend' | 'income' | 'rewards' | 'net' | 'transfers' | 'count' | 'average';
+/** `gross` and `takehome` are the pay records' own figures (see income.ts payrollTxns), counted once per paycheck; the rest read every row. */
+export type Metric = 'spend' | 'income' | 'rewards' | 'net' | 'transfers' | 'count' | 'average' | 'gross' | 'takehome';
 export type GroupBy = 'category' | 'subcategory' | 'merchant' | 'month' | 'week' | 'day' | 'account' | 'weekday' | 'need_want';
 
 export interface QuerySpec {
@@ -55,6 +58,8 @@ function contribution(t: Txn, metric: Metric, ctx: Ctx): number | null {
       return SPEND_KINDS.includes(t.kind) ? -t.cents : null;
     case 'income': return t.kind === 'income' ? t.cents : null;
     case 'rewards': return t.kind === 'rewards' ? t.cents : null;
+    case 'gross': return t.payroll?.part === 'withheld' ? t.payroll.gross ?? 0 : null;
+    case 'takehome': return t.payroll?.part === 'withheld' ? t.payroll.net ?? 0 : null;
     case 'net': return t.kind === 'income' || SPEND_KINDS.includes(t.kind) ? t.cents : null;
     case 'transfers': {
       if (t.kind !== 'transfer') return null;
@@ -90,7 +95,7 @@ function groupKey(t: Txn, g: GroupBy, ctx: Ctx): { key: string; label: string; l
     case 'month': { const k = monthOf(t.date); return { key: k, label: monthLabel(k, true), long: monthLabel(k) }; }
     case 'week': { const k = weekStart(t.date); return { key: k, label: dayLabel(k), long: `Week of ${dayLabel(k)}` }; }
     case 'day': return { key: t.date, label: dayLabel(t.date), long: dayLabel(t.date) };
-    case 'account': { const a = ctx.accounts.find((x) => x.id === t.accountId); const l = a ? (a.last4 ? `${a.institution} ${a.last4}` : a.name) : t.accountId; return { key: t.accountId, label: l, long: a?.name ?? l }; }
+    case 'account': { const a = ctx.accounts.find((x) => x.id === t.accountId); if (!a && t.payroll) return { key: t.accountId, label: 'Pay records', long: 'Taken from pay, from your pay records' }; const l = a ? (a.last4 ? `${a.institution} ${a.last4}` : a.name) : t.accountId; return { key: t.accountId, label: l, long: a?.name ?? l }; }
     case 'weekday': { const d = new Date(t.date + 'T00:00:00Z').getUTCDay(); const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; return { key: String((d + 6) % 7), label: names[d], long: names[d] }; }
     case 'need_want': { const k = categoryGroup(t.category); const l = k === 'need' ? 'Needs' : k === 'want' ? 'Wants' : 'Mixed or unsplit'; return { key: k, label: l, long: l }; }
   }
@@ -150,6 +155,7 @@ export function kindsFor(metric: Metric): Kind[] | undefined {
     case 'spend': case 'count': case 'average': return SPEND_KINDS;
     case 'income': return ['income'];
     case 'rewards': return ['rewards'];
+    case 'gross': case 'takehome': return ['income'];
     case 'net': return ['income', ...SPEND_KINDS];
     case 'transfers': return ['transfer'];
   }
@@ -181,6 +187,8 @@ export interface PeriodSummary {
   from: string; to: string;
   earned: number; rewards: number; spent: number; net: number; transfers: number;
   unconfirmedIncome: number;
+  /** what the pay records in the period add up to: gross, net, and what was taken from pay (already inside earned and spent) */
+  pay: PayTotals;
   /** accounts whose statements stop before the end of the period */
   partialAccounts: { name: string; coveredTo: string }[];
   incomeIncomplete: boolean;
@@ -197,6 +205,7 @@ export function summarize(ctx: Ctx, from: string, to: string, scope: Filter['sco
   return {
     from, to, earned, rewards: q('rewards'), spent, net: earned - spent, transfers: q('transfers'),
     unconfirmedIncome: ctx.txns.filter((t) => t.kind === 'income' && t.subtype === 'unconfirmed' && matches(t, f)).reduce((s, t) => s + t.cents, 0),
+    pay: payTotals(ctx.txns.filter((t) => t.payroll && matches(t, f))),
     partialAccounts,
     incomeIncomplete: ctx.accounts.some((a) => a.type === 'checking' && a.incomeComplete === false),
   };

@@ -76,9 +76,18 @@ export interface Txn {
   uploadedAt?: string;
   /** item lines when the transaction was split from a receipt or typed in */
   lines?: { item: string; cents: number; category?: CategoryId; /** derived: the tags this item carries (see tags.ts) */ tags?: string[]; /** derived: the tags found from its own words and its charge, before the person's changes */ autoTags?: string[] }[];
+  /** derived, never stored: set on the lines made from a pay record (see income.ts payrollTxns). They are not bank rows: nothing edits them, forecasts and bills ignore them. */
+  payroll?: PayrollMark;
   /** derived, never stored on the transaction: the tags it carries, and the ones found automatically before the person's changes */
   tags?: string[];
   autoTags?: string[];
+}
+
+/** What a line made from a pay record is. `gross` and `net` ride on the one `withheld` line of each record, so pay metrics count each paycheck once. */
+export interface PayrollMark {
+  recordId: string; sourceId: string;
+  part: 'withheld' | 'tax' | 'insurance' | 'retirement' | 'other';
+  gross?: number; net?: number;
 }
 
 export type Hint =

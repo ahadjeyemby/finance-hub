@@ -41,14 +41,14 @@ export type Scheme = 'light' | 'dark';
 export const PALETTES: Record<Scheme, Palette> = { light: LIGHT, dark: DARK };
 
 /** The six dashboard category groups, in this order everywhere. Each keeps its colour; nothing is ever reassigned. */
-export const CATEGORY_GROUPS = ['travel', 'bigbox', 'groceries', 'fuel', 'medical', 'other'] as const;
+export const CATEGORY_GROUPS = ['travel', 'bigbox', 'groceries', 'fuel', 'medical', 'pay', 'other'] as const;
 export type CategoryGroup = (typeof CATEGORY_GROUPS)[number];
 export const CATEGORY_GROUP_LABEL: Record<CategoryGroup, string> = {
-  travel: 'Travel', bigbox: 'Big-box stores', groceries: 'Groceries', fuel: 'Fuel', medical: 'Medical', other: 'Everything else',
+  travel: 'Travel', bigbox: 'Big-box stores', groceries: 'Groceries', fuel: 'Fuel', medical: 'Medical', pay: 'Taken from pay', other: 'Everything else',
 };
 export const CATEGORY_COLORS: Record<Scheme, Record<CategoryGroup, string>> = {
-  light: { travel: '#E8743B', bigbox: '#0F8F79', groceries: '#7DB83A', fuel: '#E0A800', medical: '#D9578A', other: '#8A93A6' },
-  dark: { travel: '#F08A55', bigbox: '#2BBBA2', groceries: '#93CC52', fuel: '#F2C23A', medical: '#E9779F', other: '#6F7A8E' },
+  light: { travel: '#E8743B', bigbox: '#0F8F79', groceries: '#7DB83A', fuel: '#E0A800', medical: '#D9578A', pay: '#5B6CE0', other: '#8A93A6' },
+  dark: { travel: '#F08A55', bigbox: '#2BBBA2', groceries: '#93CC52', fuel: '#F2C23A', medical: '#E9779F', pay: '#8D99F0', other: '#6F7A8E' },
 };
 
 /** Shades of the big-box colour, for the stores inside that group (the brief's design). A fourth store and later fold into Everything else. */

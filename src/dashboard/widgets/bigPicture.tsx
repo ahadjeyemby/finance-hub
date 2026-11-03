@@ -50,12 +50,17 @@ export function Kpis({ d }: P) {
           <BigMoney cents={k.spent} color={c.onHero} centsColor={c.heroSoft} />
         </Tile>
         {spendingOnly ? null : <>
-        <Tile label="Earned" foot={k.unconfirmed > 0 ? <TileChip tone="warn" text="Not confirmed yet" /> : <Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink2 }}>{k.incomeIncomplete ? 'Only the connected accounts are counted' : 'Deposits confirmed'}</Text>}>
+        <Tile label="Earned" foot={k.unconfirmed > 0 ? <TileChip tone="warn" text="Not confirmed yet" /> : <Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink2 }}>{k.pay.records ? `Gross pay: ${exact(k.pay.takenCents)} taken before it reached the bank is included` : k.incomeIncomplete ? 'Only the connected accounts are counted' : 'Deposits confirmed'}</Text>}>
           <BigMoney cents={k.earned} />
         </Tile>
         <Tile label="Left after spending" foot={<Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink2 }}>Earned minus spent</Text>}>
           <BigMoney cents={k.left} sign color={k.left >= 0 ? c.goodInk : c.bad} />
         </Tile>
+        {k.pay.records ? (
+          <Tile label="Taken from pay" foot={<Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink2 }}>{`${k.pay.records} pay record${k.pay.records === 1 ? '' : 's'}: taxes ${exact(k.pay.taxCents)}, insurance ${exact(k.pay.insuranceCents)}, retirement ${exact(k.pay.retirementCents)}${k.pay.otherCents ? `, other ${exact(k.pay.otherCents)}` : ''}. Counted in Spent; take-home ${exact(k.pay.netCents)}.`}</Text>}>
+            <BigMoney cents={k.pay.takenCents} />
+          </Tile>
+        ) : null}
         <Tile label="Rewards" foot={<Text style={{ fontFamily: F.body, fontSize: 13, color: c.ink2 }}>Kept apart from earnings</Text>}>
           <BigMoney cents={k.rewards} />
         </Tile>
@@ -86,6 +91,7 @@ export function Cashflow({ d }: P) {
         </View>
         <View style={{ flexGrow: 1, flexBasis: 200, gap: 12 }}>
           {w.unconfirmed > 0 ? note(c.inn, 'Earned is not confirmed.', `${exact(w.unconfirmed)} of deposits wait for your answer in the Inbox.`) : note(c.inn, 'Earned is confirmed.', 'Every deposit in this period has an answer.')}
+          {w.pay.records ? note(c.inn, 'Pay records are inside both bars.', `${exact(w.pay.takenCents)} of taxes, insurance and other deductions taken from ${w.pay.records} paycheck${w.pay.records === 1 ? '' : 's'} counts as earned (gross pay) and as spent, so "left" is the same as the bank shows.`) : null}
           {note(c.line2, 'Not counted:', `${exact(w.transfers)} of card payments and transfers, so nothing is counted twice.`)}
         </View>
       </View>

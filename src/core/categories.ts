@@ -25,7 +25,14 @@ export const CATEGORIES: Category[] = [
   { id: 'people', label: 'Payments to people', group: 'mixed' },
   { id: 'other', label: 'Other', group: 'mixed' },
   { id: 'uncategorized', label: 'Needs a category', group: 'mixed' },
+  // made only from pay records (income.ts payrollTxns): never offered in a picker, never given to a bank transaction
+  { id: 'payroll_tax', label: 'Taxes taken from pay', group: 'need' },
+  { id: 'payroll_insurance', label: 'Insurance taken from pay', group: 'need' },
+  { id: 'retirement', label: 'Retirement taken from pay', group: 'need' },
+  { id: 'payroll_other', label: 'Other taken from pay', group: 'need' },
 ];
+/** The categories only a pay record can give. Insurance taken from pay stays apart from insurance paid from a bank account, so no total mixes the two. */
+export const PAYROLL_CATEGORIES: ReadonlySet<string> = new Set(['payroll_tax', 'payroll_insurance', 'retirement', 'payroll_other']);
 
 /**
  * The categories the person added, renamed, regrouped, hid or merged. Kept on the overlay (their saved decisions) and registered here when it loads,
@@ -61,18 +68,18 @@ export function resolveCategory(id?: string): string | undefined {
 
 /** The list to show in pickers: built-in and added categories with the person's changes, without hidden or merged-away ones. */
 export function allCategories(): Category[] {
-  return [...CATEGORIES, ...config.custom].filter((c) => c.id === 'uncategorized' || (!config.edits[c.id]?.hidden && !config.merged[c.id])).map(effective);
+  return [...CATEGORIES, ...config.custom].filter((c) => !PAYROLL_CATEGORIES.has(c.id)).filter((c) => c.id === 'uncategorized' || (!config.edits[c.id]?.hidden && !config.merged[c.id])).map(effective);
 }
 /** Every category including hidden and merged-away ones, for the management screen. */
-export const everyCategory = (): Category[] => [...CATEGORIES, ...config.custom].map(effective);
+export const everyCategory = (): Category[] => [...CATEGORIES, ...config.custom].filter((c) => !PAYROLL_CATEGORIES.has(c.id)).map(effective);
 
 export const categoryLabel = (id?: CategoryId | string): string => (resolveCategory(id) && lookup(resolveCategory(id)!)?.label) || 'Needs a category';
 export const categoryGroup = (id?: CategoryId): Category['group'] => (resolveCategory(id) && lookup(resolveCategory(id)!)?.group) || 'mixed';
 export const isCategoryId = (s: string): s is CategoryId => !!lookup(s);
 
 /** The six colour groups every chart uses (fixed per category, never reassigned): each category counts in exactly one. */
-export type ColorGroup = 'travel' | 'bigbox' | 'groceries' | 'fuel' | 'medical' | 'other';
-const COLOR_GROUP: Record<string, ColorGroup> = { travel: 'travel', mixed_retail: 'bigbox', groceries: 'groceries', fuel: 'fuel', medical: 'medical' };
+export type ColorGroup = 'travel' | 'bigbox' | 'groceries' | 'fuel' | 'medical' | 'pay' | 'other';
+const COLOR_GROUP: Record<string, ColorGroup> = { travel: 'travel', mixed_retail: 'bigbox', groceries: 'groceries', fuel: 'fuel', medical: 'medical', payroll_tax: 'pay', payroll_insurance: 'pay', retirement: 'pay', payroll_other: 'pay' };
 export const colorGroupOf = (id?: CategoryId | string): ColorGroup => COLOR_GROUP[resolveCategory(id) ?? ''] ?? 'other';
 
 /** An id for a category the person adds, from its name, that no other category has. */

@@ -66,7 +66,9 @@ export function recurringBasis(txns: Txn[], recurring: RecurringState | undefine
  */
 export function forecastMonth(ctx: Ctx, target: string, asOf: string, scope: 'personal' | 'given' = 'personal'): Forecast {
   const basis = completeMonths(ctx, '2000-01-01', addMonths(target, -1)).filter((m) => m < target);
-  const pool = scope === 'personal' ? ctx.txns.filter((t) => !t.business) : ctx.txns;
+  // what was taken from pay is not a bill or a habit of the bank account: forecasts read the bank only
+  const bank = ctx.txns.filter((t) => !t.payroll);
+  const pool = scope === 'personal' ? bank.filter((t) => !t.business) : bank;
   const spend = pool.filter((t) => isSpend(t) && basis.includes(monthOf(t.date)));
   const b = recurringBasis(pool, ctx.recurring, asOf);
 

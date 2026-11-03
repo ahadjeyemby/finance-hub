@@ -8,7 +8,7 @@
 //     and sales tax printed on receipts.
 // Nothing here works out tax owed, capital gains or advice. It records what the documents and statements show.
 import { hasNumber } from './accounts';
-import type { Account, Txn } from './types';
+import type { Account, PayrollMark, Txn } from './types';
 
 export type IncomeType = 'salary' | 'business' | 'investment' | 'interest' | 'rental' | 'other';
 export const INCOME_TYPES: IncomeType[] = ['salary', 'business', 'investment', 'interest', 'rental', 'other'];
@@ -67,7 +67,7 @@ export function matchRecord(r: PayRecord, txns: Txn[], accounts: Account[], used
   const taken = new Set(used);
   return r.deposits.map((line) => {
     const hit = txns
-      .filter((t) => t.kind === 'income' && t.cents === line.cents && !taken.has(t.id) && dayGap(t.date, r.date) <= WINDOW_DAYS
+      .filter((t) => t.kind === 'income' && !t.payroll && t.cents === line.cents && !taken.has(t.id) && dayGap(t.date, r.date) <= WINDOW_DAYS
         && (!line.last4 || (byId.get(t.accountId) && hasNumber(byId.get(t.accountId)!, line.last4))))
       .sort((a, b) => dayGap(a.date, r.date) - dayGap(b.date, r.date))[0];
     if (hit) taken.add(hit.id);
@@ -104,6 +104,8 @@ export function attribute(txns: Txn[], state: IncomeState, accounts: Account[]):
   for (const r of state.records) for (const m of global.get(r.id) ?? []) if (m.txnId) fromRecord.set(m.txnId, r.sourceId);
   for (const t of txns) {
     if (t.kind !== 'income') continue;
+    // a line made from a pay record belongs to that record's source, whatever its words say
+    if (t.payroll) { out.set(t.id, live.has(t.payroll.sourceId) ? t.payroll.sourceId : null); continue; }
     const manual = state.assign[t.id];
     if (manual && live.has(manual)) { out.set(t.id, manual); continue; }
     const rec = fromRecord.get(t.id);
@@ -119,7 +121,7 @@ export function attribute(txns: Txn[], state: IncomeState, accounts: Account[]):
 // Taxes from the statements and the receipts
 // ---------------------------------------------------------------------------
 /** A payment to a tax authority, judged from the bank's description. Shown as a list to check, never added to anything silently. */
-export const isTaxPayment = (t: Txn) => (t.kind === 'spend' || t.kind === 'fee') && t.cents < 0
+export const isTaxPayment = (t: Txn) => !t.payroll && (t.kind === 'spend' || t.kind === 'fee') && t.cents < 0
   && /\b(irs|us treasury|treas|usataxpymt|dept of revenue|department of revenue|franchise tax|state tax|tax pymt|tax payment|estimated tax|property tax|tax collector)\b/i.test(`${t.description} ${t.merchant}`);
 
 export interface ReceiptTax { date: string | null; taxCents: number | null }
@@ -157,7 +159,7 @@ export function summarizeIncome(txns: Txn[], accounts: Account[], state: IncomeS
   const st = state ?? emptyIncome();
   const attr = attribute(txns, st, accounts);
   const matches = matchAll(st.records, txns, accounts);
-  const deposits = txns.filter((t) => t.kind === 'income' && inRange(t.date, range.from, range.to));
+  const deposits = txns.filter((t) => t.kind === 'income' && !t.payroll && inRange(t.date, range.from, range.to));
   const bySource = new Map<string | null, SourceSummary>();
   const row = (id: string | null) => {
     if (!bySource.has(id)) bySource.set(id, { source: st.sources.find((s) => s.id === id) ?? null, depositsCents: 0, count: 0, provenCents: 0, records: 0, grossCents: 0, taxCents: 0, deductionCents: 0, netCents: 0, taxRate: null });
@@ -188,6 +190,48 @@ export function summarizeIncome(txns: Txn[], accounts: Account[], state: IncomeS
     insuranceCents: insurance, retirementCents: retirement,
     paid: { cents: -sum(taxTxns), txns: taxTxns }, salesTaxCents: rec.reduce((s, r) => s + (r.taxCents ?? 0), 0), salesTaxReceipts: rec.length,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Pay records as ledger lines
+// ---------------------------------------------------------------------------
+// What was taken from a paycheck never shows on a bank statement, so it is shown here as lines of its own, made fresh from the records every time
+// and never stored. The bank already holds the net deposit, so each record adds two things that cancel in "left after spending":
+//   - one income line for everything taken out, so Earned becomes the gross pay;
+//   - one spending line for each tax and deduction, so Spent shows where the gross went.
+// The lines carry no account, cannot be edited, and are left out of forecasts, repeating bills and savings ideas (those read the bank only).
+export const PAYROLL_ACCOUNT = 'payroll';
+const PAY_CATEGORY: Record<PayrollMark['part'], string> = { withheld: '', tax: 'payroll_tax', insurance: 'payroll_insurance', retirement: 'retirement', other: 'payroll_other' };
+
+export function payrollTxns(state: IncomeState | undefined): Txn[] {
+  const out: Txn[] = [];
+  for (const r of state?.records ?? []) {
+    const source = state!.sources.find((s) => s.id === r.sourceId);
+    if (!source) continue;
+    const base = { accountId: PAYROLL_ACCOUNT, date: r.date, source: 'pay record', ...(source.type === 'business' ? { business: true } : {}) };
+    const mark = (part: PayrollMark['part'], extra: Partial<PayrollMark> = {}): PayrollMark => ({ recordId: r.id, sourceId: r.sourceId, part, ...extra });
+    const lines: { id: string; label: string; cents: number; part: Exclude<PayrollMark['part'], 'withheld'> }[] = [
+      ...r.taxes.map((l, i) => ({ id: `t${i}`, label: l.label.trim() || 'Tax', cents: l.cents, part: 'tax' as const })),
+      ...r.deductions.map((l, i) => ({ id: `d${i}`, label: l.label.trim() || 'Deduction', cents: l.cents, part: (l.group === 'other' ? 'other' : l.group) as 'insurance' | 'retirement' | 'other' })),
+    ];
+    const taken = lines.reduce((s, l) => s + l.cents, 0);
+    out.push({ ...base, id: `pay:${r.id}:w`, description: `Taken from ${source.name} pay before it reached the bank`, merchant: `${source.name} pay, taken out`, cents: taken, kind: 'income', subtype: 'salary', payroll: mark('withheld', { gross: r.grossCents, net: r.netCents }) });
+    for (const l of lines) out.push({ ...base, id: `pay:${r.id}:${l.id}`, description: `${l.label}, taken from ${source.name} pay`, merchant: l.label, cents: -l.cents, kind: 'spend', category: PAY_CATEGORY[l.part], payroll: mark(l.part) });
+  }
+  return out;
+}
+
+export interface PayTotals { records: number; grossCents: number; netCents: number; taxCents: number; insuranceCents: number; retirementCents: number; otherCents: number; takenCents: number }
+/** What the pay-record lines among these transactions add up to. Each record counts once, through its one `withheld` line. */
+export function payTotals(txns: Txn[]): PayTotals {
+  const x: PayTotals = { records: 0, grossCents: 0, netCents: 0, taxCents: 0, insuranceCents: 0, retirementCents: 0, otherCents: 0, takenCents: 0 };
+  for (const t of txns) {
+    const p = t.payroll; if (!p) continue;
+    if (p.part === 'withheld') { x.records++; x.grossCents += p.gross ?? 0; x.netCents += p.net ?? 0; continue; }
+    const c = -t.cents; x.takenCents += c;
+    if (p.part === 'tax') x.taxCents += c; else if (p.part === 'insurance') x.insuranceCents += c; else if (p.part === 'retirement') x.retirementCents += c; else x.otherCents += c;
+  }
+  return x;
 }
 
 // ---------------------------------------------------------------------------

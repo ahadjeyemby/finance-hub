@@ -9,7 +9,7 @@ import { addMonths, monthEnd, monthOf, monthStart, monthsBetween, todayISO } fro
 import { applyOverlay } from '@/core/queries';
 import type { Ctx, Filter } from '@/core/queries';
 import { buildQuestions } from '@/core/questions';
-import { emptyIncome } from '@/core/income';
+import { emptyIncome, payrollTxns } from '@/core/income';
 import type { IncomeState } from '@/core/income';
 import { emptyRecurring } from '@/core/recurring';
 import type { RecurringState } from '@/core/recurring';
@@ -406,7 +406,10 @@ export function RepoProvider({ children }: { children: ReactNode }) {
   const txns = useMemo(() => (combined && userId && viewing !== 'all' ? everyone.filter((t) => inView(t.owner, viewing, userId)) : everyone), [everyone, combined, userId, viewing]);
   const accounts = useMemo(() => (combined && userId && viewing !== 'all' ? baseAccounts.filter((a) => inView(a.owner, viewing, userId)) : baseAccounts), [baseAccounts, combined, userId, viewing]);
   // the statements' days and the recurring decisions travel with the rows, so every screen's forecast and month counts agree
-  const ctx = useMemo<Ctx>(() => ({ txns, accounts, statements: ledger.statements, recurring: overlay.recurring }), [txns, accounts, ledger.statements, overlay.recurring]);
+  // the taxes, insurance and other deductions taken from the pay records are added as lines of their own (see income.ts payrollTxns). Records carry no
+  // owner, so with members: everyone's records on "all", the signed-in person's own on "me", and none while looking at a member.
+  const payLines = useMemo(() => payrollTxns(!combined || viewing === 'all' ? incomeAll : viewing === 'me' ? overlay.income : undefined), [combined, viewing, incomeAll, overlay.income]);
+  const ctx = useMemo<Ctx>(() => ({ txns: payLines.length ? [...txns, ...payLines].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)) : txns, accounts, statements: ledger.statements, recurring: overlay.recurring }), [txns, payLines, accounts, ledger.statements, overlay.recurring]);
   const questions = useMemo(() => buildQuestions(txns, shown), [txns, shown]);
 
   const hasData = accounts.length > 0;

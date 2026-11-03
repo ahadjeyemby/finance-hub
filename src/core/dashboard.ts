@@ -14,8 +14,8 @@ import type { Interval } from './coverage';
 import { addMonths, daysInMonth, monthEnd, monthOf, monthStart } from './dates';
 import { forecastMonth, recurringBasis } from './forecast';
 import type { Forecast } from './forecast';
-import { attribute } from './income';
-import type { IncomeState } from './income';
+import { attribute, payTotals } from './income';
+import type { IncomeState, PayTotals } from './income';
 import { bestStore, compareItems, usualBasket } from './prices';
 import type { ItemCompare } from './prices';
 import type { Ctx } from './queries';
@@ -76,8 +76,10 @@ export interface KpisData extends State {
   /** Spent against the month before, only when both months are complete; otherwise why not */
   change: { pct: number; prevMonth: string } | { none: string };
   incomeIncomplete: boolean;
+  /** the pay records in this period (gross, net, taxes, insurance, retirement, other): already inside Earned and Spent, shown beside them */
+  pay: PayTotals;
 }
-export interface CashflowData extends State { earned: number; spent: number; left: number; transfers: number; unconfirmed: number; label: string }
+export interface CashflowData extends State { earned: number; spent: number; left: number; transfers: number; unconfirmed: number; label: string; pay: PayTotals }
 export interface GroupSlice { group: ColorGroup; cents: number; share: number }
 export interface DonutData extends State { slices: GroupSlice[]; total: number; from: string; to: string; /** refunds larger than the purchases in their group, left out of the slices (0 almost always) */ netCredit: number }
 export interface TrendMonth { month: string; partial: boolean; total: number; byGroup: Record<ColorGroup, number> }
@@ -119,7 +121,7 @@ export interface DashboardData {
   attention: AttentionData; dataHealth: DataHealthData;
 }
 
-const emptyGroups = (): Record<ColorGroup, number> => ({ travel: 0, bigbox: 0, groceries: 0, fuel: 0, medical: 0, other: 0 });
+const emptyGroups = (): Record<ColorGroup, number> => ({ travel: 0, bigbox: 0, groceries: 0, fuel: 0, medical: 0, pay: 0, other: 0 });
 
 /** Months between the first and last statement day, oldest first. */
 function statementMonths(from: string, to: string): string[] {
@@ -135,7 +137,10 @@ function statementMonths(from: string, to: string): string[] {
 export function dashboardData(input: DashboardInput, scope: Scope): DashboardData {
   const { ctx, questions, period, dataFrom, dataTo, income } = input;
   const hasAccounts = spendAccounts(ctx.accounts).length > 0;
-  const scoped = ctx.txns.filter(inScope(scope));
+  // the bank's own rows. The lines made from pay records (taxes, insurance and the rest taken before a paycheck arrives) count as spending and as
+  // earnings in the totals below, and nowhere that reads habits: bills, savings ideas and forecasts see `scoped` only.
+  const scopedAll = ctx.txns.filter(inScope(scope));
+  const scoped = scopedAll.filter((t) => !t.payroll);
   // bills added by hand carry no business flag: they are household bills, so a Business view leaves them out
   const recurring = scope === 'business' && ctx.recurring ? { ...ctx.recurring, manual: [] } : ctx.recurring;
   const sctx: Ctx = { ...ctx, txns: scoped, recurring };
@@ -157,7 +162,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const from = selMonth ? monthStart(selMonth) : dataFrom;
   const to = selMonth ? monthEnd(selMonth) : dataTo;
   const inSel = (t: Txn) => inRange(t, from, to);
-  const selSpend = scoped.filter((t) => isSpend(t) && inSel(t));
+  const selSpend = scopedAll.filter((t) => isSpend(t) && inSel(t));
   const incomeTxns = ctx.txns.filter((t) => t.kind === 'income' && inSel(t));
   const businessSources = new Set(income.sources.filter((s) => s.type === 'business').map((s) => s.id));
   const sourceOf = attribute(ctx.txns, income, ctx.accounts);
@@ -179,10 +184,11 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const change: KpisData['change'] = !selMonth ? { none: 'Pick a month to compare it with the one before.' }
     : !selComplete ? { none: 'This month is not complete yet, so it is not compared.' }
     : !prev || !complete.has(prev) ? { none: 'The month before is not complete, so there is nothing to compare with.' }
-    : (() => { const p = sum(scoped.filter((t) => isSpend(t) && monthOf(t.date) === prev)); return p > 0 ? { pct: (spent - p) / p, prevMonth: prev } : { none: 'Nothing was spent the month before.' }; })();
+    : (() => { const p = sum(scopedAll.filter((t) => isSpend(t) && monthOf(t.date) === prev)); return p > 0 ? { pct: (spent - p) / p, prevMonth: prev } : { none: 'Nothing was spent the month before.' }; })();
   const kpis: KpisData = {
     ...moneyState, month: selMonth, label: selMonth ?? 'all', complete: selComplete, spent, earned, left: earned - spent, rewards, unconfirmed, change,
     incomeIncomplete: ctx.accounts.some((a) => a.type === 'checking' && a.incomeComplete === false),
+    pay: payTotals(scopedAll.filter((t) => t.payroll && inSel(t))),
   };
   // transfers: each movement once (the bank side, or a card side with no bank leg), never spending
   const typeOf = new Map(ctx.accounts.map((a) => [a.id, a.type]));
@@ -191,9 +197,9 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     if (type === 'checking' || type === 'cash') return t.cents < 0 ? s - t.cents : s;
     return t.pairId ? s : s + Math.abs(t.cents);
   }, 0);
-  const cashflow: CashflowData = { ...moneyState, earned, spent, left: earned - spent, transfers, unconfirmed, label: kpis.label };
+  const cashflow: CashflowData = { ...moneyState, earned, spent, left: earned - spent, transfers, unconfirmed, label: kpis.label, pay: kpis.pay };
 
-  const allSpend = scoped.filter((t) => isSpend(t) && inRange(t, dataFrom, dataTo));
+  const allSpend = scopedAll.filter((t) => isSpend(t) && inRange(t, dataFrom, dataTo));
   const catQs = [...qOf('category'), ...qOf('person_payment')];
   const catState = (): State => (!anyData ? locked(NO_STATEMENT) : askIf(touching(catQs, new Set(allSpend.map((t) => t.id))), (n) => `${plural(n, 'charge question')} decide which category some spending is in.`));
   const groups = emptyGroups();
@@ -210,6 +216,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const spendByMonth = new Map<string, Txn[]>();
   for (const t of allSpend) { const m = monthOf(t.date); spendByMonth.set(m, [...(spendByMonth.get(m) ?? []), t]); }
   const inMonth = (m: string) => spendByMonth.get(m) ?? [];
+  const bankInMonth = (m: string) => inMonth(m).filter((t) => !t.payroll);
   const trendMonths: TrendMonth[] = months.map((m) => {
     const byGroup = emptyGroups();
     for (const t of inMonth(m)) byGroup[colorGroupOf(t.category)] += out(t);
@@ -223,8 +230,9 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     average: fullMonths.length ? Math.round(fullMonths.reduce((s, m) => s + avgOf(m.month), 0) / fullMonths.length) : null,
   };
 
+  const pSpendAll = allSpend.filter((t) => !t.payroll);
   const oneOffTxns = allSpend.filter((t) => t.oneOff === true);
-  const candidates = allSpend.filter((t) => isOneOff(t) && t.oneOff !== true);
+  const candidates = pSpendAll.filter((t) => isOneOff(t) && t.oneOff !== true);
   const oneOffSum = sum(oneOffTxns);
   const largestOne = [...oneOffTxns].sort((a, b) => a.cents - b.cents)[0];
   const oneTime: OneTimeData = {
@@ -234,7 +242,6 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   };
 
   // ---- Save money ------------------------------------------------------------------------------------------------------------------------
-  const pSpendAll = allSpend;
   const bills = basis.on;
   const yearly = (i: RecurringItem) => i.monthlyCents * 12;
   const { compare } = compareItems(pSpendAll);
@@ -257,12 +264,12 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
   const lastTwo = fullList.length >= 2 && fullList[fullList.length - 1] === addMonths(fullList[fullList.length - 2], 1) ? fullList.slice(-2) : null;
   if (lastTwo) {
     const [a, b] = lastTwo;
-    const byCat = (m: string) => { const r = new Map<string, number>(); for (const t of inMonth(m)) if (!isOneOff(t)) r.set(t.category ?? 'uncategorized', (r.get(t.category ?? 'uncategorized') ?? 0) + out(t)); return r; };
+    const byCat = (m: string) => { const r = new Map<string, number>(); for (const t of bankInMonth(m)) if (!isOneOff(t)) r.set(t.category ?? 'uncategorized', (r.get(t.category ?? 'uncategorized') ?? 0) + out(t)); return r; };
     const pa = byCat(a), pb = byCat(b);
     let rise: { cat: string; from: number; to: number } | null = null;
     for (const [cat, v] of pb) { const p = pa.get(cat) ?? 0; if (p > 0 && v > p && (!rise || v - p > rise.to - rise.from)) rise = { cat, from: p, to: v }; }
     if (rise) {
-      const inB = inMonth(b).filter((t) => (t.category ?? 'uncategorized') === rise.cat && !isOneOff(t));
+      const inB = bankInMonth(b).filter((t) => (t.category ?? 'uncategorized') === rise.cat && !isOneOff(t));
       const topM = topMerchant(inB);
       const label = categoryLabel(rise.cat);
       ideas.push({ kind: 'rise', title: `${label} rose in ${monthName(b)}`, text: `${money(rise.to)} against ${money(rise.from)} in ${monthName(a)}.${topM ? ` ${topM.merchant} took ${Math.round(topM.share * 100)}%.` : ''}`, figure: `+${Math.round(((rise.to - rise.from) / rise.from) * 100)}%`, unit: `vs ${monthName(a)}`, action: { label: 'Open in Explore', kind: 'explore' } });
@@ -279,7 +286,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
 
   const fixed = bills.reduce((s, i) => s + i.monthlyCents, 0);
   const everydayMonths = fullList;
-  const everyday = everydayMonths.length ? Math.round(everydayMonths.reduce((s, m) => s + sum(inMonth(m).filter(basis.isEveryday)), 0) / everydayMonths.length) : 0;
+  const everyday = everydayMonths.length ? Math.round(everydayMonths.reduce((s, m) => s + sum(bankInMonth(m).filter(basis.isEveryday)), 0) / everydayMonths.length) : 0;
   const noHousing = !bills.some((i) => i.category === 'housing' || i.category === 'utilities');
   // bills found by the app but not confirmed are answered on the Recurring screen, not in the Inbox; they decide the fixed part
   const detected = bills.filter((i) => i.source === 'detected');
@@ -378,9 +385,9 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
 
   // ---- Business ----------------------------------------------------------------------------------------------------------------------
   const bpQs = qOf('business_or_personal');
-  const bizSpend = ctx.txns.filter((t) => isSpend(t) && t.business === true && inRange(t, dataFrom, dataTo));
+  const bizSpend = ctx.txns.filter((t) => isSpend(t) && !t.payroll && t.business === true && inRange(t, dataFrom, dataTo));
   const waiting = uniq(bpQs);
-  const allBills = recurringBasis(ctx.txns, ctx.recurring, dataTo).on;
+  const allBills = recurringBasis(ctx.txns.filter((t) => !t.payroll), ctx.recurring, dataTo).on;
   const toolRows: ToolRow[] = allBills.filter((i) => TOOL_CATEGORIES.has(i.category ?? '') || i.txnIds.some((id) => byId.get(id)?.hints?.includes('business_or_personal')))
     .map((i) => {
       const ts = i.txnIds.map((id) => byId.get(id)).filter((t): t is Txn => !!t);
@@ -400,7 +407,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     rows: toolRows, undecided, monthly: toolRows.filter((r) => !r.confirmed).reduce((s, r) => s + r.monthly, 0), yearly: toolRows.reduce((s, r) => s + r.yearly, 0),
   };
 
-  const bizIncomeTxns = ctx.txns.filter((t) => t.kind === 'income' && isBizIncome(t));
+  const bizIncomeTxns = ctx.txns.filter((t) => t.kind === 'income' && !t.payroll && isBizIncome(t));
   const hasSource = bizIncomeTxns.length > 0;
   const bizAsk = (lead: string) => askIf(bpQs, (n) => `${plural(n, 'merchant')} ${n === 1 ? 'is' : 'are'} waiting for Business or Personal. ${lead}`);
   const bizSummary: BizSummaryData = {
@@ -408,7 +415,7 @@ export function dashboardData(input: DashboardInput, scope: Scope): DashboardDat
     tagged: sum(bizSpend), waiting, toolsMonthly: bizTools.monthly, income: hasSource ? bizIncomeTxns.reduce((s, t) => s + t.cents, 0) : null, hasSource: businessSources.size > 0 && hasSource,
   };
   const pendingRows: BizPendingRow[] = bpQs.map((q) => ({ question: q, merchant: q.merchant, cents: uniq([q]), charges: q.txnIds.length })).sort((a, b) => b.cents - a.cents);
-  const everHinted = ctx.txns.some((t) => t.hints?.includes('business_or_personal') || t.business !== undefined);
+  const everHinted = ctx.txns.some((t) => !t.payroll && (t.hints?.includes('business_or_personal') || t.business !== undefined));
   const bizPending: BizPendingData = {
     ...(!anyData ? locked(NO_STATEMENT) : !everHinted ? locked('No charge has looked like a business expense yet.', { label: 'Open the Inbox', kind: 'inbox' }) : bizAsk('Each answer applies to every charge from that merchant.')),
     rows: pendingRows, total: waiting,
