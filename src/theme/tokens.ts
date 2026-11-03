@@ -78,5 +78,7 @@ export const TABULAR = { fontVariant: ['tabular-nums' as const] };
 export const R = { sm: 6, md: 12, lg: 16, card: 22, pill: 999 } as const;
 export const S = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 export const MIN_TOUCH = 44;
-/** At this width and above the app shows the desktop layout: top bar and side bar. */
+/** At this width and above the screens use their roomy arrangement (more columns, wider padding). */
 export const WIDE = 960;
+/** At this width and above the app shows the top bar and side bar instead of the phone's tab bar: an iPad mini held upright is 744, so every iPad gets them. */
+export const TABLET = 744;

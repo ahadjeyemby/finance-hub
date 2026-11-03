@@ -3,10 +3,12 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { F, MIN_TOUCH, R, S, TABULAR, WIDE } from './tokens';
+import { F, MIN_TOUCH, R, S, TABLET, TABULAR, WIDE } from './tokens';
 import { useColors } from './theme';
 
 export const useWide = () => useWindowDimensions().width >= WIDE;
+/** True where the side bar and top bar are shown (tablets and desktops) rather than the phone's tab bar. */
+export const useSidebar = () => useWindowDimensions().width >= TABLET;
 
 export function Screen({ children, scroll = true, pad = true, max = 1120 }: { children: ReactNode; scroll?: boolean; pad?: boolean; max?: number }) {
   const C = useColors();

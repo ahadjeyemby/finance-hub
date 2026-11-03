@@ -11,7 +11,7 @@ import { useTheme } from '@/theme/theme';
 import { F } from '@/theme/tokens';
 import { AvatarButton, CountBadge, ThemeToggle } from './parts';
 
-/** Phones (under 960px): logo, theme toggle and avatar. */
+/** Phones (under 744px): logo, theme toggle and avatar. */
 export function PhoneAppBar() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();

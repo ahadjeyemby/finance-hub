@@ -54,7 +54,7 @@ function Categories() {
             <View key={c.id} style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md, opacity: hidden || into ? 0.75 : 1 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: S.sm }}>
                 <T size={13} bold>{c.label}{into ? `, merged into ${cats.find((x) => x.id === resolveCategory(c.id))?.label ?? into}` : hidden ? ' (hidden)' : ''}</T>
-                <T size={12} tone="ink3">{sum ? `${dollars(sum.cents)}, ${sum.count} charges` : 'no charges'}</T>
+                <T size={12} tone="ink3">{sum ? `${dollars(sum.cents)}, ${sum.count} charge${sum.count === 1 ? '' : 's'}` : 'no charges'}</T>
               </View>
               {c.id !== 'uncategorized' ? (
                 <>
@@ -99,7 +99,7 @@ function Categories() {
             <View key={d.id} style={{ gap: S.xs, backgroundColor: C.ground, borderRadius: R.md, padding: S.md }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: S.sm }}>
                 <T size={13} bold>{d.label}</T>
-                <T size={12} tone="ink3">{sum?.count ? `${dollars(sum.cents)}, ${sum.count} charges` : 'no charges yet'}</T>
+                <T size={12} tone="ink3">{sum?.count ? `${dollars(sum.cents)}, ${sum.count} charge${sum.count === 1 ? '' : 's'}` : 'no charges yet'}</T>
               </View>
               <FieldInput key={`n:${d.id}:${d.label}`} label="Name" value={d.label} onCommit={(t) => saveTagState(saveTag(tagState, { id: d.id, label: t || d.label }))} />
               <FieldInput key={`k:${d.id}:${d.keywords.join(',')}`} label="Words that give this tag (commas)" multiline value={d.keywords.join(', ')} onCommit={(t) => saveTagState(saveTag(tagState, { id: d.id, label: d.label, keywords: words(t) }))} />

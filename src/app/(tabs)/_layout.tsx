@@ -6,7 +6,7 @@ import { TxPanelProvider } from '@/components/txpanel';
 import { Sidebar } from '@/components/shell/sidebar';
 import { TopBar } from '@/components/shell/topbar';
 import { useColors } from '@/theme/theme';
-import { useWide } from '@/theme/ui';
+import { useSidebar } from '@/theme/ui';
 
 // Every screen is a tab route, so the side bar (wide) or the tab bar (phone) stays in place on all of them. The bars are drawn by the shell
 // components, which list only the destinations the design names; the other routes are reached from the screens that link to them.
@@ -19,7 +19,7 @@ const SCREENS: [name: string, title: string][] = [
 
 export default function TabsLayout() {
   const C = useColors();
-  const wide = useWide();
+  const wide = useSidebar();
   return (
     <TxPanelProvider>
       <View style={{ flex: 1, backgroundColor: C.ground }}>

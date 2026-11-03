@@ -27,7 +27,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
 /** Pages kept for the person who runs the workspace: a Contributor's side bar leaves them out (see components/owneronly.tsx). */
 export const OWNER_ROUTES: ReadonlySet<string> = new Set(['accounts', 'income', 'categories']);
 
-/** The side bar on screens 960px and wider: Workspace and Organize, then the statement status, the workspace row and "Powered by Sparktrum". */
+/** The side bar on screens 744px and wider (every iPad, and the web): Workspace and Organize, then the statement status, the workspace row and "Powered by Sparktrum". */
 export function Sidebar({ state, navigateToTab }: BottomTabBarProps) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();

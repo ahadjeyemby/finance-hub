@@ -73,7 +73,8 @@ export async function pickFiles(source: 'files' | 'photos' | 'camera'): Promise<
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) throw new Error('Camera access is off. Allow it in Settings, or choose a photo instead.');
   }
-  const opts = { quality: source === 'camera' && scanSupported ? 1 : 0.85, mediaTypes: ['images'] as ImagePicker.MediaType[] };
+  // the web scan works from the full photo; a phone shrinks it to 2000 px before scanning, so a full-quality original would only be a bigger file
+  const opts = { quality: source === 'camera' && scanSupported && Platform.OS === 'web' ? 1 : 0.85, mediaTypes: ['images'] as ImagePicker.MediaType[] };
   const r = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync({ ...opts, allowsMultipleSelection: true, selectionLimit: 0, orderedSelection: true });
   if (r.canceled) return [];
   const out: PickedFile[] = [];

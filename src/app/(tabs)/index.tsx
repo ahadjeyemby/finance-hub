@@ -15,10 +15,11 @@ import { useDashboardData } from '@/dashboard/useDashboardData';
 import { VIEWS, isViewId } from '@/dashboard/views';
 import { useWidgetPrefs } from '@/data/dashboardPrefs';
 import { useRepo } from '@/data/repo';
-import { Banner, Card, Screen, T, useWide } from '@/theme/ui';
+import { Banner, Card, Screen, T, useSidebar } from '@/theme/ui';
 
 export default function Dashboard() {
-  const wide = useWide();
+  // the top bar already has the Ask field and the side bar has "Powered by", so only the phone layout puts them on the page
+  const sidebar = useSidebar();
   const params = useLocalSearchParams<{ view?: string }>();
   const view = isViewId(params.view) ? params.view : 'overview';
   const prefs = useWidgetPrefs();
@@ -33,12 +34,12 @@ export default function Dashboard() {
 
   return (
     <Screen max={1280}>
-      {wide ? null : <AskField compact />}
+      {sidebar ? null : <AskField compact />}
       <DashboardHeader view={view} onView={(v) => router.setParams({ view: v })} onCustomize={() => setCustomizing(true)} />
       {prefs.error ? <Banner title="Your widget choices are not in sync.">{prefs.error} They are kept on this device and sent again with your next change.</Banner> : null}
       <WidgetGrid items={placed} render={(p) => { const { Component } = REGISTRY[p.id]; return <Component d={data} size={p.size} view={view} />; }} />
       {placed.length ? null : <Card><T tone="ink2">Every widget is switched off in this view. Open Customize to choose some.</T></Card>}
-      {wide ? null : <View style={{ alignItems: 'center', paddingTop: 8 }}><PoweredBy /></View>}
+      {sidebar ? null : <View style={{ alignItems: 'center', paddingTop: 8 }}><PoweredBy /></View>}
       <CustomizePanel visible={customizing} view={view} on={new Set(placed.map((p) => p.id))} readiness={readiness}
         onToggle={(id, on) => prefs.save(view, toggleWidget(view, rows, id, on))} onReset={() => prefs.reset(view)} onClose={() => setCustomizing(false)} />
     </Screen>

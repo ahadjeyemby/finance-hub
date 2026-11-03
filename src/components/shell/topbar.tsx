@@ -8,7 +8,7 @@ import { useTheme } from '@/theme/theme';
 import { F, MIN_TOUCH, R } from '@/theme/tokens';
 import { AskField, AvatarButton, IconButton, ThemeToggle } from './parts';
 
-/** Desktop and web at 960px and wider: logo, the Ask field, theme, Inbox, Add (the only Add button on these screens) and the avatar. */
+/** Tablets, desktop and web at 744px and wider: logo, the Ask field, theme, Inbox, Add (the only Add button on these screens) and the avatar. */
 export function TopBar() {
   const { c } = useTheme();
   const { questions } = useRepo();

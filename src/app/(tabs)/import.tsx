@@ -334,7 +334,7 @@ export default function Import() {
       else files = await pickFiles(source);
     } catch (e) { return setNotice((e as Error).message); }
     if (!files.length && !skipped.length) return;
-    if (source === 'camera' && scanSupported && scanOnRef.current && files.length) {
+    if ((source === 'camera' || source === 'photos') && scanSupported && scanOnRef.current && files.length) {
       setShots((xs) => [...xs, ...files.map((file, i) => ({ key: `shot-${Date.now()}-${i}`, file }))]);
       return;
     }
@@ -551,8 +551,8 @@ export default function Import() {
         ) : null}
         {scanSupported ? (
           <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-            <Chip label="Scan photos taken here" on={scanOn} onPress={() => setScanSetting(!scanOn)} />
-            <T size={12} tone="ink3">{scanOn ? 'A photo from Take a photo is cropped to the paper, straightened and cleaned up in black and white, on your device. You check the crop first.' : 'Off: photos are used exactly as taken'}</T>
+            <Chip label="Scan photos" on={scanOn} onPress={() => setScanSetting(!scanOn)} />
+            <T size={12} tone="ink3">{scanOn ? 'A photo from Take a photo or Choose photos is cropped to the paper, straightened and cleaned up in black and white, on your device. You check the crop first.' : 'Off: photos are used exactly as they are'}</T>
           </View>
         ) : null}
         <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>

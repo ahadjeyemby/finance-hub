@@ -1,9 +1,9 @@
-// Scanning a photo of a receipt like a document scanner: find the paper, cut it out flat, and clean up the light. This is the version phone
-// builds get: it is web only for now, and the real code is scan.web.ts (Metro picks it on the web). On a phone the photo is used as taken.
-// Nothing here or there calls a model or any outside service: the picture is decoded and processed on the device.
+// Scanning a photo of a receipt like a document scanner: find the paper, cut it out flat, and clean up the light. This file holds the shared
+// types and the stand-in for a platform with no scanner. The real code is scan.web.ts (the browser) and scan.native.ts (iPhone, iPad and
+// Android); Metro picks the one that fits. Nothing here or there calls a model or any outside service: the picture is processed on the device.
 import type { Quad, ScanMode, Suggestion } from '@/core/scan';
 
-/** True where scanning can run: in the web version. */
+/** True where scanning can run: the web version and the phone and tablet builds. */
 export const scanSupported = false;
 
 export interface Shot {
@@ -16,7 +16,7 @@ export interface Shot {
   held?: unknown;
 }
 
-const unsupported = () => new Error('Scanning works in the web version of the app. The photo is used as taken.');
+const unsupported = () => new Error('Scanning is not available here. The photo is used as taken.');
 
 /** Decode a photo and look for the paper in it. */
 export async function loadShot(_bytes: Uint8Array, _type: string): Promise<Shot> { throw unsupported(); }
@@ -28,4 +28,4 @@ export function previewScan(_shot: Shot, _quad: Quad, _mode: ScanMode, _turns: n
 export async function finishScan(_shot: Shot, _quad: Quad, _mode: ScanMode, _turns: number): Promise<{ bytes: Uint8Array; type: string }> { throw unsupported(); }
 
 /** Forget the decoded photo. */
-export function discardShot(_shot: Shot): void { /* nothing is held on a phone */ }
+export function discardShot(_shot: Shot): void { /* nothing is held here */ }
