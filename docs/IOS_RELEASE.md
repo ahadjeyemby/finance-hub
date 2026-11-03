@@ -4,7 +4,7 @@ Everything below builds on this Mac with Xcode. Expo SDK 58, bundle id `com.ahad
 
 ## What is already done in the repo
 
-- `app.json`: bundle identifier, build number, iPhone-only, encryption declaration (`ITSAppUsesNonExemptEncryption = false`, the app only uses HTTPS), privacy manifest for the required-reason APIs, camera and photo permission texts (no microphone).
+- `app.json`: bundle identifier, build number, iPhone and iPad (`supportsTablet`; iPhone portrait only, iPad all orientations), encryption declaration (`ITSAppUsesNonExemptEncryption = false`, the app only uses HTTPS), privacy manifest for the required-reason APIs, camera and photo permission texts (no microphone).
 - App icon: 1024x1024 light, dark and tinted PNGs, no transparency (`assets/images/ios-icon-*.png`). Splash: `assets/images/splash-icon.png`.
 - `scripts/ios-release.sh`: generates the native project, archives, exports a signed `.ipa`, optionally uploads it.
 
