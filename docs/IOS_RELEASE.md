@@ -1,6 +1,6 @@
 # Publishing Finora on iOS (local build, no Expo cloud)
 
-Everything below builds on this Mac with Xcode. Expo SDK 58, bundle id `com.ahadjeyemby.finora` (change it in `app.json` first if you want another; it can never change after the first upload).
+Everything below builds on this Mac with Xcode. Expo SDK 58, bundle id `com.sparktrum.finora` (change it in `app.json` first if you want another; it can never change after the first upload).
 
 ## What is already done in the repo
 
@@ -16,7 +16,7 @@ Everything below builds on this Mac with Xcode. Expo SDK 58, bundle id `com.ahad
 3. Note your 10-character **Team ID** (developer.apple.com > Membership details).
 
 ### 2. Create the app in App Store Connect
-1. appstoreconnect.apple.com > Apps > **+** > New App. Platform iOS, name `Finora`, primary language, bundle ID `com.ahadjeyemby.finora` (register it first under Certificates, Identifiers & Profiles > Identifiers if it is not in the list), SKU anything unique (`finora-ios`).
+1. appstoreconnect.apple.com > Apps > **+** > New App. Platform iOS, name `Finora`, primary language, bundle ID `com.sparktrum.finora` (register it first under Certificates, Identifiers & Profiles > Identifiers if it is not in the list), SKU anything unique (`finora-ios`).
 2. If the name is taken, pick another there; the on-device name stays `Finora` (`app.json` `name`).
 
 ### 3. Sign in to Xcode

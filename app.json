@@ -54,7 +54,7 @@
       "reactCompiler": true
     },
     "ios": {
-      "bundleIdentifier": "com.ahadjeyemby.finora",
+      "bundleIdentifier": "com.sparktrum.finora",
       "buildNumber": "1",
       "supportsTablet": true,
       "icon": {
